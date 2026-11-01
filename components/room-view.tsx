@@ -79,11 +79,20 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
     let stopped = false; let socket: WebSocket | null = null; let retry = 0; let lastSignal = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let ping: ReturnType<typeof setInterval> | undefined;
-    function connect() {
+    async function connect() {
       if (stopped) return;
       const url = new URL(`/api/rooms/${code}/live`, window.location.href);
       url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      socket = new WebSocket(url);
+      try {
+        if (window.location.hostname === 'hjaiedu.vercel.app') {
+          const access = await api<{ ticket: string; socketUrl: string }>(`/api/rooms/${code}/live-ticket`, { type: 'connect' });
+          if (stopped) return;
+          socket = new WebSocket(access.socketUrl, ['classroom-live', `classroom-auth.${access.ticket}`]);
+        } else socket = new WebSocket(url);
+      } catch {
+        if (!stopped) { setConnected(false); setError('실시간 연결을 다시 준비하고 있어요.'); timer = setTimeout(connect, Math.min(10_000, 500 * 2 ** retry++)); }
+        return;
+      }
       socket.onopen = () => { retry = 0; lastSignal = Date.now(); setConnected(true); setError(''); ping = setInterval(() => { if (Date.now() - lastSignal > 70_000) socket?.close(); else if (socket?.readyState === WebSocket.OPEN) socket.send('ping'); }, 30_000); };
       socket.onmessage = event => {
         lastSignal = Date.now();

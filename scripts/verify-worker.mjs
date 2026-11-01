@@ -64,6 +64,19 @@ try {
   const main = await Promise.all(Array.from({ length: 10 }, () => request('/api/rooms/MAMOAI', { type: 'join' })));
   assert(main.every(result => result.data.code === 'MAMOAI'));
   assert(main.every(result => result.data.title === '신현준 연구사 AI환경연구소'));
+  // Vercel proxies HTTP, while authenticated live connections go directly to the Worker.
+  const vercelHeaders = { origin: 'https://hjaiedu.vercel.app', 'sec-fetch-site': 'same-origin' };
+  assert.equal((await request('/api/rooms/MAMOAI/live-ticket', { type: 'connect' }, undefined, vercelHeaders)).response.status, 401);
+  const ticket = await request('/api/rooms/MAMOAI/live-ticket', { type: 'connect' }, main[0].cookie, vercelHeaders);
+  assert.equal(ticket.response.status, 200);
+  const liveHeaders = { upgrade: 'websocket', origin: 'https://hjaiedu.vercel.app', 'sec-fetch-site': 'cross-site', 'sec-websocket-protocol': `classroom-live, classroom-auth.${ticket.data.ticket}` };
+  const directLive = await mf.dispatchFetch(origin + '/api/rooms/MAMOAI/live', { headers: liveHeaders });
+  assert.equal(directLive.status, 101); assert.equal(directLive.headers.get('sec-websocket-protocol'), 'classroom-live');
+  directLive.webSocket.accept(); sockets.push(directLive.webSocket);
+  assert.equal((await mf.dispatchFetch(origin + '/api/rooms/MAMOAI/live', { headers: { ...liveHeaders, origin: 'https://evil.test' } })).status, 403);
+  assert.equal((await request('/api/rooms/MAMOAI/live-ticket', { type: 'connect' }, main[0].cookie, { origin: 'https://evil.vercel.app' })).response.status, 403);
+  const hostTicket = await request('/api/rooms/MAMOAI/live-ticket', { type: 'connect' }, host, vercelHeaders);
+  assert.equal(hostTicket.response.status, 200);
   const code = (await request('/api/rooms', { title: '50명 동시 검증' }, host)).data.code;
   const path = `/api/rooms/${code}`;
   const teacher = await connect(path, host);

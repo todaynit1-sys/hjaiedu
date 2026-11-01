@@ -7,6 +7,7 @@ import { FileStore } from './file-store';
 
 interface Env { CLASS_BOARD: DurableObjectNamespace<ClassBoard>; ASSETS: Fetcher; HOST_PASSWORD?: string }
 type Session = { purpose: 'host' | 'guest'; id: string; exp: number };
+type LiveTicket = { purpose: 'live'; code: string; auth: Session; exp: number };
 type Connection = { code: string; guest: string | null; exp: number; refreshed?: number };
 const encoder = new TextEncoder();
 const defaultPasswordHash = 'ed73aa5fbb8f0e9f11bd3d931b066c008c9e92d21531b9de73f5f75b1ac91608';
@@ -112,7 +113,22 @@ export class ClassBoard extends DurableObject<Env> {
       });
     } finally { this.pendingUploads--; }
   }
-  private async token(session: Session): Promise<string> { const value = base64(encoder.encode(JSON.stringify(session))); return `${value}.${base64(new Uint8Array(await crypto.subtle.sign('HMAC', this.signingKey, encoder.encode(value))))}`; }
+  private async token(session: Session | LiveTicket): Promise<string> { const value = base64(encoder.encode(JSON.stringify(session))); return `${value}.${base64(new Uint8Array(await crypto.subtle.sign('HMAC', this.signingKey, encoder.encode(value))))}`; }
+  private async liveAuth(request: Request, code: string): Promise<Session | null> {
+    if (request.headers.get('origin') !== 'https://hjaiedu.vercel.app') return null;
+    const protocols = request.headers.get('sec-websocket-protocol')?.split(',').map(value => value.trim()) ?? [];
+    if (!protocols.includes('classroom-live')) return null;
+    const ticket = protocols.find(value => value.startsWith('classroom-auth.'))?.slice('classroom-auth.'.length);
+    if (!ticket || ticket.length > 2000) return null;
+    try {
+      const [payload, signature, extra] = ticket.split('.');
+      if (extra || !signature || !await crypto.subtle.verify('HMAC', this.signingKey, decode(signature), encoder.encode(payload))) return null;
+      const value = JSON.parse(new TextDecoder().decode(decode(payload))) as LiveTicket;
+      if (value.purpose !== 'live' || value.code !== code || value.exp <= Date.now() || value.exp > Date.now() + 65_000) return null;
+      const auth = value.auth;
+      return auth && ['host', 'guest'].includes(auth.purpose) && typeof auth.id === 'string' && typeof auth.exp === 'number' && auth.exp > Date.now() ? auth : null;
+    } catch { return null; }
+  }
   private async session(request: Request, purpose: Session['purpose']): Promise<Session | null> {
     const value = request.headers.get('cookie')?.split(';').map(s => s.trim()).find(s => s.startsWith(`cb_${purpose}=`))?.slice(purpose.length + 4);
     if (!value || value.length > 1000) return null;
@@ -204,19 +220,28 @@ export class ClassBoard extends DurableObject<Env> {
           while (await this.ctx.storage.get(`room:${room.code}`)) room = newRoom(room.title);
           await this.ctx.storage.put(`room:${room.code}`, room); return json({ code: room.code });
         }
+        const liveTicket = /^\/api\/rooms\/([A-Z0-9]{6})\/live-ticket$/.exec(path);
+        if (liveTicket) {
+          if (request.method !== 'POST') throw new AppError('지원하지 않는 요청입니다.', 405);
+          const auth = host ?? guestSession;
+          if (!auth) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+          await this.room(liveTicket[1]);
+          return json({ ticket: await this.token({ purpose: 'live', code: liveTicket[1], auth, exp: Date.now() + 60_000 }), socketUrl: `wss://mamo-edu.hjsy.workers.dev/api/rooms/${liveTicket[1]}/live` });
+        }
         const match = /^\/api\/rooms\/([A-Z0-9]{6})(\/live)?$/.exec(path);
         if (!match) throw new AppError('요청 주소를 확인해주세요.', 404);
         const code = match[1]; let room = await this.room(code);
         if (match[2]) {
-          sameOrigin(request);
+          const ticketAuth = await this.liveAuth(request, code);
+          if (!ticketAuth) sameOrigin(request);
           if (request.method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') throw new AppError('실시간 연결이 필요합니다.', 426);
-          if (!host && !guestSession) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+          if (!ticketAuth && !host && !guestSession) throw new AppError('먼저 강의실에 참여해주세요.', 401);
           if (this.ctx.getWebSockets().length >= 256) throw new AppError('접속자가 많습니다. 잠시 후 다시 연결해주세요.', 429);
           const [client, server] = Object.values(new WebSocketPair());
-          const auth = host ?? guestSession!;
-          server.serializeAttachment({ code, guest: host ? null : guest, exp: auth.exp } satisfies Connection);
+          const auth = ticketAuth ?? host ?? guestSession!;
+          server.serializeAttachment({ code, guest: auth.purpose === 'host' ? null : auth.id, exp: auth.exp } satisfies Connection);
           this.ctx.acceptWebSocket(server); this.broadcast(room);
-          return new Response(null, { status: 101, webSocket: client });
+          return new Response(null, { status: 101, webSocket: client, ...(ticketAuth ? { headers: { 'Sec-WebSocket-Protocol': 'classroom-live' } } : {}) });
         }
         if (request.method === 'GET') return json(this.view(room, guest));
         if (request.method !== 'POST') throw new AppError('지원하지 않는 요청입니다.', 405);
