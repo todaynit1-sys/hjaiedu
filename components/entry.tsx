@@ -24,7 +24,7 @@ export function Entry({ preview }: { preview: boolean }) {
         <form onSubmit={enter} className="entry-form"><label htmlFor="room-code">강의실 참여 코드</label><div className="entry-field"><input id="room-code" ref={inputRef} value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} maxLength={6} placeholder="6자리 코드 입력" autoComplete="off" autoCapitalize="characters" spellCheck={false} aria-invalid={Boolean(error)} aria-describedby={error ? 'entry-error' : 'entry-hint'} /><button className="primary" disabled={busy} type="submit">{busy ? '참여 중' : '참여하기'}<ArrowRight size={18} /></button></div><p id="entry-hint" className="hint">로그인 없이 참여할 수 있어요.</p>{error && <p id="entry-error" role="alert" className="error">{error}</p>}</form>
         {preview && <a className="demo-link" href="/room/DEMO26">강의실 미리 둘러보기 <ArrowUpRight size={16} /></a>}
       </section>
-      <section className="entry-art" aria-label={APP_SUBTITLE}><img src="/branding/hj-environment-wordmark.svg" width={680} height={320} alt={`${CLASSROOM_NAME} · 실시간 강의실`} /></section>
+      <section className="entry-art" aria-label={APP_SUBTITLE}><img src="/branding/ai-environment-wordmark-v1.svg" width={680} height={320} alt={`${CLASSROOM_NAME} · 실시간 강의실`} /></section>
     </main><footer className="entry-footer"><span>{CLASSROOM_NAME}</span><span>채팅 · 자료 공유 · 실시간 투표</span><ContactLink /></footer>
   </div>;
 }

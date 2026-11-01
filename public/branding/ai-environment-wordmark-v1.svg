@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="200" viewBox="0 0 680 200" fill="none">
+  <title>AI환경연구소 · 신현준 연구사 실시간 강의실</title>
+  <g transform="translate(20 20) scale(1.3)">
+    <path d="M9 100 37 21h17l28 79H64L45 43l-19 57Z" fill="#273c6b"/>
+    <path d="M29 78h33v14H24ZM89 42h17v58H89Z" fill="#273c6b"/>
+    <circle cx="97.5" cy="24" r="9.5" fill="#3a8b82"/>
+  </g>
+  <g font-family="Malgun Gothic,Pretendard,sans-serif">
+    <text x="198" y="97" font-size="45" font-weight="700" letter-spacing="-1.5" fill="#273c6b">AI환경연구소</text>
+    <text x="200" y="138" font-size="22" fill="#526175">신현준 연구사 실시간 강의실</text>
+  </g>
+</svg>

@@ -4,7 +4,7 @@
 
 소스 저장소: https://github.com/todaynit1-sys/hjaiedu
 
-문의: **hjuni@korea.kr**. HJ 이니셜과 잎을 결합한 자체 벡터 로고, 네이비 헤더, 읽기 쉬운 채팅 화면을 사용합니다. 로고 원본은 `public/branding/hj-environment-symbol.svg`, 가로 로고는 `hj-environment-wordmark.svg`입니다.
+문의: **hjuni@korea.kr**. 선택한 6번 AI 글자형 벡터 로고, 네이비 헤더, 읽기 쉬운 채팅 화면을 사용합니다. 로고 원본은 `public/branding/ai-environment-mark-v1.svg`, 가로 로고는 `ai-environment-wordmark-v1.svg`입니다.
 
 - 수강생 주소: https://mamo-edu.hjsy.workers.dev/
 - Vercel 수강생 주소: https://hjaiedu.vercel.app/
@@ -47,4 +47,4 @@ Cloudflare 대시보드 → Workers & Pages → 기존 `mamo-edu` Worker → Set
 
 Cloudflare 계정 `1ab0cc202cc88e4caa80a36f2450d352`에 인증된 환경에서 `npm run deploy`를 실행합니다. `wrangler.jsonc`의 Worker 이름과 Durable Object 클래스·migration을 유지하면 운영 데이터를 이어서 사용합니다. 강사 코드는 선택적으로 `HOST_PASSWORD` secret으로 설정할 수 있습니다.
 
-화면의 연구소명·강사명은 `lib/brand.ts`, 새 심볼·워드마크·공유 이미지는 `public/branding/hj-environment-*`에 있습니다. 공기 심볼은 강의실을 위해 만든 독자적인 그래픽입니다. 브랜드 표기는 신현준 연구사 AI환경연구소입니다.
+화면의 연구소명·강사명은 `lib/brand.ts`, 새 심볼·워드마크·공유 이미지는 `public/branding/ai-environment-*`에 있습니다. 공기 심볼은 강의실을 위해 만든 독자적인 그래픽입니다. 브랜드 표기는 신현준 연구사 AI환경연구소입니다.
