@@ -48,3 +48,7 @@ Cloudflare 대시보드 → Workers & Pages → 기존 `mamo-edu` Worker → Set
 Cloudflare 계정 `1ab0cc202cc88e4caa80a36f2450d352`에 인증된 환경에서 `npm run deploy`를 실행합니다. `wrangler.jsonc`의 Worker 이름과 Durable Object 클래스·migration을 유지하면 운영 데이터를 이어서 사용합니다. 강사 코드는 선택적으로 `HOST_PASSWORD` secret으로 설정할 수 있습니다.
 
 화면의 연구소명·강사명은 `lib/brand.ts`, 새 심볼·워드마크·공유 이미지는 `public/branding/ai-environment-*`에 있습니다. 공기 심볼은 강의실을 위해 만든 독자적인 그래픽입니다. 브랜드 표기는 신현준 연구사 AI환경연구소입니다.
+
+## 카카오톡 공유 썸네일
+
+6번 AI 글자형 로고를 바탕으로 만든 입체 네이비·청록색 공유 이미지입니다. 파일은 public/branding/ai-environment-kakao-v3.png (1730×909 PNG)이며 Open Graph와 Twitter 메타태그에 연결합니다. 새 파일명으로 배포하며 카카오 서버의 기존 URL 스크랩 캐시는 별도로 남아 있을 수 있습니다.
