@@ -19,7 +19,7 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   assert.equal(await page.getByLabel('강의실 참여 코드',{exact:true}).count(),0);
   await page.screenshot({ path: '.local/screenshots/home-desktop.png', fullPage: true });
   await page.keyboard.press('Tab'); assert.equal(await page.locator('.skip-link').evaluate(el=>el===document.activeElement),true);
-  await page.getByRole('link',{name:'강사 로그인',exact:true}).click();
+  for (let tap = 0; tap < 5; tap++) await page.getByRole('button',{name:'AI환경연구소 로고',exact:true}).click();
   await page.getByLabel('강사 접속 코드').fill(process.env.TEST_HOST_PASSWORD || '0423');
   await page.getByRole('button', { name: '강사로 들어가기' }).click();
   await page.getByRole('heading', { name: '실시간 채팅',exact:true }).waitFor();
