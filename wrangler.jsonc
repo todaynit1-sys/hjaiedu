@@ -1,0 +1,31 @@
+{
+  "name": "mamo-edu",
+  "account_id": "1ab0cc202cc88e4caa80a36f2450d352",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-09",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CLASS_BOARD",
+        "class_name": "ClassBoard"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "ClassBoard"
+      ]
+    }
+  ]
+}

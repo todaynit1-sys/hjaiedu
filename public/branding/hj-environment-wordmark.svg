@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="160" viewBox="0 0 680 160" fill="none">
+  <title>신현준 연구사 AI환경연구소</title>
+  <g transform="translate(16 24) scale(1.75)">
+    <rect width="64" height="64" rx="18" fill="#0f1b4c"/>
+    <path d="M17 19v27M17 32h19M36 19v22c0 5-3 8-8 8-4 0-7-2-8-5" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43 13c4-1 8-1 10 0 0 6-2 11-7 12-4 0-6-4-5-8l2-4Z" fill="#eef1f8"/>
+    <path d="m44 21 6-6" stroke="#4656a5" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="17" cy="19" r="3" fill="#eef1f8"/>
+  </g>
+  <g font-family="Pretendard,Malgun Gothic,Apple SD Gothic Neo,sans-serif">
+    <text x="154" y="61" font-size="23" font-weight="550" letter-spacing="1" fill="#4656a5">신현준 연구사</text>
+    <text x="150" y="116" font-size="48" font-weight="750" letter-spacing="-1.5" fill="#0f1b4c">AI환경연구소</text>
+  </g>
+</svg>

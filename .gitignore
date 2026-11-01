@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.local/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Cloudflare local state and build output
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*

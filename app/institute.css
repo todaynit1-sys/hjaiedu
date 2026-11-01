@@ -1,0 +1,91 @@
+/* Personal classroom identity. Preserve the existing chat and quick-poll layout. */
+:root{--forest:#4656a5;--forest-dark:#0f1b4c;--ink:#1e293b;--muted:#526175;--paper:#f5f7fa;--line:#e2e7ee;--mint:#eef1f8}
+.live-room,.host-page,.entry-page{background:var(--paper)}
+.live-header,.entry-header{background:var(--forest-dark);border-bottom:0;box-shadow:0 2px 12px #0f1b4c12}
+.live-header{height:80px}
+.brand{gap:12px}
+.brand-mark{width:42px;height:42px}
+.live-header .brand-title,.entry-header .brand-title{color:#fff;font-size:21px;font-weight:750;letter-spacing:-.7px}
+.live-header .brand-wordmark small,.entry-header .brand-wordmark small{color:#e2e7ee;font-size:11px;line-height:1.5;letter-spacing:.01em}
+.live-header .about-link,.live-header .survey-link,.live-header .live-share,.live-header .room-settings summary,.live-header .icon-button,.entry-header .about-link,.entry-header .survey-link,.entry-header .host-entry{background:transparent;color:#fff;border-color:#4656a5;box-shadow:none}
+.live-header .about-link:hover,.live-header .survey-link:hover,.live-header .live-share:hover,.entry-header .about-link:hover{background:#35458b}
+.live-header .live-share{background:#fff;color:var(--forest-dark);border-color:#fff;font-weight:750}
+.live-header .live-share:hover{background:var(--mint);color:var(--forest-dark)}
+.live-header .live-online,.live-header .live-online b{color:#fff}
+.live-header .live-role{background:var(--forest);color:#fff}
+.live-header :focus-visible,.entry-header :focus-visible{outline:3px solid #fff;outline-offset:3px}
+.live-room .live-workspace{padding-top:24px;padding-bottom:24px;gap:24px}
+.live-chat{border-color:var(--line);border-radius:14px;box-shadow:0 6px 24px #0f1b4c08}
+.live-chat-heading{padding:17px 22px;background:#fff}
+.live-chat-heading h2{font-size:16px;color:var(--forest-dark);font-weight:750}
+.live-chat-heading h2 svg{color:var(--forest)}
+.chat-scroll{background:#fff;padding:20px 24px 12px}
+.chat-date{color:var(--muted);font-size:12px}
+.chat-empty>img{width:68px;height:68px;margin-bottom:20px}
+.chat-empty h3{color:var(--forest-dark);font-weight:700;font-size:19px}
+.chat-empty p{color:var(--muted);font-size:14px;line-height:1.7}
+.chat-filters{background:var(--mint);border-radius:8px}
+.chat-filters button{border-radius:6px;color:var(--muted)}
+.chat-filters .selected{color:var(--forest-dark);box-shadow:none}
+.materials-button{border-radius:8px;color:var(--forest-dark)}
+.chat-composer{padding:16px 18px 12px;border-top:1px solid var(--line);background:#fff}
+.chat-input-row{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:5px;align-items:center;box-shadow:none}
+.chat-input-row:focus-within{border-color:var(--forest);box-shadow:0 0 0 2px var(--mint)}
+.chat-input-row textarea{font-size:16px;background:transparent}
+.chat-send{border-radius:8px;background:var(--forest-dark);color:#fff;min-width:44px;min-height:44px}
+.chat-send:hover:not(:disabled){background:var(--forest)}
+.composer-hint{margin-top:9px;color:var(--muted)}
+.contact-link,.contact-email{color:var(--muted)}
+.contact-copy{color:var(--forest-dark)}
+.compact-poll,.compact-poll.poll-break,.compact-poll.poll-custom{border-radius:14px;border-color:var(--line);padding:18px;background:#fff;box-shadow:0 4px 18px #0f1b4c05}
+.compact-poll h3,.compact-poll.poll-break h3,.compact-poll.poll-custom h3{font-size:17px;color:var(--forest-dark);font-weight:700;line-height:1.5}
+.compact-poll-top,.compact-poll.poll-break .compact-poll-top{color:var(--muted);margin-bottom:10px}
+.compact-poll-kind svg{color:var(--forest)}
+.compact-poll-kind{font-weight:650}
+.compact-poll-total b{color:var(--forest-dark)}
+.compact-choice,.compact-poll.poll-break .compact-choice{border-radius:8px;background:var(--paper);border-color:var(--line);color:var(--ink);transition:background-color .15s,border-color .15s}
+.compact-choice.selected,.compact-poll.poll-break .compact-choice.selected{background:var(--forest-dark);border-color:var(--forest-dark);color:#fff;box-shadow:none}
+.compact-choice.selected .choice-fill{background:transparent}
+.compact-choice.selected .choice-number,.compact-poll.poll-break .compact-choice.selected .choice-number{color:#fff}
+.compact-choice:hover:not(:disabled):not(.selected){background:var(--mint);border-color:var(--forest)}
+.live-poll-scroll{gap:16px}
+.chat-avatar{background:var(--mint);color:var(--forest-dark)}
+.chat-bubble{background:var(--paper);border-color:var(--line)}
+.my-message .chat-bubble{background:var(--mint);color:var(--ink)}
+.chat-meta b{color:var(--forest-dark)}
+.settings-panel{color:var(--ink)}
+.entry-art{border:0;background:#fff;border-radius:14px;box-shadow:0 8px 28px #0f1b4c08}
+.entry-art img{padding:26px}
+.entry-copy h1{color:var(--forest-dark)}
+.share-dialog,.login-panel{border-radius:14px}
+@media(min-width:761px){.live-workspace{grid-template-columns:minmax(0,1fr) 316px}.compact-poll.poll-mood .compact-choice,.compact-poll.poll-break .compact-choice{min-height:68px}.chat-empty{max-width:400px;margin:auto}}
+@media(max-width:760px){
+ .live-header{height:68px;padding-left:12px;padding-right:12px;gap:8px}
+ .live-header .brand{gap:8px}.brand-mark{width:34px;height:34px}
+ .live-header .brand-title,.entry-header .brand-title{font-size:17px}
+ .live-header .brand-wordmark small,.entry-header .brand-wordmark small{font-size:9px}
+ .live-room .live-workspace{padding:12px 10px 10px;gap:10px}
+ .compact-poll,.compact-poll.poll-break,.compact-poll.poll-custom{padding:9px 7px 7px;border-radius:10px;box-shadow:none}
+ .compact-poll-top,.compact-poll.poll-break .compact-poll-top{margin-bottom:7px}
+ .live-poll-scroll{gap:7px;max-height:140px}
+ .compact-choice,.compact-poll.poll-break .compact-choice{border-radius:6px}
+ .live-chat{border-radius:10px;box-shadow:none}
+ .live-chat-heading{padding:9px 10px}.live-chat-heading h2{font-size:15px}
+ .chat-scroll{padding:14px 12px 8px}
+ .chat-composer{padding:8px}.chat-input-row{padding:3px}
+ .chat-empty>img{width:52px;height:52px;margin-bottom:12px}.chat-empty h3{font-size:16px}.chat-empty p{font-size:13px}
+ .composer-hint{margin-top:6px}.contact-email{font-size:10px}
+ .chat-send{min-width:40px;min-height:40px}
+ .entry-header{height:76px}.entry-header .brand{gap:8px}
+}
+@media(max-width:360px){
+ .live-header{padding-left:10px;padding-right:10px;gap:5px;height:62px}
+ .live-header .brand{gap:6px}.brand-mark{width:30px;height:30px}
+ .live-header .brand-title,.entry-header .brand-title{font-size:15px}
+ .live-header .brand-wordmark small,.entry-header .brand-wordmark small{font-size:8px}
+ .live-header-actions{gap:2px}
+ .live-header-actions .about-link,.live-header-actions .survey-link,.live-header-actions .live-share,.live-header .room-settings summary{width:30px;min-width:30px}
+ .live-room .live-workspace{padding-top:9px;gap:8px}
+ .chat-header-tools{gap:4px}.chat-filters button{padding-left:8px;padding-right:8px}
+}
+@media(prefers-reduced-motion:reduce){.compact-choice{transition:none}}
