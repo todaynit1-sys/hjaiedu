@@ -7,6 +7,7 @@
 문의: **hjuni@korea.kr**. HJ 이니셜과 잎을 결합한 자체 벡터 로고, 네이비 헤더, 읽기 쉬운 채팅 화면을 사용합니다. 로고 원본은 `public/branding/hj-environment-symbol.svg`, 가로 로고는 `hj-environment-wordmark.svg`입니다.
 
 - 수강생 주소: https://mamo-edu.hjsy.workers.dev/
+- Vercel 수강생 주소: https://hjaiedu.vercel.app/
 - 강사 주소: https://mamo-edu.hjsy.workers.dev/host?room=MAMOAI
 - 기본 참여 코드: `MAMOAI`
 - 강사 접속: 상단 공기 심볼을 5번 누른 뒤 기존 접속 코드 `0423` 입력
@@ -29,6 +30,16 @@ npm run dev
 로컬 주소는 http://localhost:3010 입니다. `scripts/verify-worker.mjs`는 로컬 런타임에서 50명 동시 접속·투표, 채팅, 권한, 파일 공유와 자정 초기화를 검증합니다.
 
 ## 배포
+
+### Vercel
+
+`todaynit1-sys/hjaiedu`의 `main`을 Vercel 프로젝트 `hjaiedu`로 가져옵니다. `vercel.json`이 Vite 빌드와 `dist` 출력을 설정합니다. 공개 배포물에는 해시가 붙은 압축 JS/CSS와 사용 중인 로고·폰트·자료만 들어가며 소스맵, 개발 문서와 서버 소스는 포함하지 않습니다. GitHub 저장소 자체는 공개이므로 개발 원본은 저장소에서 볼 수 있습니다.
+
+`/api/*`는 기존 `mamo-edu.hjsy.workers.dev`의 Worker로 연결합니다. Vercel은 화면을 제공하고 채팅·투표·파일·자정 초기화는 독립 Cloudflare 저장소에서 실행합니다. 양쪽 주소는 같은 강의실 데이터를 사용합니다. 개인 브라우저 세션은 접속 주소별로 구분됩니다.
+
+모바일은 큰 입력·전송 버튼, 16px 입력 글자, 기기 안전 영역을 적용합니다. 입력창에 포커스하면 빠른 투표 영역을 잠시 접어 키보드와 채팅 공간을 확보하고, 입력창을 벗어나면 다시 보입니다.
+
+### Cloudflare
 
 GitHub에 코드를 저장하는 것과 실제 강의실 서버를 실행하는 것은 별개입니다. 전체 기능은 Cloudflare **Workers**에 배포합니다. GitHub Pages에서는 WebSocket 서버와 데이터 저장 기능이 실행되지 않습니다.
 

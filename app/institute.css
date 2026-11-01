@@ -89,3 +89,18 @@
  .chat-header-tools{gap:4px}.chat-filters button{padding-left:8px;padding-right:8px}
 }
 @media(prefers-reduced-motion:reduce){.compact-choice{transition:none}}
+/* Phone-first input: keep the keyboard and composer in view, with larger taps. */
+@media(max-width:760px){
+ .live-header .about-link{display:none}
+ .live-header-actions .survey-link,.live-header-actions .live-share,.live-header .room-settings summary{width:44px;min-width:44px;height:44px;min-height:44px;padding:8px;gap:0}
+ .live-header-actions .survey-link>span,.live-header-actions .live-share>span{display:none}
+ .live-header-actions{gap:3px}
+ .chat-input-row{min-height:56px}
+ .chat-input-row textarea{min-height:44px;padding:10px 4px;line-height:24px;font-size:16px}
+ .chat-input-row .attach-button,.chat-send{width:44px;min-width:44px;height:44px;min-height:44px}
+ .chat-composer{padding-bottom:max(8px,env(safe-area-inset-bottom))}
+ .live-room:has(.chat-composer textarea:focus) .live-polls{display:none}
+ .live-header .live-role{display:none}
+ .is-host .live-header-actions .survey-link,.is-host .live-header-actions .live-share,.is-host .live-header .room-settings summary,.is-host .live-header-actions>.icon-button{width:36px;min-width:36px;height:40px;min-height:40px;padding:6px}
+ .chat-scroll{scroll-padding-bottom:16px}
+}

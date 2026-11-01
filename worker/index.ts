@@ -19,7 +19,8 @@ function json(value: unknown, status = 200, cookie?: string): Response {
 }
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  if ((origin && origin !== new URL(request.url).origin) || request.headers.get('sec-fetch-site') === 'cross-site') throw new AppError('다른 사이트에서 보낸 요청은 허용되지 않습니다.', 403);
+  const allowed = !origin || origin === new URL(request.url).origin || origin === 'https://hjaiedu.vercel.app';
+  if (!allowed || request.headers.get('sec-fetch-site') === 'cross-site') throw new AppError('다른 사이트에서 보낸 요청은 허용되지 않습니다.', 403);
 }
 async function discardBody(reader: ReadableStreamDefaultReader<Uint8Array>, limit: number) {
   let discarded = 0;
