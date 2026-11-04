@@ -1,5 +1,9 @@
 export const MAIN_ROOM_CODE = 'MAMOAI';
-export const CHARACTERS = ['smile', 'sprout', 'cheer', 'glasses', 'sleepy', 'cat'] as const;
+export const CHARACTERS = [
+  'smile', 'sprout', 'cheer', 'glasses', 'sleepy', 'cat',
+  'rabbit', 'puppy', 'frog', 'bear', 'penguin', 'hamster', 'seal',
+  'mushroom', 'acorn', 'cloud', 'chick', 'otter', 'panda', 'axolotl'
+] as const;
 export type Character = typeof CHARACTERS[number];
 export function defaultCharacter(seatNumber: number): Character {
   return CHARACTERS[(seatNumber - 1) % CHARACTERS.length];

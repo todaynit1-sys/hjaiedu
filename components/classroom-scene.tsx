@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, Smile, X } from 'lucide-react';
 import { Chalkboard } from './chalkboard';
+import { animalHeads } from './animal-heads';
+import { gardenHeads } from './garden-heads';
 import { CHARACTERS, defaultCharacter, type Character, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 
@@ -17,10 +19,17 @@ function DeskIcon() {
 }
 
 const characterNames: Record<Character, string> = {
-  smile: '방긋이', sprout: '새싹이', cheer: '신난이', glasses: '동글안경', sleepy: '꾸벅이', cat: '고양이'
+  smile: '방긋이', sprout: '새싹이', cheer: '신난이', glasses: '동글안경', sleepy: '꾸벅이', cat: '고양이',
+  rabbit: '쫑긋토끼', puppy: '멍뭉이', frog: '개굴이', bear: '곰곰이', penguin: '뒤뚱펭귄',
+  hamster: '볼빵햄찌', seal: '물범콩', mushroom: '버섯송이', acorn: '도토리', cloud: '몽실구름',
+  chick: '삐약이', otter: '수달이', panda: '판다콩', axolotl: '아기우파'
 };
 
+const illustratedHeads: Partial<Record<Character, ReactNode>> = { ...animalHeads, ...gardenHeads };
+
 function StudentHead({ character }: { character: Character }) {
+  const illustration = illustratedHeads[character];
+  if (illustration) return illustration;
   const head = character === 'cat'
     ? 'M26 35c-2-4-2-9 0-14l.5-10q.1-3 3-1l9 5q7-2 13 0l8-5q3-1.8 3 1l-.1 10c4 6 3 13-1 17-4 4-10 5-16 5-10 0-16-2-19.4-8Z'
     : 'M26 36c-2-5 0-12 4-17 5-6 11-8 18-7 9 1 17 9 17 18 0 7-4 11-9 13H35c-5-1-8-4-9-7Z';
@@ -62,9 +71,9 @@ function CharacterPicker({ current, onChange, onClose }: { current: Character; o
       setError(cause instanceof Error ? cause.message : '저장하지 못했어요. 다시 골라주세요.');
     }
   }
-  return <dialog ref={dialog} className="classroom-character-dialog" aria-labelledby="character-picker-title" onCancel={event => { event.preventDefault(); if (!saving) onClose(); }}>
+  return <dialog ref={dialog} className="classroom-character-dialog" aria-labelledby="character-picker-title" aria-describedby="character-picker-hint" onCancel={event => { event.preventDefault(); if (!saving) onClose(); }}>
     <div className="classroom-picker-heading"><h2 id="character-picker-title">캐릭터 선택</h2><button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label="캐릭터 선택 닫기"><X size={20} /></button></div>
-    <p>내 책상에 앉을 친구를 골라주세요.</p>
+    <p id="character-picker-hint">{CHARACTERS.length}명 중 내 책상에 앉을 친구를 골라주세요.</p>
     <div className="classroom-character-options" role="group" aria-label="캐릭터" aria-busy={saving}>
       {CHARACTERS.map(value => <button type="button" key={value} aria-pressed={current === value} disabled={saving} onClick={() => choose(value)}>
         {current === value && <Check className="classroom-character-check" size={15} aria-hidden="true" />}

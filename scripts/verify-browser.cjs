@@ -66,10 +66,20 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByRole('button',{name:'캐릭터 선택',exact:true}).click();
   const picker = student.getByRole('dialog',{name:'캐릭터 선택',exact:true});
   await picker.waitFor();
+  const choices = picker.getByRole('group',{name:'캐릭터',exact:true}).getByRole('button');
+  assert.equal(await choices.count(), 20);
+  const drawings = await choices.evaluateAll(buttons => buttons.map(button => button.querySelector('svg[viewBox="16 -2 60 48"]').innerHTML));
+  assert.equal(new Set(drawings).size, 20, 'Each character needs a distinct illustration');
   await student.screenshot({ path: '.local/screenshots/character-picker-mobile.png' });
-  await picker.getByRole('button',{name:'고양이',exact:true}).click();
-  await waitUntil(async () => (await second.locator('.classroom-seat[data-character="cat"]').filter({hasText:'수강생 01'}).count()) === 1,
-    'The other student must see the selected cat on the correct desk');
+  await student.setViewportSize({width:320,height:568});
+  assert(await choices.evaluateAll(buttons => buttons.every(button => {
+    const rect = button.getBoundingClientRect();
+    return rect.width >= 44 && rect.height >= 44;
+  })), 'All choices are tappable on a small phone');
+  await picker.getByRole('button',{name:'아기우파',exact:true}).click();
+  await waitUntil(async () => (await second.locator('.classroom-seat[data-character="axolotl"]').filter({hasText:'수강생 01'}).count()) === 1,
+    'The other student must see the selected axolotl on the correct desk');
+  await student.setViewportSize({width:390,height:844});
   assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
   await page.getByLabel('채팅 메시지',{exact:true}).fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
   await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
