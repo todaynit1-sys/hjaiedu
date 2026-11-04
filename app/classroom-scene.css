@@ -1,0 +1,301 @@
+.classroom-scene {
+  --desk-ink: #283452;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  padding: clamp(15px, 2vw, 28px);
+  background: linear-gradient(165deg, #fff 15%, #f5f7fc 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--forest-dark);
+  box-shadow: 0 6px 24px #0f1b4c08;
+}
+.classroom-scene-heading {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-bottom: 16px;
+}
+.classroom-scene-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--forest-dark);
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 770;
+  letter-spacing: -.055em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.classroom-board {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  flex: none;
+  width: 92%;
+  align-self: center;
+  height: clamp(106px, 16vh, 164px);
+  padding: 9px 25px 12px;
+  color: #fffcf0;
+  border: 6px solid #dfba87;
+  border-radius: 11px 11px 7px 7px;
+  background:
+    radial-gradient(ellipse at 23% 90%, #7fa99426, transparent 65%),
+    linear-gradient(105deg, #285a47, #204b3e 75%);
+  box-shadow: inset 0 2px 4px #15372990, 0 4px 9px #3935281b;
+}
+.classroom-board-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-height: 100%;
+  padding: 3px 9px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff75 transparent;
+  overscroll-behavior: contain;
+  text-align: center;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.classroom-board-content p {
+  margin: 0;
+  font-size: clamp(20px, 2.45vw, 36px);
+  font-weight: 670;
+  line-height: 1.5;
+  letter-spacing: -.045em;
+  white-space: pre-wrap;
+  text-shadow: 0 1px 1px #182e2490;
+}
+.classroom-board-content .classroom-board-long {
+  font-size: clamp(16px, 1.55vw, 22px);
+  font-weight: 540;
+}
+.classroom-board-welcome::after {
+  content: "";
+  display: block;
+  width: clamp(60px, 22%, 125px);
+  height: 5px;
+  margin: -1px auto 2px;
+  border-bottom: 2px solid #f4edce;
+  border-radius: 50%;
+  transform: rotate(-2deg);
+}
+.classroom-board-content a {
+  display: inline-block;
+  margin: 2px 4px;
+  padding: 1px 4px;
+  font-size: 14px;
+  font-weight: 580;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.classroom-board-content a svg { margin-right: 5px; }
+.classroom-board-content:focus-visible,
+.classroom-board-content a:focus-visible {
+  outline: 2px solid #fff9db;
+  outline-offset: -2px;
+  border-radius: 3px;
+}
+.classroom-board-sprout {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  color: #d9efca;
+  opacity: .82;
+  pointer-events: none;
+  transform: rotate(7deg);
+}
+.classroom-board-ledge {
+  position: absolute;
+  left: -9px;
+  right: -9px;
+  bottom: -7px;
+  height: 8px;
+  border-radius: 2px 2px 5px 5px;
+  background: linear-gradient(#f7deaf, #dfb57c);
+  border-bottom: 2px solid #be9768;
+  box-shadow: 0 3px 4px #453a2615;
+}
+.classroom-board-ledge::before {
+  content: "";
+  position: absolute;
+  left: 9%;
+  bottom: 100%;
+  width: 23px;
+  height: 5px;
+  border-radius: 4px;
+  background: #f6f3e7;
+  transform: rotate(-2deg);
+}
+.classroom-seats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: 1;
+  align-content: space-evenly;
+  gap: clamp(13px, 2.6vh, 30px) 6px;
+  margin: 0;
+  padding: 35px 2px 12px;
+  list-style: none;
+}
+.classroom-seat {
+  position: relative;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  min-width: 0;
+  color: #5d6a82;
+}
+.classroom-desk-wrap {
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  min-width: 0;
+}
+.classroom-desk {
+  display: block;
+  width: min(94%, 95px);
+  height: auto;
+  overflow: visible;
+}
+.classroom-desk-front { fill: #edf1f7; }
+.classroom-empty-chair {
+  stroke: #a6b1c4;
+  fill: #f3f5f9;
+  stroke-width: 1.6;
+}
+.classroom-seat.is-occupied { color: var(--desk-ink); }
+.classroom-seat.is-occupied .classroom-desk-front { fill: #dde6f5; }
+.classroom-seat.is-mine .classroom-desk-front { stroke: #4656a5; fill: #e5e9ff; }
+.classroom-seat-bubble {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  translate: -50% 0;
+  bottom: calc(100% - 7px);
+  width: max-content;
+  max-width: calc(100% + 3px);
+  padding: 4px 9px;
+  border: 1.5px solid var(--desk-ink);
+  border-radius: 13px;
+  background: #fffefa;
+  box-shadow: 0 2px 4px #0f1b4c11;
+  text-align: center;
+  color: var(--forest-dark);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  animation: classroom-speak .16s ease-out;
+}
+.classroom-seat-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: calc(50% - 4px);
+  width: 6px;
+  height: 6px;
+  border: solid var(--desk-ink);
+  border-width: 0 1.5px 1.5px 0;
+  background: inherit;
+  transform: rotate(45deg);
+}
+.classroom-seat-bubble span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.classroom-seating-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-height: 25px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.classroom-seating-footer p, .classroom-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.classroom-own-seat {
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+  font-weight: 620;
+  color: var(--forest);
+}
+.classroom-own-seat b, .classroom-page-controls span { font-variant-numeric: tabular-nums; }
+.classroom-page-controls { gap: 0; }
+.classroom-page-controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  color: var(--forest-dark);
+}
+.classroom-page-controls button:not(:disabled):hover { background: var(--mint); }
+.classroom-mobile-announcement { display: none; }
+@keyframes classroom-speak {
+  from { opacity: 0; transform: translateY(3px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (max-width: 760px) {
+  .classroom-mobile-announcement { display: block; }
+  .classroom-scene {
+    padding: 10px 12px 6px;
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  .classroom-scene-heading { gap: 3px 9px; margin-bottom: 8px; }
+  .classroom-scene-heading h2 { gap: 5px; font-size: 19px; }
+  .classroom-scene-heading h2 svg { width: 19px; height: 19px; }
+  .classroom-board {
+    width: 96%;
+    height: clamp(78px, 13dvh, 112px);
+    padding: 7px 13px 8px;
+    border-width: 4px;
+    border-radius: 8px;
+  }
+  .classroom-board-content p { font-size: clamp(18px, 5.2vw, 26px); }
+  .classroom-board-content .classroom-board-long { font-size: 15px; }
+  .classroom-board-content a { font-size: 13px; }
+  .classroom-board-sprout { width: 18px; height: 24px; right: 4px; bottom: 2px; }
+  .classroom-board-ledge { left: -6px; right: -6px; height: 6px; bottom: -5px; }
+  .classroom-board-ledge::before { width: 17px; height: 4px; }
+  .classroom-seats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(7px, 1.2dvh, 13px) 2px;
+    padding: 25px 0 3px;
+  }
+  .classroom-desk { width: min(94%, clamp(55px, 8dvh, 76px)); }
+  .classroom-seat-bubble { bottom: calc(100% - 5px); padding: 2px 6px; font-size: 11px; }
+  .classroom-seating-footer { min-height: 24px; font-size: 11px; }
+}
+@media (max-width: 760px) and (max-height: 620px) {
+  .classroom-scene { padding: 5px 10px; }
+  .classroom-scene-heading { margin-bottom: 4px; }
+  .classroom-board { height: 62px; padding: 2px 10px; }
+  .classroom-board-content p { font-size: 17px; line-height: 1.25; }
+  .classroom-seats { gap: 3px 2px; padding-top: 17px; }
+  .classroom-desk { width: min(94%, 50px); }
+  .classroom-desk text { font-size: 16px; }
+  .classroom-seating-footer { min-height: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .classroom-seat-bubble { animation: none; }
+}

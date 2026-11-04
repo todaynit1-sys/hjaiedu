@@ -1,16 +1,15 @@
-import { Check, Coffee, Meh, Plus, Settings2, Smile, Sparkles } from 'lucide-react';
+import { Check, Frown, Meh, Plus, Settings2, Smile, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { PublicPoll } from '../lib/types';
 export function PollCard({ poll, host, active, busy, onAction, onManage }: { poll: PublicPoll; host: boolean; active: boolean; busy: boolean; onAction: (input: Record<string, unknown>, success: string) => Promise<void>; onManage: () => void }) {
-  const Icon = poll.kind === 'mood' ? Smile : poll.kind === 'break' ? Coffee : Sparkles;
-  const choices = [Smile, Meh, Coffee];
+  const Icon = poll.kind === 'mood' ? Smile : Sparkles;
+  const choices = [Smile, Meh, Frown];
   const showFooter = !poll.open || !active || (!host && poll.myVote !== null) || (host && active);
   return <section className={`compact-poll poll-${poll.kind}`} aria-labelledby={`poll-${poll.id}`}>
-    <div className="compact-poll-top"><span className="compact-poll-kind"><Icon size={15} />{poll.kind === 'mood' ? '오늘의 컨디션' : poll.kind === 'break' ? '쉬어가는 시간' : '우리의 질문'}</span><span className="compact-poll-total"><b>{poll.total}</b>명</span></div><h3 id={`poll-${poll.id}`}>{poll.question}</h3>
+    <div className="compact-poll-top"><span className="compact-poll-kind"><Icon size={15} />{poll.kind === 'mood' ? '컨디션 투표' : '수업 투표'}</span><span className="compact-poll-total"><b>{poll.total}</b>명</span></div><h3 id={`poll-${poll.id}`}>{poll.question}</h3>
     <div className="compact-choices" aria-label="응답 결과">{poll.options.map((option, i) => {
       const ChoiceIcon = choices[i % choices.length]; const percentage = poll.total ? Math.round(poll.counts[i] / poll.total * 100) : 0;
-      const label = poll.kind === 'mood' ? ['좋아요', '보통', '힘들어요'][i] : poll.kind === 'break' ? ['계속해요', '쉬고 싶어요'][i] : option;
-      const content = <><span className="choice-fill" style={{ width: `${percentage}%` }} aria-hidden="true" />{poll.kind === 'mood' && <ChoiceIcon size={19} />}<span className="choice-name">{label}</span><span className="choice-number">{poll.counts[i]}<small>명</small></span></>;
+      const content = <><span className="choice-fill" style={{ width: `${percentage}%` }} aria-hidden="true" />{poll.kind === 'mood' && <ChoiceIcon size={19} />}<span className="choice-name">{option}</span><span className="choice-number">{poll.counts[i]}<small>명</small></span></>;
       return host ? <div key={i} className="compact-choice" aria-label={`${option} ${poll.counts[i]}명`}>{content}</div> : <button key={i} className={`compact-choice ${poll.myVote === i ? 'selected' : ''}`} disabled={!active || !poll.open || busy} aria-label={option} aria-pressed={poll.myVote === i} onClick={() => onAction({ type: 'vote', pollId: poll.id, option: i }, `${option}로 응답했어요.`)}>{content}</button>;
     })}</div>{showFooter && <div className="compact-poll-foot">{(!poll.open || !active || (!host && poll.myVote !== null)) && <span>{!poll.open || !active ? '마감된 투표' : <span className="answered"><Check size={11} />응답 완료</span>}</span>}{host && active && <button className="poll-manage-button" disabled={busy} onClick={onManage} aria-label={`${poll.question} 투표 관리`} aria-haspopup="dialog"><Settings2 size={13} />관리</button>}</div>}
   </section>;

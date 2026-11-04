@@ -1,0 +1,152 @@
+.classroom-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: clamp(12px, 1.7vw, 26px);
+  width: min(100%, 1440px);
+  min-height: 0;
+  flex: 1;
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 28px);
+}
+
+.classroom-mobile-tools { display: none; }
+.classroom-pane {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.classroom-workspace > .live-chat {
+  grid-column: 2;
+  grid-row: 1;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 0;
+  box-shadow: none;
+}
+.classroom-pane > .classroom-scene { flex: 1 0 auto; }
+.classroom-workspace > .chat-composer {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0 0 16px 16px;
+}
+.classroom-workspace .live-chat-heading { padding: 12px clamp(10px, 1vw, 18px); }
+.classroom-workspace .live-chat-heading h2 { white-space: nowrap; }
+.classroom-workspace .new-messages { bottom: 12px; }
+.classroom-workspace .chat-meta { align-items: baseline; color: var(--muted); }
+.classroom-workspace .chat-bubble { padding: 9px 13px; }
+.classroom-workspace .my-message .chat-bubble p > a,
+.classroom-workspace .my-message .chat-link { color: var(--forest); border-color: var(--line); }
+.classroom-workspace .teacher-message .chat-bubble { background: #edf0fb; border-color: #dce2f3; }
+.classroom-workspace .chat-empty { margin: 3vh auto; padding: 12px; color: var(--forest); }
+.classroom-workspace .chat-empty svg { display: block; margin: 0 auto 12px; }
+.classroom-workspace .chat-empty h3 { font-size: 16px; }
+.classroom-workspace .chat-empty p { font-size: 13px; }
+.classroom-workspace .composer-instructions { display: none; }
+.classroom-workspace .composer-meta { flex: 1; justify-content: space-between; }
+.classroom-mood, .classroom-link-filter, .classroom-poll-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 36px;
+  padding: 5px 10px;
+  border: 1px solid #d6ddea;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--forest-dark);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.classroom-mood svg:first-of-type {
+  color: #614924;
+  background: radial-gradient(circle closest-side, #ffdd79 80%, transparent 82%);
+}
+.classroom-mood:hover, .classroom-poll-tools button:hover,
+.classroom-link-filter:hover, .classroom-link-filter[aria-pressed="true"] {
+  background: var(--mint);
+  border-color: var(--forest);
+}
+.classroom-poll-tools { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 2px; }
+.classroom-polls-dialog { text-align: left; overflow-y: auto; }
+.classroom-polls-dialog h2 { padding-right: 36px; }
+.classroom-poll-list { display: grid; gap: 10px; margin-top: 16px; }
+.classroom-poll-list .compact-poll { min-height: 0; padding: 14px; }
+.classroom-poll-list .compact-poll h3 { font-size: 16px; }
+.classroom-poll-list .compact-poll .compact-choices { display: grid; grid-template-columns: 1fr; }
+.classroom-poll-list .compact-poll .compact-choice {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 7px 12px;
+  gap: 9px;
+}
+.classroom-poll-list .compact-poll .compact-choice .choice-name { flex: 1; font-size: 14px; }
+.classroom-poll-list .compact-choice > svg { display: block; }
+
+@media (max-width: 760px) {
+  .live-room { height: min(100dvh, var(--visible-room-height, 100dvh)); min-height: 0; padding-bottom: 0; }
+  .classroom-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0;
+    padding: 6px 8px max(4px, env(safe-area-inset-bottom));
+  }
+  .classroom-mobile-tools {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+  .classroom-switch {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3px;
+    flex: 1;
+    padding: 2px;
+    border: 1px solid #d7dfef;
+    border-radius: 10px;
+    background: var(--mint);
+  }
+  .classroom-switch button {
+    min-height: 40px;
+    padding: 2px;
+    border-radius: 7px;
+    color: var(--forest-dark);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .classroom-switch button[aria-pressed="true"] { color: #fff; background: var(--forest); }
+  .classroom-mobile-tools .materials-button { min-height: 44px; padding: 5px 10px; font-size: 12px; }
+  .classroom-workspace > .classroom-pane, .classroom-workspace > .live-chat {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .classroom-workspace[data-view="classroom"] > .live-chat,
+  .classroom-workspace[data-view="chat"] > .classroom-pane { display: none; }
+  .classroom-workspace > .chat-composer { grid-column: 1; grid-row: 3; padding: 6px 7px; }
+  .classroom-workspace[data-view="classroom"] > .chat-composer { border-radius: 12px; }
+  .classroom-workspace .chat-header-tools .materials-button { display: none; }
+  .classroom-workspace .chat-input-row textarea { font-size: 16px; }
+  .classroom-workspace .composer-hint { margin: 2px 2px 0; }
+  .classroom-workspace .chat-meta b { font-size: 12px; }
+  .classroom-workspace .chat-bubble { font-size: 14px; }
+  .classroom-mood { min-height: 40px; }
+  .classroom-poll-tools button, .classroom-link-filter { min-height: 44px; }
+}
+
+@media (max-width: 760px) and (max-height: 500px) {
+  .classroom-workspace .composer-hint { display: none; }
+  .live-room:has(.chat-composer textarea:focus) .live-header,
+  .live-room:has(.chat-url input:focus) .live-header { display: none; }
+}

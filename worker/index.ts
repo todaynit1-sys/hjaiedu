@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { AppError, ensureDay, mutate, newRoom, snapshot, text, today } from '../lib/domain';
+import { AppError, ensureDay, mutate, newRoom, participantName, snapshot, text, today } from '../lib/domain';
 import { MAIN_ROOM_CODE, type Room } from '../lib/types';
 import { CLASSROOM_NAME as APP_NAME } from '../lib/brand';
 import { MAX_FILE_BYTES } from '../lib/files';
@@ -41,6 +41,9 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 }
 function cookie(request: Request, purpose: Session['purpose'], token: string, age: number): string {
   return `cb_${purpose}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${new URL(request.url).protocol === 'https:' ? '; Secure' : ''}`;
+}
+function checkRoomSize(room: Room) {
+  if (encoder.encode(JSON.stringify(room)).byteLength > 900_000) throw new AppError('오늘 강의실의 저장 한도에 도달했습니다. 메시지를 일부 삭제해주세요.', 409);
 }
 export function nextMidnight(now = new Date()): number { return Date.parse(`${today(now)}T00:00:00+09:00`) + 86_400_000; }
 
@@ -107,7 +110,7 @@ export class ClassBoard extends DurableObject<Env> {
         mutate(room, { type: 'message', text: caption.trim() || name, url, date }, null, true);
         const file = { id, name, size };
         room.days[date].messages.at(-1)!.attachment = file;
-        if (encoder.encode(JSON.stringify(room)).byteLength > 900_000) throw new AppError('오늘 강의실의 저장 한도에 도달했습니다. 메시지를 일부 삭제해주세요.', 409);
+        checkRoomSize(room);
         this.files.save(room, date, file, bytes, digest); this.broadcast(room);
         return json(this.view(room, null));
       });
@@ -138,30 +141,47 @@ export class ClassBoard extends DurableObject<Env> {
       return result.purpose === purpose && typeof result.id === 'string' && typeof result.exp === 'number' && result.exp > Date.now() ? result : null;
     } catch { return null; }
   }
-  private async room(code: string): Promise<Room> {
+  private async room(code: string, arriving?: string): Promise<Room> {
     let room = await this.ctx.storage.get<Room>(`room:${code}`);
     if (!room && code === MAIN_ROOM_CODE) { room = newRoom(APP_NAME); room.code = MAIN_ROOM_CODE; await this.ctx.storage.put(`room:${code}`, room); }
     if (!room) throw new AppError('강의실을 찾을 수 없습니다. 참여 코드를 확인해주세요.', 404);
     if (code === MAIN_ROOM_CODE && ['현준선영 AI 교육', 'HJSY AI edu', 'HJSY AI Edu', '수도권대기환경청 · 신현준 연구사'].includes(room.title)) { room.title = APP_NAME; await this.ctx.storage.put(`room:${code}`, room); }
-    if (!room.days[today()] || Object.keys(room.days).length !== 1) { ensureDay(room); await this.ctx.storage.put(`room:${code}`, room); }
+    await this.prepareClassroom(room, arriving);
     return room;
   }
-  private view(room: Room, guest: string | null, excluding?: WebSocket) {
+  private connectedGuests(code: string, excluding?: WebSocket) {
     const presence = new Set<string>();
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === excluding || ws.readyState !== 1) continue;
       const peer = ws.deserializeAttachment() as Connection;
-      if (peer.code === room.code && peer.guest && peer.exp > Date.now()) presence.add(peer.guest);
+      if (peer.code === code && peer.guest && peer.exp > Date.now()) presence.add(peer.guest);
     }
-    return { ...snapshot(room, today(), guest, 'cloud'), online: presence.size };
+    return presence;
+  }
+  private async prepareClassroom(room: Room, arriving?: string) {
+    const date = today();
+    const oldDay = room.days[date];
+    let changed = !oldDay || Object.keys(room.days).length !== 1 || oldDay.polls.some(poll => poll.kind === 'break');
+    const day = ensureDay(room, date);
+    // Include hibernated sockets across deployments and at the Seoul midnight rollover.
+    const present = this.connectedGuests(room.code);
+    if (arriving) present.add(arriving);
+    for (const id of present) {
+      if (!day.participants?.[id]) { participantName(day, id); changed = true; }
+    }
+    if (changed) { checkRoomSize(room); await this.ctx.storage.put(`room:${room.code}`, room); }
+  }
+  private view(room: Room, guest: string | null, present = this.connectedGuests(room.code)) {
+    return snapshot(room, today(), guest, 'cloud', present);
   }
   private broadcast(room: Room, excluding?: WebSocket) {
+    const present = this.connectedGuests(room.code, excluding);
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === excluding || ws.readyState !== 1) continue;
       const peer = ws.deserializeAttachment() as Connection;
       if (peer.exp <= Date.now()) { ws.close(1008, '다시 참여해주세요.'); continue; }
       if (peer.code !== room.code) continue;
-      try { ws.send(JSON.stringify({ type: 'snapshot', data: this.view(room, peer.guest, excluding) })); } catch { /* Closing clients reconnect themselves. */ }
+      try { ws.send(JSON.stringify({ type: 'snapshot', data: this.view(room, peer.guest, present) })); } catch { /* Closing clients reconnect themselves. */ }
     }
   }
   async fetch(request: Request): Promise<Response> {
@@ -230,20 +250,22 @@ export class ClassBoard extends DurableObject<Env> {
         }
         const match = /^\/api\/rooms\/([A-Z0-9]{6})(\/live)?$/.exec(path);
         if (!match) throw new AppError('요청 주소를 확인해주세요.', 404);
-        const code = match[1]; let room = await this.room(code);
+        const code = match[1];
         if (match[2]) {
           const ticketAuth = await this.liveAuth(request, code);
           if (!ticketAuth) sameOrigin(request);
           if (request.method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') throw new AppError('실시간 연결이 필요합니다.', 426);
           if (!ticketAuth && !host && !guestSession) throw new AppError('먼저 강의실에 참여해주세요.', 401);
           if (this.ctx.getWebSockets().length >= 256) throw new AppError('접속자가 많습니다. 잠시 후 다시 연결해주세요.', 429);
-          const [client, server] = Object.values(new WebSocketPair());
           const auth = ticketAuth ?? host ?? guestSession!;
+          const room = await this.room(code, auth.purpose === 'guest' ? auth.id : undefined);
+          const [client, server] = Object.values(new WebSocketPair());
           server.serializeAttachment({ code, guest: auth.purpose === 'host' ? null : auth.id, exp: auth.exp } satisfies Connection);
           this.ctx.acceptWebSocket(server); this.broadcast(room);
           return new Response(null, { status: 101, webSocket: client, ...(ticketAuth ? { headers: { 'Sec-WebSocket-Protocol': 'classroom-live' } } : {}) });
         }
-        if (request.method === 'GET') return json(this.view(room, guest));
+        let room = await this.room(code);
+        if (request.method === 'GET') return json(this.view(room, host ? null : guest));
         if (request.method !== 'POST') throw new AppError('지원하지 않는 요청입니다.', 405);
         let setCookie: string | undefined;
         if (input.type === 'join') {
@@ -255,10 +277,10 @@ export class ClassBoard extends DurableObject<Env> {
           if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
         } else {
           room = structuredClone(room); mutate(room, input, guest, Boolean(host));
-          if (encoder.encode(JSON.stringify(room)).byteLength > 900_000) throw new AppError('오늘 강의실의 저장 한도에 도달했습니다. 메시지를 일부 삭제해주세요.', 409);
+          checkRoomSize(room);
           this.files.saveRoom(room); this.broadcast(room);
         }
-        return json(this.view(room, guest), 200, setCookie);
+        return json(this.view(room, host ? null : guest), 200, setCookie);
       } catch (error) {
         if (!(error instanceof AppError)) console.error('Classroom request failed', error);
         return json({ error: error instanceof AppError ? error.message : '연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.' }, error instanceof AppError ? error.status : 500);
@@ -281,7 +303,7 @@ export class ClassBoard extends DurableObject<Env> {
     await this.exclusive(async () => {
       this.files.expire(); this.filesDate = today();
       const rooms = await this.ctx.storage.list<Room>({ prefix: 'room:' });
-      for (const [key, room] of rooms) { ensureDay(room); await this.ctx.storage.put(key, room); this.broadcast(room); }
+      for (const room of rooms.values()) { await this.prepareClassroom(room); this.broadcast(room); }
       const attempts = await this.ctx.storage.list<{ since: number }>({ prefix: 'attempt:' });
       for (const [key, value] of attempts) if (Date.now() - value.since >= 300_000) await this.ctx.storage.delete(key);
       await this.ctx.storage.setAlarm(nextMidnight());

@@ -2,7 +2,7 @@ import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ResetTarget } from '../lib/types';
 
-export const RESET_LABELS: Record<ResetTarget, string> = { chat: '채팅', mood: '컨디션', break: '쉬는시간' };
+export const RESET_LABELS: Record<ResetTarget, string> = { chat: '채팅', mood: '컨디션' };
 
 export function ResetDialog({ target, busy, onAction, onClose }: { target: ResetTarget; busy: boolean; onAction: (input: Record<string, unknown>, success: string) => Promise<void>; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null); const cancelRef = useRef<HTMLButtonElement>(null); const [error, setError] = useState('');

@@ -61,7 +61,7 @@ test('a fresh poll archives its results instead of deleting them', () => {
   mutate(room, { type: 'vote', pollId: old.id, option: 0 }, 'guest', false);
   mutate(room, { type: 'poll-reset', id: old.id }, null, true);
   assert.equal(old.archived, true); assert.equal(old.open, false); assert.equal(old.votes.guest, 0);
-  assert.equal(day.polls.length, 3); assert.deepEqual(day.polls.find(p => p.kind === 'mood' && !p.archived)?.votes, {});
+  assert.equal(day.polls.length, 2); assert.deepEqual(day.polls.find(p => p.kind === 'mood' && !p.archived)?.votes, {});
 });
 test('only safe link protocols are accepted and text remains text', () => {
   for (const url of ['javascript:alert(1)', 'data:text/html,test', 'https://user:pass@example.com', 'not a url']) assert.throws(() => safeUrl(url));
@@ -73,7 +73,9 @@ test('presence deduplicates browser tabs and expires after 45 seconds', () => {
   const room = newRoom('수업'); const day = ensureDay(room);
   mutate(room, { type: 'heartbeat' }, 'guest', false); mutate(room, { type: 'heartbeat' }, 'guest', false);
   day.presence.old = Date.now() - 46_000;
-  assert.equal(snapshot(room, today(), null, 'local').online, 1);
+  const view = snapshot(room, today(), 'guest', 'local');
+  assert.equal(view.online, 1);
+  assert.deepEqual(view.seats, [{ number: 1, name: '수강생 01', mine: true }]);
 });
 test('chat reset clears messages and pins while preserving votes, aliases and presence', () => {
   const room = newRoom('수업'); const day = ensureDay(room);
@@ -88,27 +90,36 @@ test('chat reset clears messages and pins while preserving votes, aliases and pr
   mutate(room, { type: 'message', text: '초기화 후 질문' }, 'guest', false);
   assert.equal(day.messages[0].authorName, '수강생 01');
 });
-test('poll reset removes only its kind including history and rejects stale votes', () => {
-  for (const kind of ['mood', 'break'] as const) {
-    const room = newRoom('수업'); const day = ensureDay(room);
-    const initial = day.polls.find(p => p.kind === kind)!; const other = day.polls.find(p => p.kind !== kind)!;
-    mutate(room, { type: 'vote', pollId: initial.id, option: 0 }, 'guest', false);
-    mutate(room, { type: 'vote', pollId: other.id, option: 1 }, 'guest', false);
-    mutate(room, { type: 'poll-reset', id: initial.id }, null, true);
-    const current = day.polls.find(p => p.kind === kind && !p.archived)!;
-    mutate(room, { type: 'vote', pollId: current.id, option: 1 }, 'guest', false);
-    mutate(room, { type: 'message', text: '남겨둘 채팅' }, 'guest', false);
-    mutate(room, { type: 'room-reset', target: kind }, null, true);
-    const clean = day.polls.find(p => p.kind === kind)!;
-    assert.equal(day.polls.filter(p => p.kind === kind).length, 1);
-    assert.notEqual(clean.id, current.id); assert.deepEqual(clean.options, current.options);
-    assert.equal(clean.question, current.question); assert.equal(clean.open, true); assert.equal(clean.archived, false);
-    assert.deepEqual(clean.votes, {}); assert.equal(other.votes.guest, 1); assert.equal(day.messages[0].text, '남겨둘 채팅');
-    assert.equal(snapshot(room, today(), 'guest', 'local').polls.find(p => p.id === clean.id)?.myVote, null);
-    assert.throws(() => mutate(room, { type: 'vote', pollId: current.id, option: 0 }, 'guest', false), /마감/);
-    mutate(room, { type: 'vote', pollId: clean.id, option: 0 }, 'guest', false);
-    assert.equal(clean.votes.guest, 0);
-  }
+test('mood reset removes its history, preserves custom polls and rejects stale votes', () => {
+  const kind = 'mood';
+  const room = newRoom('수업'); const day = ensureDay(room);
+  mutate(room, { type: 'poll-create', question: '준비됐나요?', options: ['네', '아직'] }, null, true);
+  const initial = day.polls.find(p => p.kind === kind)!; const other = day.polls.find(p => p.kind !== kind)!;
+  mutate(room, { type: 'vote', pollId: initial.id, option: 0 }, 'guest', false);
+  mutate(room, { type: 'vote', pollId: other.id, option: 1 }, 'guest', false);
+  mutate(room, { type: 'poll-reset', id: initial.id }, null, true);
+  const current = day.polls.find(p => p.kind === kind && !p.archived)!;
+  mutate(room, { type: 'vote', pollId: current.id, option: 1 }, 'guest', false);
+  mutate(room, { type: 'message', text: '남겨둘 채팅' }, 'guest', false);
+  mutate(room, { type: 'room-reset', target: kind }, null, true);
+  const clean = day.polls.find(p => p.kind === kind)!;
+  assert.equal(day.polls.filter(p => p.kind === kind).length, 1);
+  assert.notEqual(clean.id, current.id); assert.deepEqual(clean.options, current.options);
+  assert.equal(clean.question, current.question); assert.equal(clean.open, true); assert.equal(clean.archived, false);
+  assert.deepEqual(clean.votes, {}); assert.equal(other.votes.guest, 1); assert.equal(day.messages[0].text, '남겨둘 채팅');
+  assert.equal(snapshot(room, today(), 'guest', 'local').polls.find(p => p.id === clean.id)?.myVote, null);
+  assert.throws(() => mutate(room, { type: 'vote', pollId: current.id, option: 0 }, 'guest', false), /마감/);
+  mutate(room, { type: 'vote', pollId: clean.id, option: 0 }, 'guest', false);
+  assert.equal(clean.votes.guest, 0);
+});
+test('opening an existing day retires only built-in break polls including archived rounds', () => {
+  const room = newRoom('수업'); const day = ensureDay(room);
+  const savedMood = structuredClone(day.polls[0]);
+  const custom = { ...savedMood, kind: 'custom' as const, question: '잠깐 쉬었다 갈까요?', id: 'my-custom-poll' };
+  day.polls.push({ ...savedMood, id: 'break-old', kind: 'break', archived: true }, custom, { ...savedMood, id: 'break-live', kind: 'break' });
+  ensureDay(room);
+  assert.deepEqual(day.polls, [savedMood, custom]);
+  assert.throws(() => mutate(room, { type: 'room-reset', target: 'break' }, null, true), /항목/);
 });
 test('reset requires host, validates targets and cannot clear a new day from a stale screen', () => {
   const room = newRoom('수업'); mutate(room, { type: 'message', text: '보존' }, 'guest', false);

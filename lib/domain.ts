@@ -8,19 +8,27 @@ export class AppError extends Error {
 export function today(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
-export function newPoll(kind: PollKind, question?: string, options?: string[]): Poll {
+export function newPoll(kind: PollKind, question = '지금 컨디션 어때요?', options = ['좋아요', '보통이에요', '조금 힘들어요']): Poll {
   return {
     id: randomUUID(), kind, open: true, archived: false, votes: {},
-    question: question ?? (kind === 'mood' ? '지금 컨디션 어때요?' : '잠깐 쉬었다 갈까요?'),
-    options: options ?? (kind === 'mood' ? ['좋아요', '보통이에요', '조금 힘들어요'] : ['계속할 수 있어요', '쉬고 싶어요'])
+    question, options
   };
 }
 export function ensureDay(room: Room, date = today()): Day {
   // Only today's data is retained; yesterday's messages, votes and aliases expire together.
   for (const previous of Object.keys(room.days)) if (previous !== date) delete room.days[previous];
-  if (!room.days[date]) room.days[date] = { date, active: true, messages: [], polls: [newPoll('mood'), newPoll('break')], presence: {} };
-  return room.days[date];
+  const day = room.days[date] ??= { date, active: true, messages: [], polls: [newPoll('mood')], presence: {} };
+  // Only the retired built-in poll is removed when an existing room is opened.
+  if (day.polls.some(poll => poll.kind === 'break')) day.polls = day.polls.filter(poll => poll.kind !== 'break');
+  return day;
 }
+export function participantName(day: Day, guest: string): string {
+  const participants = day.participants ??= {};
+  return participants[guest] ??= `수강생 ${String(Object.keys(participants).length + 1).padStart(2, '0')}`;
+}
+
+// The same server-assigned daily alias was already persisted by earlier releases.
+function seatNumber(name: string): number { return Number(name.slice('수강생 '.length)); }
 export function newRoom(title: string, demo = false): Room {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const bytes = crypto.getRandomValues(new Uint8Array(6));
@@ -52,14 +60,24 @@ export function safeUrl(value: unknown): string | null {
     return url.href;
   } catch { throw new AppError('http:// 또는 https://로 시작하는 링크를 입력해주세요.'); }
 }
-export function snapshot(room: Room, date: string, guest: string | null, mode: 'local' | 'cloud'): Snapshot {
+export function snapshot(room: Room, date: string, guest: string | null, mode: 'local' | 'cloud', onlineGuests?: Set<string>): Snapshot {
   const day = room.days[date];
   if (!day) throw new AppError('이 날짜의 강의 기록이 없습니다.', 404);
+  const currentDate = today();
+  const present = onlineGuests ?? new Set(Object.entries(day.presence)
+    .filter(([, at]) => date === currentDate && Date.now() - at < 45_000).map(([id]) => id));
+  const seats = Array.from(present).flatMap(id => {
+    const name = day.participants?.[id];
+    return name ? [{ number: seatNumber(name), name, mine: guest === id }] : [];
+  }).sort((a, b) => a.number - b.number);
   return {
-    code: room.code, title: room.title, demo: room.demo, date, today: today(),
-    active: day.active && date === today(), dates: Object.keys(room.days).sort().reverse(),
-    online: date === today() ? Object.values(day.presence).filter(at => Date.now() - at < 45_000).length : 0,
-    messages: day.messages.map(({ authorId, ...message }) => ({ ...message, mine: Boolean(guest && authorId === guest) })), mode, updatedAt: new Date().toISOString(),
+    code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
+    active: day.active && date === currentDate, dates: Object.keys(room.days).sort().reverse(),
+    online: present.size, seats,
+    messages: day.messages.map(({ authorId, ...message }) => {
+      const name = message.author === 'student' && authorId && day.participants?.[authorId];
+      return { ...message, mine: Boolean(guest && authorId === guest), ...(name ? { seatNumber: seatNumber(name) } : {}) };
+    }), mode, updatedAt: new Date().toISOString(),
     polls: day.polls.map(({ votes, ...poll }) => ({ ...poll, counts: poll.options.map((_, i) => Object.values(votes).filter(v => v === i).length), total: Object.keys(votes).length, myVote: guest ? votes[guest] ?? null : null }))
   };
 }
@@ -70,7 +88,7 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   if (action.type === 'heartbeat') {
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
     day.presence = Object.fromEntries(Object.entries(day.presence).filter(([, at]) => Date.now() - at < 45_000));
-    if (day.active) day.presence[guest] = Date.now();
+    if (day.active) { participantName(day, guest); day.presence[guest] = Date.now(); }
     return;
   }
   if (action.type === 'vote') {
@@ -87,16 +105,14 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     if (day.messages.length >= 2000) throw new AppError('하루에 최대 2,000개까지 메시지를 보낼 수 있습니다.');
     if (!host && day.messages.filter(m => m.authorId === guest && Date.now() - Date.parse(m.createdAt) < 60_000).length >= 10) throw new AppError('메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 보내주세요.', 429);
     const content = text(action.text, '내용', 2000); const url = safeUrl(action.url);
-    day.participants ??= {};
-    if (!host && guest && !day.participants[guest]) day.participants[guest] = `수강생 ${String(Object.keys(day.participants).length + 1).padStart(2, '0')}`;
-    day.messages.push({ id: randomUUID(), text: content, url, pinned: false, createdAt: new Date().toISOString(), author: host ? 'host' : 'student', authorName: host ? '강사' : day.participants[guest!], ...(host ? {} : { authorId: guest! }) });
+    day.messages.push({ id: randomUUID(), text: content, url, pinned: false, createdAt: new Date().toISOString(), author: host ? 'host' : 'student', authorName: host ? '강사' : participantName(day, guest!), ...(host ? {} : { authorId: guest! }) });
     return;
   }
   if (!host) throw new AppError('강사 로그인이 필요합니다.', 401);
   switch (action.type) {
     case 'room-reset': {
       if (action.target === 'chat') { day.messages = []; break; }
-      if (action.target !== 'mood' && action.target !== 'break') throw new AppError('초기화할 항목을 확인해주세요.');
+      if (action.target !== 'mood') throw new AppError('초기화할 항목을 확인해주세요.');
       const kind = action.target;
       const current = day.polls.find(p => p.kind === kind && !p.archived);
       const replacement = newPoll(kind, current?.question, current ? [...current.options] : undefined);

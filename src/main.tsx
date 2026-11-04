@@ -7,6 +7,7 @@ import '../app/globals.css';
 import '../app/live-room.css';
 import '../app/corporate.css';
 import '../app/institute.css';
+import '../app/classroom-layout.css';
 const path = window.location.pathname.replace(/\/$/, '') || '/';
 const match = /^\/room\/([A-Z0-9]{6})$/.exec(path);
 const view = path === '/' ? <RoomView code={MAIN_ROOM_CODE} host={false} /> : path === '/host' ? <Host /> : match ? <RoomView code={match[1]} host={false} /> : <Entry preview={false} />;

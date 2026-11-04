@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BookOpen, Check, ChevronDown, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Frown, Link2, LogOut, Meh, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, QrCode, RotateCcw, Send, Settings2, Smile, Trash2, Users, WifiOff, X } from 'lucide-react';
+import { ClassroomScene } from './classroom-scene';
+import { ClassroomPolls } from './classroom-polls';
 import { Brand } from './brand';
 import { AboutLink } from './about-link';
 import { BRAND_MARK } from '../lib/brand';
 import { ContactLink } from './contact-link';
 import { ResetDialog, RESET_LABELS } from './reset-dialog';
-import { PollCard, NewPoll } from './poll-card';
+import { NewPoll } from './poll-card';
 import { PollManagementDialog } from './poll-management-dialog';
 import { ShareDialog } from './share-dialog';
 import { MaterialsDialog } from './materials-dialog';
@@ -22,8 +24,7 @@ function ChatMessage({ code, message, host, editable, busy, onAction, onNotice }
   const teacher = message.author !== 'student'; const mine = message.mine || (host && teacher);
   async function copy() { try { await navigator.clipboard.writeText(message.url ?? message.text); onNotice('복사했어요.'); } catch { onNotice('내용을 선택해서 복사해주세요.'); } }
   return <article className={`chat-message ${mine ? 'my-message' : ''} ${teacher ? 'teacher-message' : ''}`}>
-    {!mine && <span className="chat-avatar" aria-hidden="true">{teacher ? <span>강</span> : <span>수</span>}</span>}
-    <div className="chat-message-body"><div className="chat-meta"><b>{message.authorName ?? '강사'}</b>{teacher && <span>강사</span>}<time dateTime={message.createdAt}>{timeLabel(message.createdAt)}</time></div>
+    <div className="chat-message-body"><div className="chat-meta"><b>{message.authorName ?? '강사'}</b>{mine && <span>나</span>}<time dateTime={message.createdAt}>{timeLabel(message.createdAt)}</time></div>
       <div className="chat-bubble"><p><MessageText text={message.text} /></p>{message.url && <a className="chat-link" href={message.url} target="_blank" rel="noopener noreferrer"><Link2 size={16} /><span>{new URL(message.url).hostname.replace('www.', '')}</span><ExternalLink size={14} /></a>}{message.attachment && <a className="chat-file" href={`/api/rooms/${code}/files/${message.attachment.id}`} download={message.attachment.name} aria-label={`${message.attachment.name} 다운로드`}><FileText size={22} aria-hidden="true" /><span><b>{message.attachment.name}</b><small>{fileSize(message.attachment.size)} · 오늘만 다운로드</small></span><Download size={18} aria-hidden="true" /></a>}</div>
       <details className="message-menu"><summary aria-label={`${message.text.slice(0, 20)} 메시지 메뉴`}><MoreHorizontal size={17} /></summary><div><button onClick={copy}><Copy size={14} />복사</button>{host && editable && <><button disabled={busy} onClick={() => onAction({ type: 'pin', id: message.id }, message.pinned ? '고정을 해제했어요.' : '메시지를 고정했어요.')}><Pin size={14} />{message.pinned ? '고정 해제' : '상단 고정'}</button><button disabled={busy} onClick={() => setConfirming(true)}><Trash2 size={14} />삭제</button></>}</div></details>
       {confirming && <div className="chat-delete" role="alert"><span>이 메시지를 삭제할까요?</span><button disabled={busy} onClick={() => onAction({ type: 'delete', id: message.id }, '메시지를 삭제했어요.')}>삭제하기</button><button onClick={() => setConfirming(false)}>취소</button></div>}
@@ -66,10 +67,23 @@ function QuestionDialog({ busy, onAction, onClose }: { busy: boolean; onAction: 
 }
 export function RoomView({ code, host, onBack, onLogout }: { code: string; host: boolean; onBack?: () => void; onLogout?: () => Promise<void> }) {
   const [data, setData] = useState<Snapshot | null>(null); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [connected, setConnected] = useState(true); const [busy, setBusy] = useState(false);
-  const [share, setShare] = useState(false); const [questions, setQuestions] = useState(false); const [tab, setTab] = useState<'all' | 'links'>('all'); const [notice, setNotice] = useState(''); const [history, setHistory] = useState(false); const [unread, setUnread] = useState(false);
+  const [share, setShare] = useState(false); const [questions, setQuestions] = useState(false); const [tab, setTab] = useState<'all' | 'links'>('all'); const [notice, setNotice] = useState(''); const [unread, setUnread] = useState(false);
+  const [mobileView, setMobileView] = useState<'classroom' | 'chat'>('classroom');
+  const [pollView, setPollView] = useState<'mood' | 'custom' | 'history' | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [managedPollId, setManagedPollId] = useState<string | null>(null);
   const [materials, setMaterials] = useState(false);
+  const roomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    function fitKeyboard() {
+      if (viewport?.scale === 1) roomRef.current?.style.setProperty('--visible-room-height', `${viewport.height}px`);
+    }
+    fitKeyboard();
+    viewport.addEventListener('resize', fitKeyboard);
+    return () => viewport.removeEventListener('resize', fitKeyboard);
+  }, []);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const scroller = useRef<HTMLDivElement>(null); const nearBottom = useRef(true); const forceBottom = useRef(false);
   function notify(message: string) { setNotice(message); if (noticeTimer.current) clearTimeout(noticeTimer.current); noticeTimer.current = setTimeout(() => setNotice(''), 4000); }
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
@@ -99,7 +113,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         if (event.data === 'pong') return;
         try { const update = JSON.parse(event.data); if (update.type !== 'snapshot') return;
           const value = update.data as Snapshot; setData(value); setDate(value.date);
-          if (value.date !== date) { setHistory(false); notify('새 날짜로 시작했어요. 채팅과 투표가 초기화됐습니다.'); }
+          if (value.date !== date) { setPollView(null); notify('새 날짜로 시작했어요. 채팅과 투표가 초기화됐습니다.'); }
         } catch { /* A later snapshot can recover a malformed update. */ }
       };
       socket.onclose = () => {
@@ -128,19 +142,104 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const messages = data?.messages.filter(m => tab === 'all' || m.url || /https?:\/\//.test(m.text)) ?? []; const lastId = messages.at(-1)?.id;
   function scrollLatest() { const element = scroller.current; if (element) element.scrollTop = element.scrollHeight; nearBottom.current = true; setUnread(false); }
   useEffect(() => { nearBottom.current = true; setUnread(false); }, [date, tab]);
-  useEffect(() => { if (nearBottom.current || forceBottom.current) { scrollLatest(); forceBottom.current = false; } else setUnread(true); }, [lastId, date, tab]);
+  useEffect(() => { if (nearBottom.current || forceBottom.current) { scrollLatest(); forceBottom.current = false; } else setUnread(true); }, [lastId, date, tab, mobileView]);
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
-  const roomControls = data ? <div className="live-room-actions"><span className="live-online"><Users size={16} /><b>{data.online}</b><span>접속 중</span></span><details className="room-settings"><summary aria-label="강의실 설정"><Settings2 size={20} /></summary><div className="settings-panel"><p className="daily-retention">오늘 {dateLabel(data.date)}<br />채팅·투표·첨부 자료는 한국 시간 자정에 초기화됩니다.</p>{data.polls.some(p => p.archived) && <button aria-pressed={history} onClick={() => setHistory(!history)}>{history ? '현재 투표 보기' : '이전 투표 결과 보기'}</button>}<p>채팅과 투표 결과가 실시간으로 반영돼요.</p>{data.mode === 'local' && <p>현재 로컬 미리보기입니다. 예시 메시지 외의 채팅·응답 수는 실제 참여로 집계됩니다.</p>}{host && editable && <div className="room-reset-actions"><p>강사 초기화</p>{(['chat', 'mood', 'break'] as const).map(target => <button key={target} disabled={busy || !connected} onClick={() => setResetTarget(target)}><RotateCcw size={14} />{RESET_LABELS[target]} 초기화</button>)}</div>}{host && editable && <button disabled={busy} onClick={() => safeAction({ type: 'active', active: !data.active }, data.active ? '오늘 강의를 종료했어요.' : '강의를 다시 시작했어요.')}>{data.active ? '오늘 강의 종료' : '강의 다시 시작'}</button>}{host && onBack ? <button onClick={onBack}><ArrowLeft size={15} />내 강의실 목록</button> : <a href="/join"><ArrowLeft size={15} />다른 강의실 참여</a>}</div></details></div> : null;
-  return <div className={`live-room${host ? ' is-host' : ''}`}><a className="skip-link" href="#main">본문으로 건너뛰기</a><header className="live-header"><Brand roomCode={code} hostAccess={!host} /><div className="live-header-actions"><AboutLink />{data && !data.demo && <a className="survey-link" href={SURVEY_URL} target="_blank" rel="noopener noreferrer" aria-label="수업 설문 참여 (새 탭)"><ClipboardList size={15} /><span>수업 설문</span></a>}{host && <span className="live-role">강사</span>}{host && onLogout && <button className="icon-button" aria-label="로그아웃" onClick={() => onLogout().catch(e => setError(e.message))}><LogOut size={18} /></button>}<button className="live-share" aria-label="참여 링크" onClick={() => setShare(true)}><QrCode size={18} /><span>참여 링크</span></button>{roomControls}</div></header>
-    {!data ? <main id="main" className="live-loading"><img src={BRAND_MARK} width="64" height="64" alt="" /><h1>{error ? '강의실에 연결하지 못했어요.' : '강의실을 열고 있어요.'}</h1>{error ? <><p role="alert">{error}</p><button className="primary" onClick={() => window.location.reload()}>다시 연결</button><a href="/join">다른 강의실 참여</a></> : <p role="status">채팅과 투표를 준비하고 있어요.</p>}</main> : <>
-
+  const moodPoll = data?.polls.find(poll => poll.kind === 'mood' && !poll.archived);
+  const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
+  const previousPolls = data?.polls.filter(poll => poll.kind !== 'break' && poll.archived) ?? [];
+  const moodChoice = moodPoll?.myVote == null ? null : moodPoll.options[moodPoll.myVote];
+  const MoodFace = [Smile, Meh, Frown][moodPoll?.myVote ?? 0] ?? Smile;
+  const moodControl = moodPoll && <button className="classroom-mood" onClick={() => setPollView('mood')} aria-haspopup="dialog" aria-label={moodChoice ? `오늘의 컨디션, 내 응답: ${moodChoice}` : '오늘의 컨디션'}>
+    <span>오늘의 컨디션</span><MoodFace size={18} aria-hidden="true" /><ChevronDown size={13} aria-hidden="true" />
+  </button>;
+  const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" aria-haspopup="dialog">
+    <BookOpen size={15} aria-hidden="true" /><span>참고자료</span>
+  </button>;
+  const roomControls = data && <div className="live-room-actions">
+    <span className="live-online"><Users size={16} /><b>{data.online}</b><span>접속 중</span></span>
+    <details className="room-settings"><summary aria-label="강의실 설정"><Settings2 size={20} /></summary>
+      <div className="settings-panel">
+        <p className="daily-retention">오늘 {dateLabel(data.date)}<br />채팅·투표·첨부 자료는 한국 시간 자정에 초기화됩니다.</p>
+        {host && active && <button onClick={() => setQuestions(true)} aria-haspopup="dialog"><Plus size={16} />새 투표 만들기</button>}
+        {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 보기</button>}
+        {previousPolls.length > 0 && <button onClick={() => setPollView('history')} aria-haspopup="dialog">이전 투표 결과 보기</button>}
+        {host && !data.demo && <a href={SURVEY_RESPONSES_URL} target="_blank" rel="noopener noreferrer"><FileSpreadsheet size={16} />설문 응답 시트 보기</a>}
+        {data.mode === 'local' && <p>로컬 미리보기입니다.</p>}
+        {host && editable && <>
+          <div className="room-reset-actions"><p>강사 초기화</p>
+            {(['chat', 'mood'] as const).map(target => <button key={target} disabled={busy || !connected} onClick={() => setResetTarget(target)}><RotateCcw size={14} />{RESET_LABELS[target]} 초기화</button>)}
+          </div>
+          <button disabled={busy} onClick={() => safeAction({ type: 'active', active: !data.active }, data.active ? '오늘 강의를 종료했어요.' : '강의를 다시 시작했어요.')}>{data.active ? '오늘 강의 종료' : '강의 다시 시작'}</button>
+        </>}
+        {host && onBack ? <button onClick={onBack}><ArrowLeft size={15} />내 강의실 목록</button> : <a href="/join"><ArrowLeft size={15} />다른 강의실 참여</a>}
+      </div>
+    </details>
+  </div>;
+  return <div className={`live-room${host ? ' is-host' : ''}`} ref={roomRef}>
+    <a className="skip-link" href="#main">본문으로 건너뛰기</a>
+    <header className="live-header"><Brand roomCode={code} hostAccess={!host} />
+      <div className="live-header-actions"><AboutLink />
+        {data && !data.demo && <a className="survey-link" href={SURVEY_URL} target="_blank" rel="noopener noreferrer" aria-label="수업 설문 참여 (새 탭)"><ClipboardList size={15} /><span>수업 설문</span></a>}
+        {host && <span className="live-role">강사</span>}
+        {host && onLogout && <button className="icon-button" aria-label="로그아웃" onClick={() => onLogout().catch(e => setError(e.message))}><LogOut size={18} /></button>}
+        <button className="live-share" aria-label="참여 링크" onClick={() => setShare(true)}><QrCode size={18} /><span>참여 링크</span></button>{roomControls}
+      </div>
+    </header>
+    {!data ? <main id="main" className="live-loading"><img src={BRAND_MARK} width="64" height="64" alt="" />
+      <h1>{error ? '강의실에 연결하지 못했어요.' : '강의실을 열고 있어요.'}</h1>
+      {error ? <><p role="alert">{error}</p><button className="primary" onClick={() => window.location.reload()}>다시 연결</button><a href="/join">다른 강의실 참여</a></> : <p role="status">좌석과 채팅을 준비하고 있어요.</p>}
+    </main> : <>
       {error && <div className="live-error" role="alert"><WifiOff size={17} /><span>{error}</span><button aria-label="오류 메시지 닫기" onClick={() => setError('')}><X size={16} /></button></div>}
-      <main id="main" className="live-workspace"><h1 className="room-accessible-title">{data.title}</h1><aside className="live-polls" aria-labelledby="polls-title"><h2 id="polls-title" className="sr-only">실시간 투표</h2>{host && <div className="live-polls-heading"><div className="live-poll-actions">{!data.demo && <a className="icon-button survey-responses" href={SURVEY_RESPONSES_URL} target="_blank" rel="noopener noreferrer" aria-label="설문 응답 시트 보기 (새 탭)" title="설문 응답 시트 보기"><FileSpreadsheet size={17} /></a>}{active && <button className="new-poll-button" onClick={() => setQuestions(true)} aria-label="새 투표 만들기" aria-haspopup="dialog"><Plus size={17} /><span>새 투표</span></button>}</div></div>}<div className="live-poll-scroll">{data.polls.filter(p => history ? p.archived : !p.archived).map(poll => <PollCard key={poll.id} poll={poll} host={host && !history} active={active && !history} busy={busy} onAction={safeAction} onManage={() => setManagedPollId(poll.id)} />)}{history && !data.polls.some(p => p.archived) && <p className="poll-empty">이전 투표 결과가 아직 없어요.</p>}</div>{data.polls.some(p => p.archived) && <div className="live-poll-note"><button aria-pressed={history} onClick={() => setHistory(!history)}>{history ? '현재 투표' : '이전 결과'}</button></div>}</aside>
-        <section className="live-chat" aria-labelledby="chat-title"><div className="live-chat-heading"><h2 id="chat-title"><MessageCircle size={20} />실시간 채팅</h2><div className="chat-header-tools"><button className="materials-button" onClick={() => setMaterials(true)} aria-label="기본 실습자료 다운로드" aria-haspopup="dialog"><Download size={14} aria-hidden="true" /><span>자료</span></button><div className="chat-filters" role="group" aria-label="채팅 필터"><button className={tab === 'all' ? 'selected' : ''} aria-pressed={tab === 'all'} onClick={() => setTab('all')}>전체</button><button className={tab === 'links' ? 'selected' : ''} aria-pressed={tab === 'links'} onClick={() => setTab('links')}><Link2 size={14} />링크</button></div></div></div>
+      <main id="main" className="classroom-workspace" data-view={mobileView}>
+        <h1 className="room-accessible-title">{data.title}</h1>
+        <div className="classroom-mobile-tools">
+          <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
+            <button aria-pressed={mobileView === 'classroom'} aria-controls="classroom-pane" onClick={() => setMobileView('classroom')}>교실</button>
+            <button aria-pressed={mobileView === 'chat'} aria-controls="chat-pane" onClick={() => setMobileView('chat')}>채팅</button>
+          </div>
+          {materialsButton}
+        </div>
+        <div id="classroom-pane" className="classroom-pane">
+          <ClassroomScene data={data} mood={moodControl} />
+          {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
+            {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 {customPolls.length}개 보기</button>}
+            {host && active && <button onClick={() => setQuestions(true)} aria-label="새 투표 만들기" aria-haspopup="dialog"><Plus size={16} />새 투표</button>}
+          </div>}
+        </div>
+        <section className="live-chat" id="chat-pane" aria-labelledby="chat-title">
+          <div className="live-chat-heading"><h2 id="chat-title"><MessageCircle size={20} />실시간 채팅</h2>
+            <div className="chat-header-tools">
+              <button className="classroom-link-filter" aria-label="링크만 보기" aria-pressed={tab === 'links'} onClick={() => setTab(tab === 'links' ? 'all' : 'links')}><Link2 size={14} />링크만</button>
+              {materialsButton}
+            </div>
+          </div>
           {pinned && <div className="chat-pinned"><Pin size={14} /><span>고정</span>{pinned.url ? <a href={pinned.url} target="_blank" rel="noopener noreferrer">{pinned.text}</a> : <p>{pinned.text}</p>}{pinned.url && <ExternalLink size={13} />}</div>}
-          <div className="chat-scroll" ref={scroller} tabIndex={0} aria-label="채팅 메시지 목록" onScroll={() => { const el = scroller.current; if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 65; if (nearBottom.current) setUnread(false); } }}><p className="chat-date">{dateLabel(data.date)}{data.demo ? ' · 예시 강의실' : ''}</p><div role="log" aria-live="polite" aria-relevant="additions" aria-label="실시간 채팅 메시지">{messages.map(message => <ChatMessage key={message.id} code={code} message={message} host={host} editable={editable} busy={busy} onAction={safeAction} onNotice={notify} />)}</div>{messages.length === 0 && <div className="chat-empty"><img src={BRAND_MARK} alt="" width="64" height="64" /><h3>{tab === 'links' ? '공유된 링크가 아직 없어요.' : '아직 메시지가 없습니다.'}</h3><p>{tab === 'links' ? '링크가 담긴 메시지가 여기에 모여요.' : '메시지나 실습 링크를 공유해보세요.'}</p></div>}</div>
-          {unread && <button className="new-messages" onClick={scrollLatest}><ArrowDown size={15} />새 메시지 보기</button>}<Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
-        </section></main></>}
-    <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>{materials && <MaterialsDialog onClose={() => setMaterials(false)} />}{share && <ShareDialog code={code} onClose={() => setShare(false)} />}{questions && <QuestionDialog busy={busy} onAction={action} onClose={() => setQuestions(false)} />}{data && managedPollId && host && active && !history && data.polls.filter(poll => poll.id === managedPollId && !poll.archived).map(poll => <PollManagementDialog key={poll.id} poll={poll} busy={busy} onAction={action} onClose={() => setManagedPollId(null)} />)}{resetTarget && host && <ResetDialog target={resetTarget} busy={busy} onAction={action} onClose={() => setResetTarget(null)} />}
+          <div className="chat-scroll" ref={scroller} tabIndex={0} aria-label="채팅 메시지 목록" onScroll={() => {
+            const el = scroller.current;
+            if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 65; if (nearBottom.current) setUnread(false); }
+          }}>
+            <p className="chat-date">{dateLabel(data.date)}{data.demo ? ' · 예시 강의실' : ''}</p>
+            <div role="log" aria-live="polite" aria-relevant="additions" aria-label="실시간 채팅 메시지">
+              {messages.map(message => <ChatMessage key={message.id} code={code} message={message} host={host} editable={editable} busy={busy} onAction={safeAction} onNotice={notify} />)}
+            </div>
+            {messages.length === 0 && <div className="chat-empty">
+              <MessageCircle size={26} aria-hidden="true" /><h3>{tab === 'links' ? '아직 공유된 링크가 없어요.' : '첫 질문을 기다리고 있어요.'}</h3>
+              <p>{tab === 'links' ? '링크가 담긴 메시지가 여기에 모여요.' : '궁금한 점을 편하게 남겨주세요.'}</p>
+            </div>}
+          </div>
+          {unread && <button className="new-messages" onClick={scrollLatest}><ArrowDown size={15} />새 메시지 보기</button>}
+        </section>
+        <Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
+      </main>
+    </>}
+    <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>
+    {materials && <MaterialsDialog onClose={() => setMaterials(false)} />}
+    {share && <ShareDialog code={code} onClose={() => setShare(false)} />}
+    {questions && <QuestionDialog busy={busy} onAction={action} onClose={() => setQuestions(false)} />}
+    {pollView && <ClassroomPolls title={{ mood: '오늘의 컨디션', custom: '수업 투표', history: '이전 투표 결과' }[pollView]}
+      polls={pollView === 'mood' ? (moodPoll ? [moodPoll] : []) : pollView === 'custom' ? customPolls : previousPolls}
+      host={host} active={active} busy={busy} onAction={safeAction} onManage={setManagedPollId} onClose={() => setPollView(null)} />}
+    {data && managedPollId && host && active && data.polls.filter(poll => poll.id === managedPollId && !poll.archived).map(poll => <PollManagementDialog key={poll.id} poll={poll} busy={busy} onAction={action} onClose={() => setManagedPollId(null)} />)}
+    {resetTarget && host && <ResetDialog target={resetTarget} busy={busy} onAction={action} onClose={() => setResetTarget(null)} />}
   </div>;
 }
