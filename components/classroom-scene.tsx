@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
-import type { PublicMessage, Snapshot } from '../lib/types';
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { Check, ChevronLeft, ChevronRight, Smile, X } from 'lucide-react';
+import { Chalkboard } from './chalkboard';
+import { CHARACTERS, defaultCharacter, type Character, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 
 const PAGE_SIZE = 20;
@@ -15,33 +16,69 @@ function DeskIcon() {
   </svg>;
 }
 
-function Chalkboard({ message, code, active }: { message?: PublicMessage; code: string; active: boolean }) {
-  const caption = message?.text || (active ? '질문은 편하게 남겨주세요!' : '오늘 강의가 끝났어요.');
-  return <div className="classroom-board" role="region" aria-label="강의실 칠판">
-    <div className="classroom-board-content" tabIndex={0} key={message?.id ?? 'welcome'}>
-      <p className={!message ? 'classroom-board-welcome' : caption.length > 50 ? 'classroom-board-long' : undefined}>{caption}</p>
-      {message?.url && <a href={message.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true" />{new URL(message.url).hostname}</a>}
-      {message?.attachment && <a href={`/api/rooms/${code}/files/${message.attachment.id}`} download={message.attachment.name}><Download size={14} aria-hidden="true" />{message.attachment.name}</a>}
-    </div>
-    <svg className="classroom-board-sprout" width="34" height="39" viewBox="0 0 34 39" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 36c1-7 2-13-.5-18M17 25C8 26 4 19 3.5 14c7-.2 12 3 13.5 11Zm.1-7.5C15 10 22 4 30 3c.6 8-3.5 14.5-12.9 14.5Z" />
-    </svg>
-    <span className="classroom-board-ledge" aria-hidden="true" />
-  </div>;
+const characterNames: Record<Character, string> = {
+  smile: '방긋이', sprout: '새싹이', cheer: '신난이', glasses: '동글안경', sleepy: '꾸벅이', cat: '고양이'
+};
+
+function StudentHead({ character }: { character: Character }) {
+  const head = character === 'cat'
+    ? 'M26 35c-2-4-2-9 0-14l.5-10q.1-3 3-1l9 5q7-2 13 0l8-5q3-1.8 3 1l-.1 10c4 6 3 13-1 17-4 4-10 5-16 5-10 0-16-2-19.4-8Z'
+    : 'M26 36c-2-5 0-12 4-17 5-6 11-8 18-7 9 1 17 9 17 18 0 7-4 11-9 13H35c-5-1-8-4-9-7Z';
+  return <g>
+    <path fill="#fffefa" d={head} />
+    {character === 'cat' && <g stroke="none" fill="#efb6a8"><path d="m29 13 .2 5 4-2Zm31 0-4 3 4 2Z" /></g>}
+    {character === 'sprout' && <g strokeWidth="1.55"><path d="m44 13 .3-5" /><path d="M44.5 10q-7 1-8-6 7-.5 8 6Zm.2.1Q45 .4 54 1q.2 8-9.3 9.1Z" fill="#a3d0a0" /></g>}
+    {character === 'cheer' && <path d="M44 13q-4-7 2-10m-2 8q2-5 6-4" />}
+    <g stroke="none" fill="#f1b8ae"><ellipse cx="33" cy="32" rx="3.3" ry="2.1" /><ellipse cx="56" cy="32" rx="3.3" ry="2.1" /></g>
+    {character === 'sleepy' ? <g><path d="M34 26q3 4 6 0m9 0q3 4 6 0" /><path d="m62 14 4-1-2 4 4-1m0-9 4-1-2 4 4-1" strokeWidth="1.4" /></g>
+      : character === 'cheer' ? <g><circle cx="38" cy="27" r="1.8" fill="currentColor" stroke="none" /><path d="m50 24 4 2-4 2" /></g>
+      : <g fill="currentColor" stroke="none"><circle cx="37.5" cy="27" r="1.8" /><circle cx="52" cy="27" r="1.8" /></g>}
+    {character === 'glasses' && <g strokeWidth="1.7"><circle cx="38" cy="26.5" r="5.3" /><circle cx="51" cy="26.5" r="5.3" /><path d="M43 26h3m-17-1 4 1m23 0 4-1" /></g>}
+    {character === 'cat' ? <g><path d="M41 31q2 4 4 0 2 4 4 0" /><path d="m30 30-6-1m6 4-6 1m35-4 6-1m-6 4 6 1" strokeWidth="1.1" /></g>
+      : character === 'cheer' ? <path fill="#eaa7a1" d="M41 31h8q-3 8-8 0Z" /> : <path d="M41 32q3.6 4.5 7.5-.2" />}
+  </g>;
 }
 
-function DeskDrawing({ number, occupied, mine }: { number: number; occupied: boolean; mine: boolean }) {
-  const style = number % 6;
+function CharacterPicker({ current, onChange, onClose }: { current: Character; onChange: (value: Character) => Promise<void>; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const inFlight = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const element = dialog.current;
+    element?.showModal();
+    element?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+    return () => { element?.close(); previous?.focus(); };
+  }, []);
+  async function choose(value: Character) {
+    if (inFlight.current) return;
+    if (value === current) { onClose(); return; }
+    inFlight.current = true;
+    setSaving(true); setError('');
+    try { await onChange(value); onClose(); }
+    catch (cause) {
+      inFlight.current = false; setSaving(false);
+      setError(cause instanceof Error ? cause.message : '저장하지 못했어요. 다시 골라주세요.');
+    }
+  }
+  return <dialog ref={dialog} className="classroom-character-dialog" aria-labelledby="character-picker-title" onCancel={event => { event.preventDefault(); if (!saving) onClose(); }}>
+    <div className="classroom-picker-heading"><h2 id="character-picker-title">캐릭터 선택</h2><button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label="캐릭터 선택 닫기"><X size={20} /></button></div>
+    <p>내 책상에 앉을 친구를 골라주세요.</p>
+    <div className="classroom-character-options" role="group" aria-label="캐릭터" aria-busy={saving}>
+      {CHARACTERS.map(value => <button type="button" key={value} aria-pressed={current === value} disabled={saving} onClick={() => choose(value)}>
+        {current === value && <Check className="classroom-character-check" size={15} aria-hidden="true" />}
+        <svg viewBox="16 -2 60 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><StudentHead character={value} /></svg>
+        <span>{characterNames[value]}</span>
+      </button>)}
+    </div>
+    {error && <p className="error" role="alert">{error}</p>}
+  </dialog>;
+}
+
+function DeskDrawing({ number, character, mine }: { number: number; character?: Character; mine: boolean }) {
   return <svg className="classroom-desk" viewBox="0 0 90 68" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {occupied ? <g>
-      {style === 2 && <path d="M43 15q-4-8 2-10m-1 7q1-5 5-5" />}
-      <path fill="#fffefa" d="M26 36c-2-5 0-12 4-17 5-6 11-8 18-7 9 1 17 9 17 18 0 7-4 11-9 13H35c-5-1-8-4-9-7Z" />
-      <g stroke="none" fill="#f1b8ae"><ellipse cx="33" cy="32" rx="3.3" ry="2.1" /><ellipse cx="56" cy="32" rx="3.3" ry="2.1" /></g>
-      {style === 4 ? <g strokeWidth="1.8"><circle cx="38" cy="26.5" r="5" /><circle cx="51" cy="26.5" r="5" /><path d="M43 26h3m-17-1 4 1m23 0 4-1" /></g>
-        : style === 5 ? <path d="M34 26q3 4 6 0m9 0q3 4 6 0" />
-        : <g fill="currentColor" stroke="none"><circle cx="37.5" cy="27" r="1.9" /><circle cx="52" cy="27" r="1.9" /></g>}
-      {style === 3 ? <path fill="#eaa7a1" d="M41 32h8q-3 7-8 0Z" /> : <path d="M41 32q3.6 4.5 7.5-.2" />}
-    </g> : <path className="classroom-empty-chair" d="M29 38v-8c0-3 2-5 5-5h22c3 0 5 2 5 5v8" />}
+    {character ? <StudentHead character={character} /> : <path className="classroom-empty-chair" d="M29 38v-8c0-3 2-5 5-5h22c3 0 5 2 5 5v8" />}
     <path d="m14 56 .5 6m60-6-.5 6" />
     <rect className="classroom-desk-front" x="7" y="36.5" width="76" height="22" rx="7.2" />
     <path d="M14.5 39.5h61" stroke="white" strokeOpacity=".8" strokeWidth="1" />
@@ -73,9 +110,10 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, mood }: { data: Snapshot; mood?: ReactNode }) {
+export function ClassroomScene({ data, mood, onCharacterChange }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void> }) {
   const seats = data.seats ?? [];
   const mySeat = seats.find(seat => seat.mine);
+  const [choosingCharacter, setChoosingCharacter] = useState(false);
   const pages = [...new Set([0, ...seats.map(seat => seatPage(seat.number))])].sort((a, b) => a - b);
   const [selectedPage, setSelectedPage] = useState<{ roomDay: string; page: number } | null>(null);
   const roomDay = `${data.code}/${data.date}`;
@@ -99,22 +137,29 @@ export function ClassroomScene({ data, mood }: { data: Snapshot; mood?: ReactNod
         const number = firstSeat + index;
         const seat = seats.find(item => item.number === number);
         const bubble = seat && bubbles.get(number);
-        return <li key={number} className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
-          <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{seat?.mine ? ', 내 자리' : ''}</span>
+        const character = seat && (seat.character ?? defaultCharacter(number));
+        return <li key={number} data-character={character} className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
+          <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{character && ', ' + characterNames[character]}{seat?.mine ? ', 내 자리' : ''}</span>
           <div className="classroom-desk-wrap">
             {bubble && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
-            <DeskDrawing number={number} occupied={Boolean(seat)} mine={Boolean(seat?.mine)} />
+            <DeskDrawing number={number} character={character} mine={Boolean(seat?.mine)} />
+            {seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={() => setChoosingCharacter(true)} />}
           </div>
         </li>;
       })}
     </ol>
     <div className="classroom-seating-footer">
-      <p>{mySeat && <span className="classroom-own-seat">내 자리 <b>{seatLabel(mySeat.number)}</b></span>}<span>수강생 {seats.length}명</span></p>
+      <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat">내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
+        {mySeat && onCharacterChange && <button className="classroom-character-trigger" type="button" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터 선택</button>}
+        <span className="classroom-student-count">수강생 {seats.length}명</span>
+      </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">
         <button type="button" aria-label="앞 좌석 보기" disabled={pageIndex === 0} onClick={() => turnPage(-1)}><ChevronLeft size={17} aria-hidden="true" /></button>
         <span aria-live="polite">{seatLabel(firstSeat)}–{seatLabel(firstSeat + PAGE_SIZE - 1)}</span>
         <button type="button" aria-label="뒤 좌석 보기" disabled={pageIndex === pages.length - 1} onClick={() => turnPage(1)}><ChevronRight size={17} aria-hidden="true" /></button>
       </div>}
     </div>
+    {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}
+      onChange={onCharacterChange} onClose={() => setChoosingCharacter(false)} />}
   </section>;
 }

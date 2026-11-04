@@ -63,6 +63,14 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await waitUntil(async () => (await occupied.count()) === 2, 'Expected one desk for each connected student');
   assert.equal(await page.locator('.classroom-seats > li').count(), 20);
   assert.equal(await student.locator('.classroom-seat.is-mine').count(), 1);
+  await student.getByRole('button',{name:'캐릭터 선택',exact:true}).click();
+  const picker = student.getByRole('dialog',{name:'캐릭터 선택',exact:true});
+  await picker.waitFor();
+  await student.screenshot({ path: '.local/screenshots/character-picker-mobile.png' });
+  await picker.getByRole('button',{name:'고양이',exact:true}).click();
+  await waitUntil(async () => (await second.locator('.classroom-seat[data-character="cat"]').filter({hasText:'수강생 01'}).count()) === 1,
+    'The other student must see the selected cat on the correct desk');
+  assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
   await page.getByLabel('채팅 메시지',{exact:true}).fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
   await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
   await student.getByLabel('채팅 메시지',{exact:true}).fill('한글 조합 중');
@@ -97,10 +105,15 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByRole('heading',{name:'실습을 따라오고 있나요?'}).waitFor({timeout:10000});
   await student.getByRole('button',{name:'투표 창 닫기'}).click();
   const newPoll = (await (await studentA.request.get(roomURL)).json()).polls.find(p=>p.kind==='mood'&&!p.archived);
-  await student.getByRole('button',{name:/^오늘의 컨디션/}).click();
-  await student.getByRole('button',{name:'좋아요',exact:true}).click();
+  const moods = student.getByRole('group',{name:'오늘의 컨디션',exact:true});
+  await moods.getByRole('button',{name:'좋아요 0명',exact:true}).click();
   await waitUntil(async()=>{ const s=await(await teacher.request.get(roomURL)).json();return s.polls.find(p=>p.id===newPoll.id).counts[0]===1; },'Student vote did not arrive');
-  await student.keyboard.press('Escape');
+  const peerMoods = second.getByRole('group',{name:'오늘의 컨디션',exact:true});
+  await peerMoods.getByRole('button',{name:'좋아요 1명',exact:true}).waitFor();
+  await moods.getByRole('button',{name:'보통이에요 0명',exact:true}).click();
+  await peerMoods.getByRole('button',{name:'보통이에요 1명',exact:true}).waitFor();
+  assert.equal(await peerMoods.getByRole('button',{name:'좋아요 0명',exact:true}).isVisible(), true);
+  assert.equal(await peerMoods.getByRole('button',{name:'조금 힘들어요 0명',exact:true}).isVisible(), true);
   await teacher.request.post(roomURL,{data:{type:'active',active:false}});
   assert.equal((await studentA.request.post(roomURL,{data:{type:'vote',pollId:newPoll.id,option:0}})).status(),409);
   assert.equal((await studentA.request.post(roomURL,{data:{type:'message',text:'종료된 강의에 전송'}})).status(),409);
@@ -118,10 +131,20 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
     assert.equal(columns, width === 1440 ? 5 : 4, 'Seat columns at '+width);
     assert.equal(await student.locator('.classroom-seat').count(), 20);
     const lastDesk = await student.locator('.classroom-seat').last().boundingBox();
-    if (width < 761) assert(lastDesk.y + lastDesk.height <= composer.y, 'Last seat hidden behind composer at '+width);
+    if (width < 761) {
+      const shell = await student.locator('.chat-composer').boundingBox();
+      const picker = await student.getByRole('button',{name:'캐릭터 선택',exact:true}).boundingBox();
+      if (picker.y+picker.height > shell.y+1 || lastDesk.y+lastDesk.height > shell.y+1) {
+        await student.screenshot({ path: '.local/screenshots/geometry-'+width+'.png' });
+        const sizes = await student.locator('.classroom-scene, .classroom-board, .classroom-seats, .classroom-seating-footer, .chat-composer, .classroom-pane').evaluateAll(items =>
+          items.map(el => [el.className,el.getBoundingClientRect().y,el.getBoundingClientRect().height,el.hasAttribute('data-expanded')]));
+        assert.fail('Normal classroom, last desk and avatar picker must fit above the composer at '+width+': '+JSON.stringify(sizes));
+      }
+    }
     const heading = await student.getByRole('heading',{name:'AI 강의실',exact:true}).boundingBox();
-    const mood = await student.getByRole('button',{name:/^오늘의 컨디션/}).boundingBox();
-    assert(mood.x >= heading.x+heading.width-1 && mood.y < heading.y+heading.height && heading.y < mood.y+mood.height, 'Mood beside classroom heading at '+width);
+    const mood = await moods.boundingBox();
+    assert(mood && mood.y <= heading.y+heading.height+16, 'Mood choices placed with the heading at '+width);
+    for (const choice of await moods.getByRole('button').all()) assert(await choice.isVisible());
     await student.screenshot({path:'.local/screenshots/student-'+width+'.png',fullPage:true});
   }
   await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
@@ -135,10 +158,57 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByRole('button',{name:'이전 투표 결과 보기',exact:true}).click();
   assert.equal(await student.locator('.compact-poll').count(),1); assert.match(await student.locator('.compact-poll-total').innerText(),/18명/);
   await student.getByRole('button',{name:'투표 창 닫기'}).click();
+  // Measure the rendered text and links, including a maximum-length post on a phone.
+  const board = student.locator('.classroom-board');
+  const content = board.locator('.classroom-board-content');
+  const shortNote = '잠깐 같이 볼까요?';
+  const mediumNote = '강의자료에서 대기환경 실습 파일을 열고 측정값을 입력해 보세요. '.repeat(5).trim();
+  const longNote = ('측정값을 적어주세요. 🌱 ' + 'PM25'.repeat(17) + '\n').repeat(35).slice(0, 1997) + ' 끝!';
+  async function postNote(note) {
+    const result = await teacher.request.post(roomURL, { data: { type: 'message', text: note } });
+    assert.equal(result.status(), 200);
+    await waitUntil(async () => (await content.locator('p').textContent()) === note, 'Teacher post did not appear on the board');
+  }
+  async function boardMetrics() {
+    return board.evaluate(el => {
+      const body = el.querySelector('.classroom-board-content');
+      const p = body.querySelector('p');
+      const frame = el.getBoundingClientRect();
+      const textAndLinks = Array.from(body.querySelectorAll('p,a')).map(item => item.getBoundingClientRect());
+      return { size: parseFloat(getComputedStyle(p).fontSize), height: frame.height,
+        fits: body.scrollHeight <= body.clientHeight+1 && body.scrollWidth <= body.clientWidth+1 &&
+          textAndLinks.every(box => box.top >= frame.top && box.bottom <= frame.bottom && box.left >= frame.left && box.right <= frame.right) };
+    });
+  }
+  await postNote(shortNote);
+  const compact = await boardMetrics();
+  await postNote(mediumNote);
+  await waitUntil(async () => { const m = await boardMetrics(); return m.fits && m.size < compact.size; }, 'Medium post must shrink and fit the mobile board');
+  const file = Buffer.from('local QA');
+  const uploaded = await teacher.request.post(roomURL+'/files', { data: file, headers: {
+    'content-type': 'application/octet-stream', 'x-upload-id': crypto.randomUUID(), 'x-class-date': value.date,
+    'x-file-name': encodeURIComponent('강의 안내.txt'), 'x-file-caption': encodeURIComponent(longNote), 'x-file-url': 'https://example.org/'
+  } });
+  assert.equal(uploaded.status(), 200);
+  await content.getByRole('link', { name: '강의 안내.txt' }).waitFor();
+  assert.equal(await content.locator('p').textContent(), longNote);
+  for (const width of [320,390,1440]) {
+    await student.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+    await waitUntil(async () => (await boardMetrics()).fits, 'Clipped long chalkboard post at '+width);
+    const seatsBelowBoard = await student.locator('.classroom-seats').boundingBox();
+    const boardBounds = await board.boundingBox();
+    assert(seatsBelowBoard.height > 100 && seatsBelowBoard.y >= boardBounds.y + boardBounds.height - 1,
+      'Expanded board must preserve all desk rows below the message at '+width);
+  }
+  await student.setViewportSize({ width: 320, height: 568 });
+  await postNote(shortNote);
+  await waitUntil(async () => { const m = await boardMetrics(); return m.fits && Math.abs(m.height-compact.height)<2 && Math.abs(m.size-compact.size)<1; }, 'Short posts restore original board size');
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,
     checks: ['instructor login', '20 visible desks', 'two students with distinct seat bubbles', 'teacher chalkboard',
+      'student avatar visible to peers', 'visible live mood counts and vote replacement',
+      'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'mobile tab draft', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/390/320 layouts', 'browser errors']
   }, null, 2));

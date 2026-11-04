@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, BookOpen, Check, ChevronDown, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Frown, Link2, LogOut, Meh, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, QrCode, RotateCcw, Send, Settings2, Smile, Trash2, Users, WifiOff, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
+import { ClassroomMood } from './classroom-mood';
 import { ClassroomPolls } from './classroom-polls';
 import { Brand } from './brand';
 import { AboutLink } from './about-link';
@@ -69,7 +70,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const [data, setData] = useState<Snapshot | null>(null); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [connected, setConnected] = useState(true); const [busy, setBusy] = useState(false);
   const [share, setShare] = useState(false); const [questions, setQuestions] = useState(false); const [tab, setTab] = useState<'all' | 'links'>('all'); const [notice, setNotice] = useState(''); const [unread, setUnread] = useState(false);
   const [mobileView, setMobileView] = useState<'classroom' | 'chat'>('classroom');
-  const [pollView, setPollView] = useState<'mood' | 'custom' | 'history' | null>(null);
+  const [pollView, setPollView] = useState<'custom' | 'history' | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [managedPollId, setManagedPollId] = useState<string | null>(null);
   const [materials, setMaterials] = useState(false);
@@ -147,11 +148,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const moodPoll = data?.polls.find(poll => poll.kind === 'mood' && !poll.archived);
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
   const previousPolls = data?.polls.filter(poll => poll.kind !== 'break' && poll.archived) ?? [];
-  const moodChoice = moodPoll?.myVote == null ? null : moodPoll.options[moodPoll.myVote];
-  const MoodFace = [Smile, Meh, Frown][moodPoll?.myVote ?? 0] ?? Smile;
-  const moodControl = moodPoll && <button className="classroom-mood" onClick={() => setPollView('mood')} aria-haspopup="dialog" aria-label={moodChoice ? `오늘의 컨디션, 내 응답: ${moodChoice}` : '오늘의 컨디션'}>
-    <span>오늘의 컨디션</span><MoodFace size={18} aria-hidden="true" /><ChevronDown size={13} aria-hidden="true" />
-  </button>;
+  const moodControl = moodPoll && <ClassroomMood key={moodPoll.id} poll={moodPoll} host={host} active={active} busy={busy}
+    onVote={option => action({ type: 'vote', pollId: moodPoll.id, option }, `${moodPoll.options[option]}로 응답했어요.`)} />;
   const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" aria-haspopup="dialog">
     <BookOpen size={15} aria-hidden="true" /><span>참고자료</span>
   </button>;
@@ -161,6 +159,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       <div className="settings-panel">
         <p className="daily-retention">오늘 {dateLabel(data.date)}<br />채팅·투표·첨부 자료는 한국 시간 자정에 초기화됩니다.</p>
         {host && active && <button onClick={() => setQuestions(true)} aria-haspopup="dialog"><Plus size={16} />새 투표 만들기</button>}
+        {host && active && moodPoll && <button onClick={() => setManagedPollId(moodPoll.id)} aria-haspopup="dialog"><Settings2 size={16} />컨디션 투표 관리</button>}
         {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 보기</button>}
         {previousPolls.length > 0 && <button onClick={() => setPollView('history')} aria-haspopup="dialog">이전 투표 결과 보기</button>}
         {host && !data.demo && <a href={SURVEY_RESPONSES_URL} target="_blank" rel="noopener noreferrer"><FileSpreadsheet size={16} />설문 응답 시트 보기</a>}
@@ -200,7 +199,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {materialsButton}
         </div>
         <div id="classroom-pane" className="classroom-pane">
-          <ClassroomScene data={data} mood={moodControl} />
+          <ClassroomScene data={data} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
             {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 {customPolls.length}개 보기</button>}
             {host && active && <button onClick={() => setQuestions(true)} aria-label="새 투표 만들기" aria-haspopup="dialog"><Plus size={16} />새 투표</button>}
@@ -236,8 +235,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
     {materials && <MaterialsDialog onClose={() => setMaterials(false)} />}
     {share && <ShareDialog code={code} onClose={() => setShare(false)} />}
     {questions && <QuestionDialog busy={busy} onAction={action} onClose={() => setQuestions(false)} />}
-    {pollView && <ClassroomPolls title={{ mood: '오늘의 컨디션', custom: '수업 투표', history: '이전 투표 결과' }[pollView]}
-      polls={pollView === 'mood' ? (moodPoll ? [moodPoll] : []) : pollView === 'custom' ? customPolls : previousPolls}
+    {pollView && <ClassroomPolls title={pollView === 'custom' ? '수업 투표' : '이전 투표 결과'}
+      polls={pollView === 'custom' ? customPolls : previousPolls}
       host={host} active={active} busy={busy} onAction={safeAction} onManage={setManagedPollId} onClose={() => setPollView(null)} />}
     {data && managedPollId && host && active && data.polls.filter(poll => poll.id === managedPollId && !poll.archived).map(poll => <PollManagementDialog key={poll.id} poll={poll} busy={busy} onAction={action} onClose={() => setManagedPollId(null)} />)}
     {resetTarget && host && <ResetDialog target={resetTarget} busy={busy} onAction={action} onClose={() => setResetTarget(null)} />}

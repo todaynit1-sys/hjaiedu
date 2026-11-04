@@ -1,5 +1,5 @@
 const randomUUID = () => crypto.randomUUID();
-import type { Day, Poll, PollKind, Room, Snapshot } from './types.ts';
+import { CHARACTERS, defaultCharacter, type Day, type Poll, type PollKind, type Room, type Snapshot } from './types.ts';
 
 export class AppError extends Error {
   status: number;
@@ -68,7 +68,9 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     .filter(([, at]) => date === currentDate && Date.now() - at < 45_000).map(([id]) => id));
   const seats = Array.from(present).flatMap(id => {
     const name = day.participants?.[id];
-    return name ? [{ number: seatNumber(name), name, mine: guest === id }] : [];
+    if (!name) return [];
+    const number = seatNumber(name);
+    return [{ number, name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number) }];
   }).sort((a, b) => a.number - b.number);
   return {
     code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
@@ -85,6 +87,15 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   const date = today();
   if (action.date !== undefined && action.date !== date) throw new AppError('지난 강의 기록은 변경할 수 없습니다.', 409);
   const day = ensureDay(room, date);
+  if (action.type === 'character') {
+    if (host) throw new AppError('수강생만 캐릭터를 고를 수 있어요.', 403);
+    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    if (!day.active || !day.participants?.[guest]) throw new AppError('강의실에 입장한 뒤 캐릭터를 골라주세요.', 409);
+    const character = CHARACTERS.find(choice => choice === action.character);
+    if (!character) throw new AppError('목록에서 캐릭터를 골라주세요.');
+    (day.characters ??= {})[guest] = character;
+    return;
+  }
   if (action.type === 'heartbeat') {
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
     day.presence = Object.fromEntries(Object.entries(day.presence).filter(([, at]) => Date.now() - at < 45_000));

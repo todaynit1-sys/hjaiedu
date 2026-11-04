@@ -1,20 +1,20 @@
 # 신현준 연구사 AI환경연구소 실시간 강의실
 
-20석이 한 화면에 보이는 실시간 AI 강의실입니다. 수강생이 접속하면 빈 책상에 캐릭터가 앉고, 채팅을 보내면 자기 자리 위에 말풍선이 뜹니다. 초록 칠판에는 강사가 마지막으로 공유한 메시지가 표시됩니다. 21번 이후 좌석은 20석 단위로 넘겨볼 수 있습니다.
+20석이 한 화면에 보이는 실시간 AI 강의실입니다. 수강생은 자기 책상이나 **캐릭터 선택**을 눌러 여섯 캐릭터 중 하나를 고릅니다. 선택은 같은 날 재접속해도 유지되며, 채팅은 그 캐릭터 위에 말풍선으로 뜹니다. 초록 칠판에는 강사의 마지막 메시지가 보입니다. 21번 이후 좌석은 20석 단위로 넘겨볼 수 있습니다.
 
 소스 저장소: https://github.com/todaynit1-sys/hjaiedu
 
 문의: **hjuni@korea.kr**. 선택한 6번 AI 글자형 벡터 로고, 네이비 헤더, 읽기 쉬운 채팅 화면을 사용합니다. 로고 원본은 `public/branding/ai-environment-mark-v1.svg`, 가로 로고는 `ai-environment-wordmark-v1.svg`입니다.
 
-- 수강생 주소: https://mamo-edu.hjsy.workers.dev/
-- Vercel 수강생 주소: https://hjaiedu.vercel.app/
-- 강사 주소: https://mamo-edu.hjsy.workers.dev/host?room=MAMOAI
+- 회사 수강생 주소: https://hjaiedu.vercel.app/
+- 회사 강사 주소: https://hjaiedu.vercel.app/host?room=MAMOAI
+- 회사 전용 Cloudflare 서버: https://mamo-edu.hjsy.workers.dev/
 - 기본 참여 코드: `MAMOAI`
 - 강사 접속: 상단 공기 심볼을 5번 누른 뒤 기존 접속 코드 `0423` 입력
 
-채팅, 링크·당일 파일 공유, 메시지 고정·삭제, 실시간 투표, 참여 링크·QR, 별도 강의실 생성, 한국 시간 자정 초기화 기능을 유지합니다. 강사 업로드는 개당 10MiB이며, 기존 실습 PDF 12종도 제공합니다. 기존 수업 설문을 유지하고 문의 이메일은 hjuni@korea.kr로 제공합니다.
+채팅, 링크·당일 파일 공유, 메시지 고정·삭제, 실시간 투표, 참여 링크·QR, 별도 강의실 생성, 한국 시간 자정 초기화를 지원합니다. 강사 업로드는 개당 10MiB이며, 기본 실습 PDF 12종도 제공합니다. 외부 수업 설문은 개인 AI전략연구소와 같은 구글폼을 사용합니다. 강의실 안의 컨디션과 수업 투표는 회사 전용 서버에 저장됩니다.
 
-React/Vite + Cloudflare Workers + SQLite Durable Object 구조입니다. Worker 이름은 `mamo-edu`, 기본 강의실은 `MAMOAI`, 내부 객체는 `mamo-class-board`입니다. 별도 Worker와 저장소를 사용하므로 기존 `edu`의 대화·투표·강사 세션과 독립적으로 운영합니다. 기존 환경 파일, 인증 정보와 운영 데이터를 복사하지 않았습니다.
+Vercel은 회사 강의실 화면을 제공하고 회사 전용 Cloudflare Worker `mamo-edu`가 채팅·투표·당일 첨부파일을 저장합니다. 기본 방은 `MAMOAI`, Durable Object 이름은 `mamo-class-board`입니다. 개인 AI전략연구소는 별도 저장소 `todaynit1-sys/hjsyedu`, Worker `edu`, 방 `HJSYAI`를 사용합니다.
 
 ## 개발 및 검증
 
@@ -37,7 +37,7 @@ npm run dev
 
 일반 `/api/*` 요청은 기존 `mamo-edu.hjsy.workers.dev`의 Worker로 연결합니다. WebSocket은 프록시를 거치지 않고, 60초 유효한 서명 접속권을 발급받아 Worker에 직접 연결합니다. 접속권은 방과 기존 세션 권한에 묶이며 URL이나 브라우저 저장소에 보관하지 않습니다. Vercel은 화면을 제공하고 채팅·투표·파일·자정 초기화는 독립 Cloudflare 저장소에서 실행합니다. 양쪽 주소는 같은 강의실 데이터를 사용합니다. 개인 브라우저 세션은 접속 주소별로 구분됩니다.
 
-PC에서는 교실과 실시간 채팅이 나란히 열립니다. 모바일에서는 **교실**과 **채팅**을 전환하며, 어느 쪽에서도 같은 입력창으로 메시지를 보낼 수 있습니다. **오늘의 컨디션**은 강의실 제목 옆에서 열고, **참고자료**에서 실습 PDF를 내려받습니다.
+PC에서는 교실과 실시간 채팅이 나란히 열립니다. 모바일에서는 **교실**과 **채팅**을 전환하며, 어느 쪽에서도 같은 입력창으로 메시지를 보낼 수 있습니다. **오늘의 컨디션**에서 표정을 누르면 세 항목별 인원수가 모두의 화면에 갱신됩니다. **참고자료**에서는 실습 PDF를 내려받습니다.
 
 ### Cloudflare
 

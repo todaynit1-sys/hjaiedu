@@ -8,11 +8,11 @@ test('Seoul midnight deletes yesterday and resets messages, votes, presence and 
   const before = ensureDay(room, '2026-10-08');
   before.polls[0].votes.guest = 2;
   before.messages.push({ id: 'old', text: '어제 채팅', url: null, pinned: true, createdAt: '2026-10-08T10:00:00Z' });
-  before.presence.guest = Date.now(); before.participants = { guest: '수강생 01' }; before.active = false;
+  before.presence.guest = Date.now(); before.participants = { guest: '수강생 01' }; before.characters = { guest: 'cat' }; before.active = false;
   const after = ensureDay(room, '2026-10-09');
   assert.deepEqual(after.polls[0].votes, {});
   assert.deepEqual(after.messages, []); assert.deepEqual(after.presence, {});
-  assert.equal(after.participants, undefined); assert.equal(after.active, true);
+  assert.equal(after.participants, undefined); assert.equal(after.characters, undefined); assert.equal(after.active, true);
   assert.deepEqual(Object.keys(room.days), ['2026-10-09']);
   assert.equal(JSON.stringify(room).includes('어제 채팅'), false);
   assert.throws(() => snapshot(room, '2026-10-08', null, 'local'), /기록이 없습니다/);
@@ -75,7 +75,22 @@ test('presence deduplicates browser tabs and expires after 45 seconds', () => {
   day.presence.old = Date.now() - 46_000;
   const view = snapshot(room, today(), 'guest', 'local');
   assert.equal(view.online, 1);
-  assert.deepEqual(view.seats, [{ number: 1, name: '수강생 01', mine: true }]);
+  assert.deepEqual(view.seats, [{ number: 1, name: '수강생 01', mine: true, character: 'smile' }]);
+});
+test('a signed student selects only their own character and it survives chat reset', () => {
+  const room = newRoom('수업');
+  for (const id of ['one', 'two']) mutate(room, { type: 'heartbeat' }, id, false);
+  const change = { type: 'character', character: 'cat', guest: 'two', seatNumber: 2 };
+  assert.throws(() => mutate(room, change, null, false), /참여/);
+  assert.throws(() => mutate(room, change, 'one', true), /수강생만/);
+  assert.throws(() => mutate(room, { ...change, character: 'custom' }, 'one', false), /목록/);
+  mutate(room, change, 'one', false);
+  mutate(room, { type: 'room-reset', target: 'chat' }, null, true);
+  const view = snapshot(room, today(), 'two', 'local');
+  assert.deepEqual(view.seats.map(seat => seat.character), ['cat', 'sprout']);
+  assert.equal('characters' in view, false);
+  mutate(room, { type: 'active', active: false }, null, true);
+  assert.throws(() => mutate(room, change, 'one', false), /강의실에 입장/);
 });
 test('chat reset clears messages and pins while preserving votes, aliases and presence', () => {
   const room = newRoom('수업'); const day = ensureDay(room);
