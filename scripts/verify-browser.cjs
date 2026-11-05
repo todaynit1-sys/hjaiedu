@@ -225,6 +225,22 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   assert.equal(await arrival.evaluate(el => getComputedStyle(el).animationName), 'classroom-arrive');
   await student.reload();
   await student.locator('.classroom-seat.is-mine[title="몽실구름"]').waitFor();
+  await student.getByRole('button',{name:'움직이기',exact:true}).click();
+  const floor = student.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
+  await floor.tap({position:{x:90,y:130}});
+  const walker = second.locator('.classroom-walker[title="몽실구름"]');
+  await walker.waitFor();
+  await waitUntil(async () => Math.abs(parseFloat(await walker.evaluate(el=>el.style.left)) - 90 / (await floor.boundingBox()).width * 100) < 1,
+    'Touch/click movement must reach the other student');
+  await floor.focus();
+  await student.keyboard.press('ArrowRight');
+  const moved = await student.locator('.classroom-walker.is-mine').evaluate(el=>el.style.left);
+  await waitUntil(async () => (await walker.evaluate(el=>el.style.left)) === moved, 'Arrow-key movement must be broadcast');
+  await student.reload();
+  await student.locator('.classroom-walker.is-mine').waitFor();
+  await student.getByRole('button',{name:'내 자리로',exact:true}).click();
+  await waitUntil(async () => await walker.count() === 0, 'Returning to seat must remove roaming character for everyone');
+  await student.locator('.classroom-seat.is-mine .classroom-head').waitFor();
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,

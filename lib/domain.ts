@@ -70,7 +70,7 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     const name = day.participants?.[id];
     if (!name) return [];
     const number = seatNumber(name);
-    return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number) }];
+    return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number), ...(day.positions?.[id] ? { position: day.positions[id] } : {}) }];
   }).sort((a, b) => a.number - b.number);
   return {
     code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
@@ -87,6 +87,20 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   const date = today();
   if (action.date !== undefined && action.date !== date) throw new AppError('지난 강의 기록은 변경할 수 없습니다.', 409);
   const day = ensureDay(room, date);
+  if (action.type === 'move') {
+    if (host) throw new AppError('수강생 캐릭터만 움직일 수 있어요.', 403);
+    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    if (!day.active || !day.participants?.[guest]) throw new AppError('진행 중인 강의실에서 움직일 수 있어요.', 409);
+    if (action.position === null) { delete day.positions?.[guest]; return; }
+    const position = action.position as { x?: unknown; y?: unknown } | undefined;
+    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number'
+      || !Number.isFinite(position.x) || !Number.isFinite(position.y)
+      || position.x < 0.06 || position.x > 0.94 || position.y < 0.08 || position.y > 0.92) {
+      throw new AppError('교실 안에서 이동할 위치를 골라주세요.');
+    }
+    (day.positions ??= {})[guest] = { x: Math.round(position.x * 10000) / 10000, y: Math.round(position.y * 10000) / 10000 };
+    return;
+  }
   if (action.type === 'nickname') {
     if (host) throw new AppError('수강생만 닉네임을 설정할 수 있어요.', 403);
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);

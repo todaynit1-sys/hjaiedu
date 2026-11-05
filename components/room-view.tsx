@@ -133,6 +133,10 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   }, [code, date, host]);
   const action = useCallback(async (input: Record<string, unknown>, success: string) => { setBusy(true); try { const value = await api<Snapshot>(`/api/rooms/${code}`, { ...input, date }); if (input.type === 'message') forceBottom.current = true; setData(value); setConnected(true); setError(''); notify(success); } catch (e) { setError((e as Error).message); throw e; } finally { setBusy(false); } }, [code, date]);
   const safeAction = useCallback(async (input: Record<string, unknown>, success: string) => { try { await action(input, success); } catch { /* visible room error */ } }, [action]);
+  const moveCharacter = useCallback(async (position: import('../lib/types').ClassroomPosition | null) => {
+    const value = await api<Snapshot>(`/api/rooms/${code}`, { type: 'move', position, date });
+    setData(current => !current || (current.code === value.code && current.date === value.date && Date.parse(value.updatedAt) >= Date.parse(current.updatedAt)) ? value : current);
+  }, [code, date]);
   const attachFile = useCallback(async (file: File, id: string, caption: string, url: string) => {
     setBusy(true);
     try {
@@ -200,6 +204,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         </div>
         <div id="classroom-pane" className="classroom-pane">
           <ClassroomScene data={data} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+            onMove={!host && active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
             {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 {customPolls.length}개 보기</button>}

@@ -20,6 +20,27 @@ test('nicknames keep daily seat identity and are used for new chat messages', ()
   }
   assert.equal(ensureDay(room).participants?.first, '수강생 01');
 });
+
+test('movement shares only each student position and preserves assigned seats', () => {
+  const room = newRoom('이동 수업');
+  mutate(room, {type: 'heartbeat'}, 'a', false);
+  mutate(room, {type: 'heartbeat'}, 'b', false);
+  mutate(room, {type: 'move', position: {x: .25, y: .75}, guest: 'b'}, 'a', false);
+  let view = snapshot(room, today(), 'b', 'local');
+  assert.deepEqual(view.seats[0].position, {x: .25, y: .75});
+  assert.equal(view.seats[1].position, undefined);
+  assert.equal(view.seats[0].number, 1);
+  for (const position of [undefined, {}, {x: NaN,y:.5}, {x:2,y:.5}, {x:.5,y:-1}, {x:'0.5',y:.5}]) {
+    assert.throws(() => mutate(room, {type:'move', position}, 'a', false));
+  }
+  assert.throws(() => mutate(room, {type:'move', position:null}, null, true));
+  mutate(room, {type:'move', position:null}, 'a', false);
+  view = snapshot(room, today(), 'b', 'local');
+  assert.equal(view.seats[0].position, undefined);
+  assert.equal(view.seats[0].number, 1);
+  mutate(room, {type:'active', active:false}, null, true);
+  assert.throws(() => mutate(room, {type:'move', position:{x:.5,y:.5}}, 'a', false));
+});
 import { ensureDay, mutate, newRoom, safeUrl, snapshot, today } from '../lib/domain.ts';
 test('Seoul midnight deletes yesterday and resets messages, votes, presence and aliases', () => {
   assert.equal(today(new Date('2026-10-08T14:59:59Z')), '2026-10-08');

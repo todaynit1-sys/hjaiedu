@@ -423,9 +423,42 @@
 .classroom-nickname-dialog form p { color: var(--muted); font-size: 13px; margin: 0; }
 .classroom-nickname-dialog form .error { color: #a63829; }
 .classroom-seat-info { flex-wrap: wrap; }
+.classroom-floor { position: relative; display: flex; flex: 1 0 220px; min-height: 220px; isolation: isolate; }
+.classroom-floor > .classroom-seats { width: 100%; }
+.classroom-floor[data-moving] { cursor: crosshair; }
+.classroom-floor[data-moving] .classroom-desk-hit { pointer-events: none; }
+.classroom-walker {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  justify-items: center;
+  width: clamp(36px, 7vw, 62px);
+  color: var(--desk-ink);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: left 200ms linear, top 200ms linear;
+}
+.classroom-walker > svg { width: 100%; height: auto; animation: classroom-walk 200ms ease-in-out; }
+.classroom-walker-name { max-width: 90px; padding: 1px 5px; border-radius: 5px; background: #fff; color: #283452; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classroom-walker.is-mine .classroom-walker-name { outline: 1px solid var(--forest); }
+.classroom-move-hint { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 760px) {
+  .classroom-seat-info { gap: 5px; }
+  .classroom-student-count { display: none; }
+  .classroom-character-trigger { padding-inline: 5px; }
+}
+@media (max-width: 760px) and (max-height: 620px) {
+  .classroom-floor { flex: 1 1 0; min-height: 135px; }
+}
+@keyframes classroom-walk {
+  25% { transform: translateY(-3px) rotate(-5deg); }
+  75% { transform: translateY(-2px) rotate(5deg); }
+}
 @media (max-width: 760px) and (max-height: 620px) {
   .classroom-desk[data-nickname] text { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .classroom-arrival, .classroom-head { animation: none; }
+  .classroom-walker { transition: none; }
+  .classroom-walker > svg { animation: none; }
 }
