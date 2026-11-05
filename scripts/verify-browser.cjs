@@ -131,16 +131,18 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await page.getByRole('button',{name:'참여 링크',exact:true}).click(); await page.getByAltText('강의실 '+code+' 참여 QR코드').waitFor();
   assert.equal(await page.locator('dialog').evaluate(el=>el.open),true);
   await page.screenshot({path:'.local/screenshots/share-qr.png',fullPage:true}); await page.keyboard.press('Escape'); assert.equal(await page.locator('dialog').count(),0);
-  for (const [width,height] of [[1440,900],[390,844],[320,568]]) {
+  for (const [width,height] of [[1440,900],[810,535],[390,844],[320,568]]) {
     await student.setViewportSize({width,height});
     await student.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
     assert.equal(await student.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true, 'Overflow at '+width);
     assert.equal(await student.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true,'Page scroll at '+width);
     const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox(); assert(composer.y>=0 && composer.y+composer.height<=height,'Composer outside first viewport at '+width);
     const columns = await student.locator('.classroom-seats').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
-    assert.equal(columns, width === 1440 ? 5 : 4, 'Seat columns at '+width);
+    assert.equal(columns, width >= 761 ? 5 : 4, 'Seat columns at '+width);
     assert.equal(await student.locator('.classroom-seat').count(), 20);
     const lastDesk = await student.locator('.classroom-seat').last().boundingBox();
+    const footer = await student.locator('.classroom-seating-footer').boundingBox();
+    assert(lastDesk.y + lastDesk.height <= footer.y + 1, 'Desk rows overlap the controls at '+width);
     if (width < 761) {
       const shell = await student.locator('.chat-composer').boundingBox();
       const picker = await student.getByRole('button',{name:'캐릭터 선택',exact:true}).boundingBox();

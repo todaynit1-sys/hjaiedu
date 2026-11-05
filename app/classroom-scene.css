@@ -423,7 +423,7 @@
 .classroom-nickname-dialog form p { color: var(--muted); font-size: 13px; margin: 0; }
 .classroom-nickname-dialog form .error { color: #a63829; }
 .classroom-seat-info { flex-wrap: wrap; }
-.classroom-floor { position: relative; display: flex; flex: 1 0 220px; min-height: 220px; isolation: isolate; }
+.classroom-floor { position: relative; display: flex; flex: 1 0 auto; min-height: min-content; isolation: isolate; }
 .classroom-floor > .classroom-seats { width: 100%; }
 .classroom-floor[data-moving] { cursor: crosshair; }
 .classroom-floor[data-moving] .classroom-desk-hit { pointer-events: none; }
