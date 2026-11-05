@@ -70,7 +70,7 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     const name = day.participants?.[id];
     if (!name) return [];
     const number = seatNumber(name);
-    return [{ number, name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number) }];
+    return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number) }];
   }).sort((a, b) => a.number - b.number);
   return {
     code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
@@ -87,6 +87,15 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   const date = today();
   if (action.date !== undefined && action.date !== date) throw new AppError('지난 강의 기록은 변경할 수 없습니다.', 409);
   const day = ensureDay(room, date);
+  if (action.type === 'nickname') {
+    if (host) throw new AppError('수강생만 닉네임을 설정할 수 있어요.', 403);
+    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    if (!day.active || !day.participants?.[guest]) throw new AppError('강의실에 입장한 뒤 닉네임을 설정해주세요.', 409);
+    const nickname = text(action.nickname, '닉네임', 20);
+    if (/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(nickname)) throw new AppError('닉네임에 줄바꿈이나 숨김 문자를 사용할 수 없어요.');
+    (day.nicknames ??= {})[guest] = nickname;
+    return;
+  }
   if (action.type === 'character') {
     if (host) throw new AppError('수강생만 캐릭터를 고를 수 있어요.', 403);
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
@@ -116,7 +125,7 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     if (day.messages.length >= 2000) throw new AppError('하루에 최대 2,000개까지 메시지를 보낼 수 있습니다.');
     if (!host && day.messages.filter(m => m.authorId === guest && Date.now() - Date.parse(m.createdAt) < 60_000).length >= 10) throw new AppError('메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 보내주세요.', 429);
     const content = text(action.text, '내용', 2000); const url = safeUrl(action.url);
-    day.messages.push({ id: randomUUID(), text: content, url, pinned: false, createdAt: new Date().toISOString(), author: host ? 'host' : 'student', authorName: host ? '강사' : participantName(day, guest!), ...(host ? {} : { authorId: guest! }) });
+    day.messages.push({ id: randomUUID(), text: content, url, pinned: false, createdAt: new Date().toISOString(), author: host ? 'host' : 'student', authorName: host ? '강사' : day.nicknames?.[guest!] ?? participantName(day, guest!), ...(host ? {} : { authorId: guest! }) });
     return;
   }
   if (!host) throw new AppError('강사 로그인이 필요합니다.', 401);

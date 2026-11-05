@@ -1,5 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+
+test('nicknames keep daily seat identity and are used for new chat messages', () => {
+  const room = newRoom('닉네임 수업');
+  mutate(room, { type: 'heartbeat' }, 'first', false);
+  mutate(room, { type: 'heartbeat' }, 'second', false);
+  mutate(room, { type: 'nickname', nickname: '  새싹이  ' }, 'first', false);
+  const view = snapshot(room, today(), 'first', 'local');
+  assert.equal(view.seats[0].number, 1);
+  assert.equal(view.seats[0].name, '새싹이');
+  assert.equal(view.seats[1].number, 2);
+  mutate(room, { type: 'message', text: '반가워요' }, 'first', false);
+  const message = snapshot(room, today(), 'second', 'local').messages.at(-1)!;
+  assert.equal(message.authorName, '새싹이');
+  assert.equal(message.seatNumber, 1);
+  assert.throws(() => mutate(room, { type: 'nickname', nickname: '이름' }, null, true));
+  for (const nickname of ['', ' '.repeat(2), 'a'.repeat(21), '이름\n변경']) {
+    assert.throws(() => mutate(room, { type: 'nickname', nickname }, 'first', false));
+  }
+  assert.equal(ensureDay(room).participants?.first, '수강생 01');
+});
 import { ensureDay, mutate, newRoom, safeUrl, snapshot, today } from '../lib/domain.ts';
 test('Seoul midnight deletes yesterday and resets messages, votes, presence and aliases', () => {
   assert.equal(today(new Date('2026-10-08T14:59:59Z')), '2026-10-08');

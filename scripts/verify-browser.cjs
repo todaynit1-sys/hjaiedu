@@ -213,6 +213,18 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.setViewportSize({ width: 320, height: 568 });
   await postNote(shortNote);
   await waitUntil(async () => { const m = await boardMetrics(); return m.fits && Math.abs(m.height-compact.height)<2 && Math.abs(m.size-compact.size)<1; }, 'Short posts restore original board size');
+  await student.getByRole('button', {name:'닉네임 설정', exact:true}).click();
+  const nicknameDialog = student.getByRole('dialog', {name:'닉네임 설정', exact:true});
+  await nicknameDialog.getByLabel('수업에서 사용할 이름').fill('몽실구름');
+  await nicknameDialog.getByRole('button', {name:'저장하기', exact:true}).click();
+  await waitUntil(async () => (await second.locator('.classroom-seat[title="몽실구름"]').count()) === 1, 'Nickname must reach another student');
+  const arrival = student.locator('.classroom-seat.is-mine .classroom-arrival');
+  await student.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await arrival.evaluate(el => getComputedStyle(el).animationName), 'none');
+  await student.emulateMedia({reducedMotion:'no-preference'});
+  assert.equal(await arrival.evaluate(el => getComputedStyle(el).animationName), 'classroom-arrive');
+  await student.reload();
+  await student.locator('.classroom-seat.is-mine[title="몽실구름"]').waitFor();
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,

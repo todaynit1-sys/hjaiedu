@@ -199,7 +199,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {materialsButton}
         </div>
         <div id="classroom-pane" className="classroom-pane">
-          <ClassroomScene data={data} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined} />
+          <ClassroomScene data={data} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+            onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
             {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 {customPolls.length}개 보기</button>}
             {host && active && <button onClick={() => setQuestions(true)} aria-label="새 투표 만들기" aria-haspopup="dialog"><Plus size={16} />새 투표</button>}

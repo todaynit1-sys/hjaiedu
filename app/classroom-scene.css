@@ -402,3 +402,30 @@
 @media (prefers-reduced-motion: reduce) {
   .classroom-seat-bubble { animation: none; }
 }
+
+.classroom-arrival { animation: classroom-arrive 800ms ease-out both; }
+.classroom-head { transform-origin: 45px 36px; animation: classroom-breathe 8s ease-in-out 1s 2; }
+@keyframes classroom-arrive {
+  0% { opacity: 0; transform: translate(-18px, -8px) rotate(-7deg); }
+  35% { opacity: 1; transform: translate(-10px, -12px) rotate(5deg); }
+  70% { transform: translate(0, -4px) rotate(-3deg); }
+  85% { transform: translate(0, 1px); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+}
+@keyframes classroom-breathe {
+  0%, 80%, 100% { transform: translateY(0); }
+  88% { transform: translateY(-1px) rotate(1deg); }
+  94% { transform: translateY(0) rotate(-1deg); }
+}
+.classroom-nickname-dialog { max-width: 400px; }
+.classroom-nickname-dialog form { display: grid; gap: 12px; margin-top: 12px; }
+.classroom-nickname-dialog input { width: 100%; min-height: 44px; font-size: 16px; }
+.classroom-nickname-dialog form p { color: var(--muted); font-size: 13px; margin: 0; }
+.classroom-nickname-dialog form .error { color: #a63829; }
+.classroom-seat-info { flex-wrap: wrap; }
+@media (max-width: 760px) and (max-height: 620px) {
+  .classroom-desk[data-nickname] text { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .classroom-arrival, .classroom-head { animation: none; }
+}

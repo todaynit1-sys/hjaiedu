@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, Smile, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
 import { Chalkboard } from './chalkboard';
 import { animalHeads } from './animal-heads';
 import { gardenHeads } from './garden-heads';
@@ -85,13 +85,53 @@ function CharacterPicker({ current, onChange, onClose }: { current: Character; o
   </dialog>;
 }
 
-function DeskDrawing({ number, character, mine }: { number: number; character?: Character; mine: boolean }) {
-  return <svg className="classroom-desk" viewBox="0 0 90 68" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {character ? <StudentHead character={character} /> : <path className="classroom-empty-chair" d="M29 38v-8c0-3 2-5 5-5h22c3 0 5 2 5 5v8" />}
+function NicknameDialog({ current, onSave, onClose }: { current: string; onSave: (nickname: string) => Promise<void>; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [nickname, setNickname] = useState(current);
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const element = dialog.current;
+    element?.showModal();
+    element?.querySelector('input')?.select();
+    return () => { element?.close(); previous?.focus(); };
+  }, []);
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true); setError('');
+    try { await onSave(nickname.trim()); onClose(); }
+    catch (cause) {
+      inFlight.current = false; setSaving(false);
+      setError(cause instanceof Error ? cause.message : '닉네임을 저장하지 못했어요. 다시 시도해주세요.');
+    }
+  }
+  return <dialog ref={dialog} className="classroom-character-dialog classroom-nickname-dialog" aria-labelledby="nickname-title"
+    onCancel={event => { event.preventDefault(); if (!saving) onClose(); }}>
+    <div className="classroom-picker-heading"><h2 id="nickname-title">닉네임 설정</h2><button className="icon-button" type="button" disabled={saving} onClick={onClose} aria-label="닉네임 설정 닫기"><X size={20} /></button></div>
+    <form onSubmit={save}>
+      <label htmlFor="classroom-nickname">수업에서 사용할 이름</label>
+      <input id="classroom-nickname" value={nickname} onChange={event => setNickname(event.target.value)} maxLength={20} required disabled={saving}
+        autoComplete="nickname" aria-describedby="nickname-hint" aria-invalid={Boolean(error)} />
+      <p id="nickname-hint">1~20자 · 오늘 수업의 채팅과 내 자리에 표시돼요.</p>
+      {error && <p className="error" role="alert">{error}</p>}
+      <button className="primary" type="submit" disabled={saving || !nickname.trim()}>{saving ? '저장 중' : '저장하기'}</button>
+    </form>
+  </dialog>;
+}
+
+function DeskDrawing({ number, character, mine, name }: { number: number; character?: Character; mine: boolean; name?: string }) {
+  const nickname = name && name !== `수강생 ${seatLabel(number)}` ? name : '';
+  const label = Array.from(nickname);
+  return <svg className="classroom-desk" data-nickname={nickname || undefined} viewBox="0 0 90 68" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {character ? <g key={character} className="classroom-arrival"><g className="classroom-head"><StudentHead character={character} /></g></g> : <path className="classroom-empty-chair" d="M29 38v-8c0-3 2-5 5-5h22c3 0 5 2 5 5v8" />}
     <path d="m14 56 .5 6m60-6-.5 6" />
     <rect className="classroom-desk-front" x="7" y="36.5" width="76" height="22" rx="7.2" />
     <path d="M14.5 39.5h61" stroke="white" strokeOpacity=".8" strokeWidth="1" />
-    <text x="45" y="52.7" textAnchor="middle" fill="currentColor" stroke="none" fontSize="13.8" fontWeight="750">{seatLabel(number)}</text>
+    <text x="45" y="52.7" textAnchor="middle" fill="currentColor" stroke="none" fontSize={nickname ? 10 : 13.8} fontWeight="750">{nickname ? label.slice(0, 5).join('') + (label.length > 5 ? '…' : '') : seatLabel(number)}</text>
     {mine && <path d="M22 63q22 4 46 0" stroke="#4656a5" strokeWidth="2.8" />}
   </svg>;
 }
@@ -119,10 +159,11 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, mood, onCharacterChange }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void> }) {
+export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void> }) {
   const seats = data.seats ?? [];
   const mySeat = seats.find(seat => seat.mine);
   const [choosingCharacter, setChoosingCharacter] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
   const pages = [...new Set([0, ...seats.map(seat => seatPage(seat.number))])].sort((a, b) => a - b);
   const [selectedPage, setSelectedPage] = useState<{ roomDay: string; page: number } | null>(null);
   const roomDay = `${data.code}/${data.date}`;
@@ -147,18 +188,19 @@ export function ClassroomScene({ data, mood, onCharacterChange }: { data: Snapsh
         const seat = seats.find(item => item.number === number);
         const bubble = seat && bubbles.get(number);
         const character = seat && (seat.character ?? defaultCharacter(number));
-        return <li key={number} data-character={character} className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
+        return <li key={number} data-character={character} title={seat?.name} className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
           <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{character && ', ' + characterNames[character]}{seat?.mine ? ', 내 자리' : ''}</span>
           <div className="classroom-desk-wrap">
             {bubble && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
-            <DeskDrawing number={number} character={character} mine={Boolean(seat?.mine)} />
+            <DeskDrawing number={number} character={character} mine={Boolean(seat?.mine)} name={seat?.name} />
             {seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={() => setChoosingCharacter(true)} />}
           </div>
         </li>;
       })}
     </ol>
     <div className="classroom-seating-footer">
-      <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat">내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
+      <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat" title={mySeat.name}>내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
+        {mySeat && onNicknameChange && <button className="classroom-character-trigger" type="button" aria-haspopup="dialog" onClick={() => setEditingNickname(true)}><Pencil size={15} aria-hidden="true" />닉네임 설정</button>}
         {mySeat && onCharacterChange && <button className="classroom-character-trigger" type="button" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터 선택</button>}
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
@@ -170,5 +212,6 @@ export function ClassroomScene({ data, mood, onCharacterChange }: { data: Snapsh
     </div>
     {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}
       onChange={onCharacterChange} onClose={() => setChoosingCharacter(false)} />}
+    {editingNickname && mySeat && onNicknameChange && <NicknameDialog key={roomDay} current={mySeat.name} onSave={onNicknameChange} onClose={() => setEditingNickname(false)} />}
   </section>;
 }
