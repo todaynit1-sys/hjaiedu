@@ -243,6 +243,56 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByRole('button',{name:'내 자리로',exact:true}).click();
   await waitUntil(async () => await walker.count() === 0, 'Returning to seat must remove roaming character for everyone');
   await student.locator('.classroom-seat.is-mine .classroom-head').waitFor();
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto(base+'/host?room='+code);
+  await page.getByRole('heading',{name:'실시간 기능 검증 수업'}).waitFor();
+  await student.getByRole('button',{name:'활동',exact:true}).click();
+  const activities = student.getByRole('dialog',{name:'교실 활동',exact:true});
+  await activities.getByRole('button',{name:'질문 있어요',exact:true}).click();
+  await waitUntil(async()=>await page.locator('.raised-hand').count() === 1,'Raised hand must reach instructor');
+  await activities.getByRole('button',{name:'박수',exact:true}).click();
+  await second.locator('.classroom-seat[title="몽실구름"] [data-kind="clap"]').waitFor();
+  await activities.getByRole('button',{name:'단체사진 미리보기',exact:true}).click();
+  const photoDownload = student.waitForEvent('download');
+  await activities.getByRole('button',{name:'단체사진 PNG 저장',exact:true}).click();
+  const photo = await photoDownload;
+  assert.match(photo.suggestedFilename(),/^AI강의실-단체사진-.*\.png$/);
+  assert.equal(await photo.failure(),null);
+  const photoBytes = require('node:fs').readFileSync(await photo.path());
+  assert.equal(photoBytes.subarray(1,4).toString(),'PNG');
+  require('node:fs').copyFileSync(await photo.path(),'.local/screenshots/classroom-group-photo.png');
+  await activities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
+  const greetingRequest = target => target.waitForResponse(response => response.request().method()==='POST' && response.url().endsWith('/api/rooms/'+code) && response.request().postDataJSON()?.type==='greet');
+  const firstGreeting = greetingRequest(second);
+  await second.getByRole('button',{name:'몽실구름에게 인사하기',exact:true}).click();
+  const firstResponse = await firstGreeting;
+  assert.equal(firstResponse.status(),200);
+  const firstGreetingBody = await firstResponse.json();
+  const replyGreeting = greetingRequest(student);
+  await student.getByRole('button',{name:'수강생 02에게 인사하기',exact:true}).click();
+  const replyResponse = await replyGreeting;
+  assert.equal(replyResponse.status(),200);
+  const replyGreetingBody = await replyResponse.json();
+  assert.equal(replyGreetingBody.seats.find(seat=>seat.name==='몽실구름').activity.reaction.kind,'heart',JSON.stringify({first:firstGreetingBody.seats,last:replyGreetingBody.seats,firstAt:firstGreetingBody.updatedAt,lastAt:replyGreetingBody.updatedAt}));
+  await second.locator('.classroom-seat[title="몽실구름"] [data-kind="heart"]').waitFor();
+  await page.getByRole('button',{name:/^활동/}).click();
+  const hostActivities = page.getByRole('dialog',{name:'교실 활동',exact:true});
+  await hostActivities.getByRole('button',{name:'응답 완료',exact:true}).click();
+  await waitUntil(async()=>await second.locator('.raised-hand').count() === 0,'Instructor can acknowledge raised hand');
+  await hostActivities.getByLabel('문제',{exact:true}).fill('AI는 실무에 활용할 수 있다.');
+  await hostActivities.getByRole('button',{name:'OX 퀴즈 시작',exact:true}).click();
+  await hostActivities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
+  await student.getByRole('button',{name:'O 선택',exact:true}).click();
+  await second.locator('.classroom-walker[title="몽실구름"]').waitFor();
+  await waitUntil(async()=>parseFloat(await second.locator('.classroom-walker[title="몽실구름"]').evaluate(el=>el.style.left))<50,'Quiz answer moves character to O zone');
+  const quizLastDesk = await student.locator('.classroom-seat').last().boundingBox();
+  const quizFooter = await student.locator('.classroom-seating-footer').boundingBox();
+  assert(quizLastDesk.y+quizLastDesk.height <= quizFooter.y+1,'Quiz desks must not overlap activity controls');
+  await student.screenshot({path:'.local/screenshots/classroom-quiz-mobile.png'});
+  await page.getByRole('button',{name:'정답 공개',exact:true}).click();
+  await student.getByText('정답은 O · 참여 1명',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'퀴즈 닫기',exact:true}).click();
+  await student.getByRole('button',{name:'내 자리로',exact:true}).click();
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,
@@ -250,7 +300,8 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
       'student avatar visible to peers', 'visible live mood counts and vote replacement',
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'mobile tab draft', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
-      'WebSocket delivery', '1440/390/320 layouts', 'browser errors']
+      'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
+      'OX quiz, answer regions and correct-answer reveal', 'group-photo PNG download', 'browser errors']
   }, null, 2));
   console.log('PASS: 20-seat classroom, two students, teacher chalkboard, mobile tabs, materials, voting, moderation and 1440/390/320 layouts.');
   await browser.close();

@@ -4,6 +4,7 @@ import { Chalkboard } from './chalkboard';
 import { animalHeads } from './animal-heads';
 import { gardenHeads } from './garden-heads';
 import { useClassroomMovement } from './classroom-movement';
+import { ActivityBadge, ClassroomActivities, QuizStatus, type ClassroomAction } from './classroom-activities';
 import { CHARACTERS, defaultCharacter, type Character, type ClassroomPosition, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 
@@ -160,11 +161,18 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange, onMove }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (position: ClassroomPosition | null) => Promise<void> }) {
+export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange, onMove, host = false, onActivity }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (position: ClassroomPosition | null) => Promise<void>; host?: boolean; onActivity?: ClassroomAction }) {
   const seats = data.seats ?? [];
   const mySeat = seats.find(seat => seat.mine);
   const [choosingCharacter, setChoosingCharacter] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
+  const [activityError, setActivityError] = useState('');
+  async function greet(number: number) {
+    if (!onActivity) return;
+    setActivityError('');
+    try { await onActivity({type:'greet',seatNumber:number}); }
+    catch (cause) { setActivityError(cause instanceof Error ? cause.message : '인사를 다시 보내주세요.'); }
+  }
   const pages = [...new Set([0, ...seats.map(seat => seatPage(seat.number))])].sort((a, b) => a - b);
   const [selectedPage, setSelectedPage] = useState<{ roomDay: string; page: number } | null>(null);
   const roomDay = `${data.code}/${data.date}`;
@@ -181,13 +189,15 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   const latest = data.messages.at(-1);
   const turnPage = (offset: number) => setSelectedPage({ roomDay, page: pages[pageIndex + offset] });
 
-  return <section className="classroom-scene" aria-labelledby="classroom-title">
+  return <section className={`classroom-scene${data.quiz ? ' has-quiz' : ''}`} aria-labelledby="classroom-title">
     <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2>{mood}</div>
     <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
-    <Chalkboard message={teacher} code={data.code} active={data.active} />
+    <Chalkboard message={data.quiz ? {id: data.quiz.id, text: data.quiz.question, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher} code={data.code} active={data.active} />
+    <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
     <div ref={movement.floor} className="classroom-floor" data-moving={movement.moving && Boolean(onMove) || undefined}
       role="group" aria-label="캐릭터 이동 영역" aria-describedby={onMove ? 'classroom-move-hint' : undefined}
       tabIndex={canMoveHere ? 0 : undefined} onClick={canMoveHere ? movement.click : undefined} onKeyDown={canMoveHere ? movement.keyDown : undefined}>
+    {data.quiz?.open && <div className="classroom-quiz-zones" aria-hidden="true"><span>O</span><span>X</span></div>}
     <ol className="classroom-seats" aria-label={`강의실 좌석 ${firstSeat}번부터 ${firstSeat + PAGE_SIZE - 1}번까지`} start={firstSeat}>
       {Array.from({ length: PAGE_SIZE }, (_, index) => {
         const number = firstSeat + index;
@@ -200,6 +210,9 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
           <div className="classroom-desk-wrap">
             {bubble && !walking && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
             <DeskDrawing number={number} character={walking ? undefined : character} mine={Boolean(seat?.mine)} name={seat?.name} />
+            {seat && !walking && <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>}
+            {seat && !seat.mine && !walking && !host && onActivity && <button className="classroom-desk-hit classroom-greet-hit" type="button" aria-label={`${seat.name}에게 인사하기`}
+              onClick={event => { event.stopPropagation(); void greet(seat.number); }}/>}
             {seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={() => setChoosingCharacter(true)} />}
           </div>
         </li>;
@@ -214,6 +227,9 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
         {bubble && <div className="classroom-seat-bubble" key={bubble.id}><span>{bubble.text}</span></div>}
         <svg key={`${position.x}/${position.y}`} viewBox="16 -2 60 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><StudentHead character={seat.character ?? defaultCharacter(seat.number)} /></svg>
         <span className="classroom-walker-name">{seat.name}</span>
+        <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
+        {!seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
+          onClick={event=>{event.stopPropagation(); void greet(seat.number);}}/>}
       </div>;
     })}
     </div>
@@ -222,6 +238,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
         {mySeat && onNicknameChange && <button className="classroom-character-trigger" type="button" aria-label="닉네임 설정" aria-haspopup="dialog" onClick={() => setEditingNickname(true)}><Pencil size={15} aria-hidden="true" />닉네임</button>}
         {mySeat && onCharacterChange && <button className="classroom-character-trigger" type="button" aria-label="캐릭터 선택" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터</button>}
         {mySeat && onMove && seatPage(mySeat.number) === page && <button className="classroom-character-trigger" type="button" aria-pressed={movement.moving} onClick={movement.toggle}>{movement.moving ? '내 자리로' : '움직이기'}</button>}
+        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={character=><StudentHead character={character}/>}/>
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">
@@ -232,6 +249,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
     </div>
     {onMove && <p id="classroom-move-hint" className={movement.moving ? 'classroom-move-hint' : 'sr-only'}>터치·클릭한 곳으로 이동 · 방향키로 조종 · Esc로 착석</p>}
     {movement.error && <p role="alert" className="error">{movement.error}</p>}
+    {activityError && <p role="alert" className="error">{activityError}</p>}
     {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}
       onChange={onCharacterChange} onClose={() => setChoosingCharacter(false)} />}
     {editingNickname && mySeat && onNicknameChange && <NicknameDialog key={roomDay} current={mySeat.name} onSave={onNicknameChange} onClose={() => setEditingNickname(false)} />}

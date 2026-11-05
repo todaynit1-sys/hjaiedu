@@ -1,0 +1,49 @@
+.classroom-activities-trigger { min-width: 44px; min-height: 44px; justify-content: center; }
+.classroom-activities-trigger b { font-size: 11px; }
+.classroom-activities-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
+.classroom-activities-content section { padding: 15px 0; border-top: 1px solid var(--line); }
+.classroom-activities-content h3 { margin: 0 0 10px; font-size: 17px; }
+.classroom-activities-content p { margin: 8px 0; font-size: 13px; color: var(--muted); }
+.classroom-activities-content button:not(.primary), .quiz-actions button {
+  min-height: 44px; padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 7px; background: #fff; color: var(--forest-dark); font-size: 14px;
+}
+.classroom-activities-content button[aria-pressed="true"], .quiz-actions button[aria-pressed="true"] { background: var(--mint); border-color: var(--forest); }
+.classroom-activities-content form { display: grid; gap: 8px; }
+.classroom-activities-content input, .classroom-activities-content select { min-height: 44px; width: 100%; font-size: 16px; }
+.classroom-activities-content .error { color: #a63829; }
+.activity-hand { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.activity-reactions { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 5px; margin-top: 12px; }
+.activity-reactions button { display: grid; justify-items: center; gap: 5px; padding-inline: 3px !important; font-size: 12px !important; }
+.activity-hand-queue { margin: 0; padding-left: 24px; }
+.activity-hand-queue li { padding: 4px 0; }
+.activity-hand-queue li button { margin-left: 10px; }
+.classroom-activity-badge { position: absolute; z-index: 6; top: -8px; right: 2px; display: flex; gap: 2px; pointer-events: none; }
+.classroom-activity-badge > span { display: inline-flex; align-items: center; padding: 3px; border: 1px solid #bac4e4; border-radius: 7px; background: #fff; color: #283452; box-shadow: 0 1px 4px #28345214; }
+.classroom-activity-badge .raised-hand { background: #fff1c6; border-color: #927321; }
+.classroom-activity-badge[data-kind="heart"] > span { color: #a63852; }
+.classroom-quiz-zones { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; pointer-events: none; z-index: -1; }
+.classroom-quiz-zones span { padding: 4px; background: #dff1eb99; color: #285d4c; font-size: 22px; font-weight: 800; }
+.classroom-quiz-zones span + span { background: #eeebfa99; color: #594577; text-align: right; border-left: 2px dashed #7b849f; }
+.classroom-quiz-status { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; padding: 7px 0; color: var(--forest-dark); font-size: 13px; flex: none; }
+.quiz-actions { display: flex; gap: 6px; }
+.classroom-walker-greet { position: absolute; inset: 0; border: 0; background: transparent; pointer-events: auto; min-width: 44px; min-height: 44px; }
+.classroom-floor[data-moving] .classroom-desk-hit.classroom-greet-hit { pointer-events: auto; }
+.classroom-workspace .classroom-pane > .classroom-scene.has-quiz { flex: 1 0 auto; }
+.classroom-group-photo { display: block; width: 100%; height: auto; margin: 12px 0; }
+.classroom-seat:has(.classroom-activity-badge[data-kind="understood"]) .classroom-head { animation: classroom-nod 600ms ease-in-out 3; }
+.classroom-seat:has(.classroom-activity-badge[data-kind="wave"]) .classroom-head { animation: classroom-nod 700ms ease-in-out 2; }
+.classroom-seat:has(.classroom-activity-badge[data-kind="clap"]) .classroom-head { animation: classroom-hop 500ms ease-in-out 4; }
+@keyframes classroom-nod { 50% { transform: translateY(2px) rotate(6deg); } }
+@keyframes classroom-hop { 50% { transform: translateY(-4px); } }
+@media (max-width: 760px) {
+  .classroom-activities-trigger .activity-label { display: none; }
+  .classroom-own-seat { font-size: 0; gap: 0; }
+  .classroom-own-seat b { font-size: 11px; }
+  .classroom-seat-info { gap: 3px; }
+  .classroom-character-trigger { padding-inline: 4px; }
+  .classroom-character-trigger > svg { width: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .classroom-seat:has(.classroom-activity-badge) .classroom-head { animation: none; }
+}

@@ -41,6 +41,42 @@ test('movement shares only each student position and preserves assigned seats', 
   mutate(room, {type:'active', active:false}, null, true);
   assert.throws(() => mutate(room, {type:'move', position:{x:.5,y:.5}}, 'a', false));
 });
+
+test('classroom activities protect roles, expire visually and keep quiz answers private until reveal', () => {
+  const room = newRoom('교실 활동');
+  mutate(room, {type:'heartbeat'}, 'a', false);
+  mutate(room, {type:'heartbeat'}, 'b', false);
+  mutate(room, {type:'hand',raised:true}, 'a', false);
+  const handAt = ensureDay(room).activities!.a.handAt;
+  mutate(room, {type:'hand',raised:true}, 'a', false);
+  assert.equal(ensureDay(room).activities!.a.handAt, handAt);
+  assert.equal(snapshot(room,today(),'b','local').seats[0].activity?.handAt,handAt);
+  assert.throws(()=>mutate(room,{type:'hand-lower',seatNumber:1},'b',false));
+  mutate(room,{type:'hand-lower',seatNumber:1},null,true);
+  assert.equal(ensureDay(room).activities!.a.handAt,undefined);
+  mutate(room,{type:'reaction',kind:'clap'},'a',false);
+  assert.equal(snapshot(room,today(),'b','local').seats[0].activity?.reaction?.kind,'clap');
+  assert.throws(()=>mutate(room,{type:'reaction',kind:'clap'},'a',false),/1초/);
+  mutate(room,{type:'greet',seatNumber:2},'a',false);
+  ensureDay(room).greetings!.a.at -= 12_000;
+  mutate(room,{type:'greet',seatNumber:1},'b',false);
+  assert.equal(ensureDay(room).activities!.a.reaction?.kind,'heart');
+  assert.equal(ensureDay(room).activities!.b.reaction?.kind,'heart');
+  assert.throws(()=>mutate(room,{type:'quiz-start',question:'문제',answer:'O'},'a',false));
+  mutate(room,{type:'quiz-start',question:'AI는 도구다.',answer:'O'},null,true);
+  const id = ensureDay(room).quiz!.id;
+  assert.equal(snapshot(room,today(),'a','local').quiz?.answer,undefined);
+  assert.throws(()=>mutate(room,{type:'quiz-answer',quizId:'old',choice:'O'},'a',false));
+  mutate(room,{type:'quiz-answer',quizId:id,choice:'X'},'a',false);
+  assert.equal(ensureDay(room).positions!.a.x > .5,true);
+  mutate(room,{type:'move',position:{x:.2,y:.3}},'a',false);
+  assert.deepEqual(snapshot(room,today(),'a','local').quiz?.counts,[1,0]);
+  mutate(room,{type:'quiz-reveal',quizId:id},null,true);
+  assert.equal(snapshot(room,today(),'a','local').quiz?.answer,'O');
+  assert.throws(()=>mutate(room,{type:'quiz-answer',quizId:id,choice:'X'},'a',false));
+  mutate(room,{type:'quiz-clear',quizId:id},null,true);
+  assert.equal(ensureDay(room).quiz,undefined);
+});
 import { ensureDay, mutate, newRoom, safeUrl, snapshot, today } from '../lib/domain.ts';
 test('Seoul midnight deletes yesterday and resets messages, votes, presence and aliases', () => {
   assert.equal(today(new Date('2026-10-08T14:59:59Z')), '2026-10-08');

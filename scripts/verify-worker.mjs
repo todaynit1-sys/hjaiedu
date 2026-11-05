@@ -119,6 +119,10 @@ try {
   await until(() => duplicate.latest?.online === 50, 'Duplicate tab count is wrong');
   assert.deepEqual(duplicate.latest.seats.filter(s => s.mine), [{ number: 1, name: '수강생 01', mine: true, character: 'cat' }]);
   duplicate.ws.send('ping'); await until(() => duplicate.pong, 'Automatic hibernation ping response missing');
+  assert.equal((await request(path,{type:'greet',seatNumber:2},students[0].cookie)).response.status,200);
+  const reciprocalGreeting = await request(path,{type:'greet',seatNumber:1},students[1].cookie);
+  assert.equal(reciprocalGreeting.data.seats[0].activity.reaction.kind,'heart');
+  assert.equal(reciprocalGreeting.data.seats[1].activity.reaction.kind,'heart');
   duplicate.ws.close(1000); students[0].peer.ws.close(1000);
   await until(() => teacher.latest?.online === 49, 'Disconnected participant remained online');
   assert.equal(teacher.latest.seats.some(s => s.number === 1), false);

@@ -1,5 +1,5 @@
 const randomUUID = () => crypto.randomUUID();
-import { CHARACTERS, defaultCharacter, type Day, type Poll, type PollKind, type Room, type Snapshot } from './types.ts';
+import { CHARACTERS, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type Room, type Snapshot } from './types.ts';
 
 export class AppError extends Error {
   status: number;
@@ -70,12 +70,18 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     const name = day.participants?.[id];
     if (!name) return [];
     const number = seatNumber(name);
-    return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number), ...(day.positions?.[id] ? { position: day.positions[id] } : {}) }];
+    return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number), ...(day.positions?.[id] ? { position: day.positions[id] } : {}),
+      ...(day.activities?.[id] ? { activity: day.activities[id] } : {}),
+      ...(day.quiz?.answers[id] ? { quizChoice: day.quiz.answers[id] } : {}) }];
   }).sort((a, b) => a.number - b.number);
   return {
     code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
     active: day.active && date === currentDate, dates: Object.keys(room.days).sort().reverse(),
     online: present.size, seats,
+    ...(day.quiz ? { quiz: { id: day.quiz.id, question: day.quiz.question, open: day.quiz.open,
+      ...(!day.quiz.open ? { answer: day.quiz.answer } : {}),
+      counts: [Object.values(day.quiz.answers).filter(v => v === 'O').length, Object.values(day.quiz.answers).filter(v => v === 'X').length] as [number, number],
+      myAnswer: guest ? day.quiz.answers[guest] ?? null : null } } : {}),
     messages: day.messages.map(({ authorId, ...message }) => {
       const name = message.author === 'student' && authorId && day.participants?.[authorId];
       return { ...message, mine: Boolean(guest && authorId === guest), ...(name ? { seatNumber: seatNumber(name) } : {}) };
@@ -87,11 +93,68 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   const date = today();
   if (action.date !== undefined && action.date !== date) throw new AppError('지난 강의 기록은 변경할 수 없습니다.', 409);
   const day = ensureDay(room, date);
+  if (['hand', 'reaction', 'greet', 'quiz-answer'].includes(String(action.type))) {
+    if (host) throw new AppError('수강생으로 참여해주세요.', 403);
+    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    if (!day.active || !day.participants?.[guest]) throw new AppError('진행 중인 강의실에서 참여해주세요.', 409);
+    const activities = day.activities ??= {};
+    const own = activities[guest] ??= {};
+    const now = Date.now();
+    if (action.type === 'hand') {
+      if (typeof action.raised !== 'boolean') throw new AppError('손들기 상태를 확인해주세요.');
+      if (action.raised) own.handAt ??= now;
+      else delete own.handAt;
+    } else if (action.type === 'reaction') {
+      const kind = REACTIONS.find(value => value === action.kind);
+      if (!kind) throw new AppError('리액션을 골라주세요.');
+      if (own.reaction && now - own.reaction.at < 1000) throw new AppError('잠깐만요. 리액션은 1초에 한 번 보낼 수 있어요.', 429);
+      own.reaction = { kind, at: now };
+    } else if (action.type === 'greet') {
+      const target = Object.entries(day.participants).find(([id, name]) => id !== guest && seatNumber(name) === action.seatNumber);
+      if (!target) throw new AppError('인사할 친구를 골라주세요.');
+      const previous = day.greetings?.[guest];
+      if (previous && now - previous.at < 1000) throw new AppError('인사는 잠깐 간격을 두고 보내주세요.', 429);
+      const number = seatNumber(day.participants[guest]);
+      const reply = day.greetings?.[target[0]];
+      const mutual = reply?.to === number && now - reply.at < 30_000;
+      (day.greetings ??= {})[guest] = { to: action.seatNumber as number, at: now };
+      own.reaction = { kind: mutual ? 'heart' : 'wave', at: now };
+      const friend = activities[target[0]] ??= {};
+      friend.greeting = { from: number, at: now };
+      if (mutual) friend.reaction = { kind: 'heart', at: now };
+    } else {
+      if (!day.quiz?.open || action.quizId !== day.quiz.id) throw new AppError('이 OX 퀴즈는 마감됐어요.', 409);
+      if (action.choice !== 'O' && action.choice !== 'X') throw new AppError('O 또는 X를 골라주세요.');
+      day.quiz.answers[guest] = action.choice;
+      const index = (seatNumber(day.participants[guest]) - 1) % 20;
+      (day.positions ??= {})[guest] = { x: (action.choice === 'O' ? .12 : .62) + index % 4 * .07, y: .22 + Math.floor(index / 4) * .13 };
+    }
+    return;
+  }
+  if (['quiz-start', 'quiz-reveal', 'quiz-clear', 'hand-lower'].includes(String(action.type))) {
+    if (!host) throw new AppError('강사 로그인이 필요합니다.', 403);
+    if (!day.active) throw new AppError('강의가 종료됐어요.', 409);
+    if (action.type === 'quiz-start') {
+      const question = text(action.question, 'OX 문제', 160);
+      if (action.answer !== 'O' && action.answer !== 'X') throw new AppError('정답을 골라주세요.');
+      day.quiz = { id: randomUUID(), question, answer: action.answer, open: true, answers: {} };
+    } else if (action.type === 'quiz-clear') {
+      if (!day.quiz || action.quizId !== day.quiz.id) throw new AppError('현재 퀴즈를 확인해주세요.', 409);
+      delete day.quiz;
+    } else if (action.type === 'quiz-reveal') {
+      if (!day.quiz || action.quizId !== day.quiz.id) throw new AppError('현재 퀴즈를 확인해주세요.', 409);
+      day.quiz.open = false;
+    } else {
+      const target = Object.entries(day.participants ?? {}).find(([, name]) => seatNumber(name) === action.seatNumber);
+      if (target && day.activities?.[target[0]]) delete day.activities[target[0]].handAt;
+    }
+    return;
+  }
   if (action.type === 'move') {
     if (host) throw new AppError('수강생 캐릭터만 움직일 수 있어요.', 403);
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
     if (!day.active || !day.participants?.[guest]) throw new AppError('진행 중인 강의실에서 움직일 수 있어요.', 409);
-    if (action.position === null) { delete day.positions?.[guest]; return; }
+    if (action.position === null) { delete day.positions?.[guest]; if (day.quiz?.open) delete day.quiz.answers[guest]; return; }
     const position = action.position as { x?: unknown; y?: unknown } | undefined;
     if (!position || typeof position.x !== 'number' || typeof position.y !== 'number'
       || !Number.isFinite(position.x) || !Number.isFinite(position.y)
@@ -99,6 +162,7 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
       throw new AppError('교실 안에서 이동할 위치를 골라주세요.');
     }
     (day.positions ??= {})[guest] = { x: Math.round(position.x * 10000) / 10000, y: Math.round(position.y * 10000) / 10000 };
+    if (day.quiz?.open) day.quiz.answers[guest] = position.x < .5 ? 'O' : 'X';
     return;
   }
   if (action.type === 'nickname') {

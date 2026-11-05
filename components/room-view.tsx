@@ -137,6 +137,10 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
     const value = await api<Snapshot>(`/api/rooms/${code}`, { type: 'move', position, date });
     setData(current => !current || (current.code === value.code && current.date === value.date && Date.parse(value.updatedAt) >= Date.parse(current.updatedAt)) ? value : current);
   }, [code, date]);
+  const classroomActivity = useCallback(async (input: Record<string, unknown>) => {
+    const value = await api<Snapshot>(`/api/rooms/${code}`, { ...input, date });
+    setData(current => !current || (current.code === value.code && current.date === value.date && Date.parse(value.updatedAt) >= Date.parse(current.updatedAt)) ? value : current);
+  }, [code, date]);
   const attachFile = useCallback(async (file: File, id: string, caption: string, url: string) => {
     setBusy(true);
     try {
@@ -203,7 +207,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {materialsButton}
         </div>
         <div id="classroom-pane" className="classroom-pane">
-          <ClassroomScene data={data} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+          <ClassroomScene data={data} host={host} onActivity={active ? classroomActivity : undefined} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
             onMove={!host && active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
