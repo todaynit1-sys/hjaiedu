@@ -21,12 +21,25 @@
 .classroom-activity-badge .raised-hand { background: #fff1c6; border-color: #927321; }
 .classroom-activity-badge[data-kind="heart"] > span { color: #a63852; }
 .classroom-question-trigger {
-  display: inline-flex; flex: none; align-items: center; justify-content: center;
+  position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center;
   gap: 6px; min-height: 44px; padding: 6px 10px;
   border: 1px solid var(--forest); border-radius: 8px;
   background: var(--forest); color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap;
 }
 .classroom-question-trigger:hover { background: var(--forest-dark); }
+.classroom-question-trigger > .question-short-label { display: none; }
+.question-trigger-count {
+  display: grid; min-width: 19px; min-height: 19px; place-items: center; padding-inline: 3px;
+  border-radius: 6px; color: #fff; background: var(--forest-dark); font-size: 11px;
+  line-height: 1;
+}
+@media (max-width: 580px) {
+  .classroom-themed .classroom-view-actions > .classroom-question-trigger > svg { display: none; }
+  .classroom-themed .classroom-view-actions > .classroom-question-trigger > .question-short-label { display: inline; }
+  .classroom-question-trigger .question-trigger-count {
+    position: absolute; top: 1px; right: 1px; min-width: 14px; min-height: 14px; font-size: 9px;
+  }
+}
 .classroom-question-content {
   display: grid; gap: 14px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px;
 }

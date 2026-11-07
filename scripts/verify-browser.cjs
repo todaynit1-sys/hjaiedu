@@ -515,12 +515,23 @@ async function readyStage(page) {
 
   const prompt = 'AI를 환경업무에 활용할 첫 과제는 무엇인가요?';
   const answer = '습도 센서 기록을 먼저 확인하겠습니다.';
+  const peerAnswer = '측정 단위를 먼저 비교하겠습니다.';
+  const chatDraft = '질문 알림을 받기 전에 쓰던 채팅';
+  await second.setViewportSize({width:320,height:568});
+  await second.getByRole('button',{name:'채팅',exact:true}).click();
+  const peerComposer = second.getByLabel('채팅 메시지',{exact:true});
+  await peerComposer.fill(chatDraft);
   await page.getByRole('button',{name:'질문 출제',exact:true}).click();
   const hostQuestion = page.getByRole('dialog',{name:/^질문 (출제|관리)$/});
   await hostQuestion.getByLabel('질문',{exact:true}).fill(prompt);
-  await hostQuestion.getByRole('button',{name:'질문 열기',exact:true}).click();
+  await hostQuestion.getByRole('button',{name:'질문 올리기',exact:true}).click();
+  await hostQuestion.waitFor({state:'hidden'});
   const questionAlert = student.locator('.classroom-alert[data-kind="question"]');
+  const peerAlert = second.locator('.classroom-alert[data-kind="question"]');
   await questionAlert.getByText(prompt,{exact:true}).waitFor();
+  await peerAlert.getByText(prompt,{exact:true}).waitFor();
+  assert.equal(await peerComposer.inputValue(),chatDraft);
+  assert(await peerComposer.evaluate(element=>document.activeElement===element),'The incoming question must not interrupt the chat composer');
   assert.equal(await page.locator('.classroom-alert[data-kind="question"]').count(),0);
   const mobileToolbar = student.locator('.classroom-view-tools');
   const mobileToolbarButtons = mobileToolbar.getByRole('button');
@@ -534,47 +545,42 @@ async function readyStage(page) {
       (index===0 || box.left>=boxes[index-1].right));
   }), 'Question, camera, tabs and materials must fit on one 320px toolbar with distinct touch targets');
   await student.screenshot({path:'.local/screenshots/classroom-toolbar-320.png'});
-  await questionAlert.getByRole('button',{name:'질문 답하기',exact:true}).click();
-  const studentQuestion = student.getByRole('dialog',{name:'질문 답하기',exact:true});
-  await studentQuestion.getByText(prompt,{exact:true}).waitFor();
-  assert.equal(await questionAlert.count(),0);
-  await studentQuestion.getByLabel('내 답변',{exact:true}).fill(answer);
-  await studentQuestion.getByRole('button',{name:'답변 보내기',exact:true}).click();
-  await studentQuestion.getByRole('button',{name:'답변 수정',exact:true}).waitFor();
+  await questionAlert.getByLabel('내 답변',{exact:true}).fill(answer);
   await student.screenshot({path:'.local/screenshots/classroom-question-mobile.png'});
-  await studentQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+  await questionAlert.getByRole('button',{name:'답변 보내기',exact:true}).click();
+  await questionAlert.waitFor({state:'hidden'});
 
+  await peerAlert.getByRole('button',{name:'질문 나중에 보기',exact:true}).click();
+  await peerAlert.waitFor({state:'hidden'});
+  await second.locator('.classroom-view-tools').getByRole('button',{name:'질문 답하기',exact:true}).waitFor();
   await second.reload();
   await readyStage(second);
-  const peerQuestionButton = second.locator('.classroom-view-tools').getByRole('button',{name:'질문 답하기',exact:true});
-  await peerQuestionButton.waitFor();
-  assert.equal(await second.locator('.classroom-alert[data-kind="question"]').count(),0,'Reload must not alert for an already active question');
+  await peerAlert.getByText(prompt,{exact:true}).waitFor();
   await second.getByRole('button',{name:'채팅',exact:true}).click();
   assert.equal(await second.getByRole('group',{name:'교실 보기',exact:true}).count(),0);
-  await peerQuestionButton.click();
-  const peerQuestion = second.getByRole('dialog',{name:'질문 답하기',exact:true});
-  await peerQuestion.getByText(prompt,{exact:true}).waitFor();
-  assert.equal(await peerQuestion.getByText(answer,{exact:true}).count(),0);
-  assert.equal(await peerQuestion.getByLabel('내 답변',{exact:true}).inputValue(),'');
+  assert.equal(await peerAlert.getByText(answer,{exact:true}).count(),0);
+  assert.equal(await peerAlert.getByLabel('내 답변',{exact:true}).inputValue(),'');
   const peerOpenRound = (await (await studentB.request.get(roomURL)).json()).questionRound;
   assert.equal(peerOpenRound.total,1);
   assert.equal(peerOpenRound.myAnswer,null);
   assert.equal('answers' in peerOpenRound,false,'Peer snapshots must withhold the answer list before publication');
-  await peerQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+  await peerAlert.getByLabel('내 답변',{exact:true}).fill(peerAnswer);
+  await peerAlert.getByRole('button',{name:'답변 보내기',exact:true}).click();
+  await peerAlert.waitFor({state:'hidden'});
 
-  if (!await hostQuestion.isVisible()) await page.getByRole('button',{name:'질문 관리',exact:true}).click();
-  await hostQuestion.getByRole('region',{name:'수강생 답변',exact:true}).getByText(answer,{exact:true}).waitFor();
-  await hostQuestion.getByRole('button',{name:'질문 마감',exact:true}).click();
-  await second.getByRole('button',{name:'답변 보기',exact:true}).waitFor();
-  const peerClosedRound = (await (await studentB.request.get(roomURL)).json()).questionRound;
-  assert.equal(peerClosedRound.open,false);
-  assert.equal('answers' in peerClosedRound,false,'Closing the question must not publish peer answers');
-  await hostQuestion.getByRole('button',{name:'답변 공개',exact:true}).click();
-  await second.getByRole('button',{name:'답변 보기',exact:true}).click();
-  const publishedQuestion = second.getByRole('dialog',{name:'답변 보기',exact:true});
-  await publishedQuestion.getByRole('region',{name:'공개된 답변',exact:true}).getByText(answer,{exact:true}).waitFor();
-  await publishedQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
-  await hostQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+  await page.getByRole('button',{name:/^질문 관리/}).click();
+  const privateResponses = hostQuestion.getByRole('region',{name:'수강생 답변',exact:true});
+  await privateResponses.getByText(answer,{exact:true}).waitFor();
+  await privateResponses.getByText(peerAnswer,{exact:true}).waitFor();
+  assert.equal(await second.locator('.classroom-alert[data-kind="results"]').count(),0);
+  await hostQuestion.getByRole('button',{name:'답변 띄우기',exact:true}).click();
+  for (const guest of [student, second]) {
+    const published = guest.locator('.classroom-alert[data-kind="results"]');
+    await published.getByText(answer,{exact:true}).waitFor();
+    await published.getByText(peerAnswer,{exact:true}).waitFor();
+  }
+  await second.screenshot({path:'.local/screenshots/classroom-question-results-320.png'});
+  if (await hostQuestion.isVisible()) await hostQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
   await verifyAuditoriumCapacity(browser, teacher, base, waitUntil);
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
@@ -584,8 +590,8 @@ async function readyStage(page) {
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'single-line 320px classroom toolbar', 'full-width auditorium and persistent composer', 'desktop classroom chat send', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
-      'short-answer questions in classroom and chat, private submission, close and publication',
-      'teacher and question alert destinations, student-message filtering and reload suppression',
+      'live short-answer questions and published results in classroom and chat, private submission, dismiss and reload',
+      'teacher alert destinations, student-message filtering and message alert reload suppression',
       'group-photo PNG download and local portfolio with reflection, reload persistence and context isolation', 'instructor movement and return visible to students',
       'student autonomous movement, manual takeover and continuous animated return to seat',
       '20 to 50 live WebGL seats', 'WebGL context loss, fallback and rendered restoration', 'browser errors']

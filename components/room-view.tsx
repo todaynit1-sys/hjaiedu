@@ -77,9 +77,9 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const [nearRequest, setNearRequest] = useState(0);
   const [hasNewChat, setHasNewChat] = useState(false);
   const observedChat = useRef<{ date: string; id?: string } | null>(null);
-  const observedAlerts = useRef<{ day: string; messages: Set<string>; questions: Set<string> } | null>(null);
+  const observedAlerts = useRef<{ day: string; messages: Set<string> } | null>(null);
   const [messageAlert, setMessageAlert] = useState<string>();
-  const [questionAlert, setQuestionAlert] = useState<string>();
+  const [dismissedQuestionCard, setDismissedQuestionCard] = useState<string>();
   const [questionOpen, setQuestionOpen] = useState(false);
   const [chatTarget, setChatTarget] = useState<string>();
   const [pollView, setPollView] = useState<'custom' | 'history' | null>(null);
@@ -188,16 +188,13 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   useEffect(() => {
     if (!data || host) return;
     const day = `${data.code}/${data.date}`;
-    const round = data.questionRound;
     const seen = observedAlerts.current;
     if (seen?.day !== day) {
       observedAlerts.current = {
         day,
-        messages: new Set(data.messages.map(message => message.id)),
-        questions: new Set(round ? [round.id] : [])
+        messages: new Set(data.messages.map(message => message.id))
       };
       setMessageAlert(undefined);
-      setQuestionAlert(undefined);
       return;
     }
     let latest: PublicMessage | undefined;
@@ -206,11 +203,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       seen.messages.add(message.id);
     }
     if (latest) setMessageAlert(latest.id);
-    if (round && !seen.questions.has(round.id)) {
-      seen.questions.add(round.id);
-      if (round.open && round.myAnswer === null && !questionOpen) setQuestionAlert(round.id);
-    }
-  }, [data, host, questionOpen]);
+  }, [data, host]);
   useEffect(() => {
     if (!messageAlert) return;
     const timer = window.setTimeout(() => {
@@ -227,12 +220,31 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   }, [chatTarget, view]);
   const alertMessage = data?.messages.find(message => message.id === messageAlert);
   const round = data?.questionRound;
-  const alertQuestion = round?.id === questionAlert && round?.open && round.myAnswer === null ? round : undefined;
+  const joinedAsStudent = !host && Boolean(data?.seats.some(seat => seat.mine));
+  const questionCardKey = joinedAsStudent && round
+    ? round.published && round.answers ? `${round.id}/results`
+      : data?.active && round.open && round.myAnswer === null ? `${round.id}/question` : undefined
+    : undefined;
+  const alertQuestion = !questionOpen && questionCardKey && questionCardKey !== dismissedQuestionCard ? round : undefined;
   function toggleQuestion(open: boolean) {
     setQuestionOpen(open);
-    if (open) setQuestionAlert(undefined);
+    if (open && questionCardKey) setDismissedQuestionCard(questionCardKey);
+  }
+  function dismissQuestionCard() {
+    setDismissedQuestionCard(questionCardKey);
+    if (document.activeElement?.closest('.classroom-alert:is([data-kind="question"], [data-kind="results"])')) {
+      requestAnimationFrame(() => roomRef.current?.querySelector<HTMLButtonElement>('.classroom-question-trigger')?.focus({ preventScroll: true }));
+    }
   }
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
+  async function runQuestion(input: Record<string, unknown>) {
+    await classroomActivity(input);
+    if (input.type === 'question-start') notify('질문을 올렸어요.');
+  }
+  async function submitQuestionAnswer(roundId: string, text: string) {
+    await classroomActivity({ type: 'question-answer', roundId, text });
+    notify('답변을 보냈어요.');
+  }
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
   const previousPolls = data?.polls.filter(poll => poll.kind === 'custom' && poll.archived) ?? [];
   const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" title="참고자료" aria-haspopup="dialog">
@@ -271,7 +283,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           onClick={() => { setSceneView('near'); setNearRequest(request => request + 1); }}><LocateFixed size={16} aria-hidden="true" /><span>내 주변</span></button>
       </div>}
       <ClassroomQuestion data={data} host={host} open={questionOpen} onOpenChange={toggleQuestion}
-        onAction={active ? classroomActivity : undefined} />
+        onAction={active && (host || joinedAsStudent) ? runQuestion : undefined} />
       {materialsButton}
     </div>
   </div>;
@@ -328,9 +340,9 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         <Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
         {!host && <ClassroomAlerts message={alertMessage} question={alertQuestion}
           onOpenChat={() => { setChatTarget(messageAlert); setMessageAlert(undefined); setTab('all'); setView('chat'); }}
-          onOpenQuestion={() => toggleQuestion(true)}
+          onAnswerQuestion={active && joinedAsStudent ? submitQuestionAnswer : undefined}
           onDismissMessage={() => setMessageAlert(undefined)}
-          onDismissQuestion={() => setQuestionAlert(undefined)} />}
+          onDismissQuestion={dismissQuestionCard} />}
         <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>
       </main>
     </>}

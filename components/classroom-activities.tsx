@@ -42,14 +42,20 @@ export function ClassroomQuestion({ data, onAction, host, open, onOpenChange }: 
 }) {
   const round = data.questionRound;
   const trigger = useRef<HTMLButtonElement>(null);
+  const countId = useId();
   if (!host && !round) return null;
 
   const label = host ? (round ? '질문 관리' : '질문 출제') : (round?.open ? '질문 답하기' : '답변 보기');
+  const count = host ? round?.total : undefined;
   return <>
     <button className="classroom-question-trigger" type="button" aria-haspopup="dialog" aria-label={label} title={label}
+      aria-describedby={count !== undefined ? countId : undefined}
       ref={trigger} onClick={() => onOpenChange(true)}>
       <MessageSquare size={16} aria-hidden="true" /><span>{label}</span>
+      <span className="question-short-label" aria-hidden="true">{round && (host || !round.open) ? '답변' : '질문'}</span>
+      {Boolean(count) && <b className="question-trigger-count" aria-hidden="true">{count}</b>}
     </button>
+    {count !== undefined && <span id={countId} className="sr-only">답변 {count}개</span>}
     {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host}
       onAction={onAction} onClose={() => {
         onOpenChange(false);
@@ -92,6 +98,7 @@ function QuestionDialog({ round, host, onAction, onClose }: {
     setNotice('');
     try {
       await onAction(input);
+      if (input.type === 'question-start') { onClose(); return; }
       if (input.type === 'question-answer') setDraft(null);
       if (message) setNotice(message);
     } catch (cause) {
@@ -139,22 +146,10 @@ function QuestionDialog({ round, host, onAction, onClose }: {
       {host && round && !round.published && onAction && <div className="question-actions">
         {round.open && <button type="button" disabled={busy}
           onClick={() => void send({type:'question-close', roundId:round.id}, '질문을 마감했어요.')}>질문 마감</button>}
-        <button type="button" className="primary" disabled={busy}
-          onClick={() => void send({type:'question-publish', roundId:round.id}, '답변을 공개했어요.')}>답변 공개</button>
-        <p className="question-meta">{round.open ? '공개하면 질문을 마감하고 이름과 답변을 모두에게 보여줘요.' : '공개하면 이름과 답변을 모두에게 보여줘요.'}</p>
+        <button type="button" className="primary" disabled={busy || round.total === 0}
+          onClick={() => void send({type:'question-publish', roundId:round.id}, '수강생 화면에 답변을 띄웠어요.')}>답변 띄우기</button>
+        <p className="question-meta">{round.open ? '답변을 띄우면 질문이 마감되고, 수강생 화면에 이름과 답변이 보여요.' : '수강생 화면에 이름과 답변을 띄워요.'}</p>
       </div>}
-
-      {host && !round?.open && onAction && <form className="question-form"
-        onSubmit={event => { event.preventDefault(); if (prompt.trim()) void send({type:'question-start', prompt:prompt.trim()}); }}>
-        <label htmlFor={promptId}>{round ? '새 질문' : '질문'}</label>
-        <textarea id={promptId} value={prompt} maxLength={QUESTION_PROMPT_MAX_LENGTH} rows={2} required disabled={busy}
-          onChange={event => setPrompt(event.target.value)} placeholder="수강생에게 물어볼 질문을 적어주세요." />
-        {round && <p className="question-meta">새 질문을 출제하면 이전 질문과 답변을 대체해요.</p>}
-        <div className="question-actions">
-          <button type="submit" className="primary" disabled={busy || !prompt.trim()}>질문 열기</button>
-          <span className="question-meta">{prompt.length}/{QUESTION_PROMPT_MAX_LENGTH}</span>
-        </div>
-      </form>}
 
       {round && (host || round.published) && <section className="question-responses" aria-label={host ? '수강생 답변' : '공개된 답변'}>
         <h3>{host ? '수강생 답변' : '공개된 답변'}</h3>
@@ -165,6 +160,18 @@ function QuestionDialog({ round, host, onAction, onClose }: {
           </li>
         ))}</ul> : <p className="question-meta">아직 답변이 없어요.</p>}
       </section>}
+
+      {host && !round?.open && onAction && <form className="question-form"
+        onSubmit={event => { event.preventDefault(); if (prompt.trim()) void send({type:'question-start', prompt:prompt.trim()}); }}>
+        <label htmlFor={promptId}>{round ? '새 질문' : '질문'}</label>
+        <textarea id={promptId} value={prompt} maxLength={QUESTION_PROMPT_MAX_LENGTH} rows={2} required disabled={busy}
+          onChange={event => setPrompt(event.target.value)} placeholder="수강생에게 물어볼 질문을 적어주세요." />
+        {round && <p className="question-meta">새 질문을 출제하면 이전 질문과 답변을 대체해요.</p>}
+        <div className="question-actions">
+          <button type="submit" className="primary" disabled={busy || !prompt.trim()}>질문 올리기</button>
+          <span className="question-meta">{prompt.length}/{QUESTION_PROMPT_MAX_LENGTH}</span>
+        </div>
+      </form>}
 
       {!onAction && (host || round?.open) && <p className="question-meta">강의실에 다시 연결되면 질문을 진행할 수 있어요.</p>}
       {error && <p className="error" role="alert">{error}</p>}
