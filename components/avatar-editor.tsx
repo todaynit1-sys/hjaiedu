@@ -50,13 +50,13 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const pending = useRef(false);
+  const headsByTab = useRef<Partial<Record<AvatarKind, AvatarCustomization['hair']>>>({});
   const [initial] = useState(() => current ?? starterAvatar(character));
   const [draft, setDraft] = useState(initial);
   const [category, setCategory] = useState<(typeof categories)[number]['id']>('hair');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const changed = !sameAvatar(draft, initial);
-  const previewAvatar = changed ? draft : current;
   const kind = avatarKind(draft);
   const creature = !isHumanHair(draft.hair);
 
@@ -89,10 +89,12 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
   function selectKind(selected: AvatarKind) {
     if (selected === kind) return;
     const heads = AVATAR_HEADS_BY_KIND[selected];
+    headsByTab.current[kind] = draft.hair;
+    const lastHead = headsByTab.current[selected];
     setDraft(previous => ({
       ...previous,
       kind: selected,
-      hair: heads.includes(previous.hair) ? previous.hair : heads[0],
+      hair: lastHead ?? (heads.includes(previous.hair) ? previous.hair : heads[0]),
     }));
     setCategory('hair');
     setError('');
@@ -124,7 +126,7 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
     </div>
     <div className="avatar-editor-workspace">
       <figure className="avatar-editor-preview">
-        <AvatarPreview character={character} avatar={previewAvatar} />
+        <AvatarPreview character={character} avatar={draft} />
         <figcaption>미리 보기</figcaption>
       </figure>
       <div className="avatar-editor-controls">
@@ -132,25 +134,25 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
           {AVATAR_KINDS.map(value => <button key={value} type="button" aria-pressed={kind === value} disabled={saving}
             onClick={() => selectKind(value)}>{kindLabels[value]}</button>)}
         </div>
-        <div className="avatar-category-list" role="group" aria-label="꾸미기 종류" data-creature={creature || undefined}>
-          {categories.filter(({ id }) => !creature || id === 'hair' || id === 'clothes').map(({ id, label, Icon }) =>
+        {!creature && <div className="avatar-category-list" role="group" aria-label="꾸미기 종류">
+          {categories.map(({ id, label, Icon }) =>
             <button className="avatar-category" key={id} type="button" aria-pressed={category === id}
               disabled={saving} onClick={() => setCategory(id)}>
-              <Icon size={16} aria-hidden="true" />{creature && id === 'hair' ? '종류' : label}
+              <Icon size={16} aria-hidden="true" />{label}
             </button>)}
+        </div>}
+        <div className="avatar-editor-options" key={kind}>
+          {creature ? optionsFor('hair', `${kindLabels[kind]} 종류`, AVATAR_HEADS_BY_KIND[kind]) :
+            categoryOptions[category].map(([key, label]) =>
+              key === 'hair' ? optionsFor(key, label, AVATAR_HEADS_BY_KIND[kind]) : optionsFor(key, label))}
         </div>
-        <div className="avatar-editor-options" key={kind}>{categoryOptions[category].map(([key, label]) => {
-          if (key === 'hair') return optionsFor(key, creature ? `${kindLabels[kind]} 종류` : label, AVATAR_HEADS_BY_KIND[kind]);
-          if (key === 'hairColor' && creature) return null;
-          return optionsFor(key, label);
-        })}</div>
       </div>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {!onSave && <p role="status">지금은 캐릭터를 저장할 수 없어요.</p>}
     <div className="avatar-editor-footer">
       <button type="button" className="avatar-reset" disabled={!changed || saving}
-        onClick={() => { setDraft(initial); setCategory('hair'); setError(''); }}>되돌리기</button>
+        onClick={() => { headsByTab.current = {}; setDraft(initial); setCategory('hair'); setError(''); }}>되돌리기</button>
       <button type="button" className="primary" disabled={!changed || saving || !onSave} onClick={() => void save()}>{saving ? '저장 중' : '꾸민 모습 저장'}</button>
     </div>
   </dialog>;

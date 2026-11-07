@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import type { AvatarCustomization } from '../lib/avatar-customization';
+import { isHumanHair, type AvatarCustomization } from '../lib/avatar-customization';
 import type { Character, ClassroomPosition } from '../lib/types';
 import { AvatarArt } from './classroom-avatar';
 import { StorybookAvatarArt } from './storybook-avatar-art';
@@ -165,6 +165,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     ...(scale === undefined ? {} : { '--actor-scale': `${scale * 100}%` }),
   } as CSSProperties;
   return <div ref={element} className={className} data-seat={number} data-customized={avatar ? 'true' : undefined}
+    data-creature={avatar && !isHumanHair(avatar.hair) ? avatar.hair : undefined}
     data-illustrated={illustrated || undefined} data-seat-side={origin.x < .5 ? 'left' : 'right'}
     data-at-lectern={Boolean(instructor && !position) || undefined}
     data-pose={seated ? 'seated' : 'standing'} data-facing={facing} title={name} style={style}>
@@ -175,7 +176,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     <div className="storybook-actor-art" aria-hidden="true">
       <div className="storybook-gait">
         <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor} pose="idle"
-          lookingUp={!seated && facing === 'up'} preloadDirections={mine}
+          direction={!seated && (facing === 'up' || facing === 'down') ? facing : undefined} preloadDirections={mine}
           onReady={seated ? undefined : () => setReadyAppearance(appearanceKey)} />
         <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor}
           pose={facing === 'up' ? 'step-up' : facing === 'down' ? 'step-down' : 'step'} frame="step" bodyOnly />

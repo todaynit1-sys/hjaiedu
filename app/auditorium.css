@@ -158,6 +158,9 @@
 .storybook-actor-art [data-frame="seated"] {
   inset: auto 0 5%; height: 72%; clip-path: inset(0 0 30%);
 }
+.storybook-actor-art [data-frame="seated"][data-creature] {
+  inset: auto 0 18%; height: 100%; clip-path: none;
+}
 .classroom-actor[data-at-lectern] .storybook-actor-art { clip-path: inset(0 0 29%); }
 @media (prefers-reduced-motion: no-preference) {
   .classroom-actor[data-pose="standing"][data-walking] .storybook-gait {

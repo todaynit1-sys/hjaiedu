@@ -25,10 +25,12 @@ export const STORYBOOK_AVATARS: ReadonlyArray<{id: StorybookAvatarId; label: str
   }
 ];
 
+const portraitFields = ['hair', 'hairColor', 'skin', 'expression', 'accessory'] as const;
+
 export function storybookAvatar(character: Character, avatar?: AvatarCustomization): StorybookAvatarId | undefined {
   if (!avatar) return character === 'smile' ? 'cardigan' : undefined;
   return STORYBOOK_AVATARS.find(preset =>
-    (Object.keys(preset.avatar) as (keyof AvatarCustomization)[]).every(key => avatar[key] === preset.avatar[key]))?.id;
+    portraitFields.every(key => avatar[key] === preset.avatar[key]))?.id;
 }
 
 export function storybookSprite(id: StorybookAvatarId, pose: StorybookPose) {

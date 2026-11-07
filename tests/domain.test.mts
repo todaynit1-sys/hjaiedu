@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AUDITORIUM_PAGE_SIZE, auditoriumCapacity, auditoriumQuizPosition, auditoriumSeat } from '../lib/auditorium.ts';
 import type { AvatarCustomization } from '../lib/avatar-customization.ts';
+import { STORYBOOK_AVATARS, storybookAvatar } from '../lib/storybook-avatar.ts';
 
 test('nicknames keep daily seat identity and are used for new chat messages', () => {
   const room = newRoom('닉네임 수업');
@@ -195,6 +196,14 @@ test('avatar customization shares validated options for the signed seat and retu
   assert.equal(seat.avatar, undefined);
   mutate(room, { type: 'active', active: false }, null, true);
   assert.throws(() => mutate(room, change, 'one', false), /강의실에 입장/);
+});
+test('changing clothes keeps the illustrated avatar portrait', () => {
+  for (const { id, avatar } of STORYBOOK_AVATARS) {
+    const dressed: AvatarCustomization = { ...avatar, kind: id === 'cardigan' ? 'female' : 'male' };
+    assert.equal(storybookAvatar('smile', { ...dressed, clothing: 'hoodie' }), id);
+    assert.equal(storybookAvatar('smile', { ...dressed, clothingColor: 'rose' }), id);
+    assert.equal(storybookAvatar('smile', { ...dressed, expression: 'sleepy' }), undefined);
+  }
 });
 test('chat reset clears messages and pins while preserving votes, aliases and presence', () => {
   const room = newRoom('수업'); const day = ensureDay(room);
