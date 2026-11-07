@@ -27,7 +27,7 @@ async function readyStage(page) {
   await page.keyboard.press('Tab');
   await page.getByRole('button',{name:'채팅',exact:true}).click();
   await page.getByRole('heading',{name:'실시간 채팅',exact:true}).waitFor();
-  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isEnabled(),true);
+  await waitUntil(async()=>await page.getByLabel('채팅 메시지',{exact:true}).isEnabled(),'The home chat composer must enable after the live connection opens');
   for (let tap = 0; tap < 5; tap++) await page.getByRole('button',{name:'AI환경연구소 로고',exact:true}).click();
   await page.getByLabel('강사 접속 코드').fill(process.env.TEST_HOST_PASSWORD || '0423');
   await page.getByRole('button', { name: '강사로 들어가기' }).click();
@@ -94,7 +94,7 @@ async function readyStage(page) {
   assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
   await page.getByRole('button',{name:'채팅',exact:true}).click();
   await page.getByLabel('채팅 메시지',{exact:true}).fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
-  await page.getByRole('button',{name:'강당',exact:true}).click();
+  await page.getByRole('button',{name:'강의실',exact:true}).click();
   await readyStage(page);
   await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
   await waitUntil(async()=>await student.getByRole('button',{name:'채팅',exact:true}).getAttribute('aria-describedby')==='new-chat-hint',
@@ -109,7 +109,7 @@ async function readyStage(page) {
   await second.getByRole('button',{name:'채팅',exact:true}).click();
   await second.getByLabel('채팅 메시지',{exact:true}).fill('저도 잘 보여요!');
   await second.getByLabel('채팅 메시지',{exact:true}).press('Enter');
-  await second.getByRole('button',{name:'강당',exact:true}).click();
+  await second.getByRole('button',{name:'강의실',exact:true}).click();
   await readyStage(second);
   await occupied.filter({hasText:'수강생 02'}).locator('.classroom-seat-bubble').getByText('저도 잘 보여요!',{exact:true}).waitFor();
   await page.getByRole('button',{name:'채팅',exact:true}).click();
@@ -117,8 +117,8 @@ async function readyStage(page) {
   await student.locator('.classroom-board-content').getByText('실습 자료',{exact:true}).waitFor({timeout:10000});
   await page.locator('.chat-message').filter({hasText:'실습 자료'}).locator('.message-menu summary').click();
   await page.getByRole('button',{name:'상단 고정',exact:true}).click();
-  await page.getByRole('button',{name:'강당',exact:true}).click();
-  const classroomButton = student.getByRole('button',{name:'강당',exact:true});
+  await page.getByRole('button',{name:'강의실',exact:true}).click();
+  const classroomButton = student.getByRole('button',{name:'강의실',exact:true});
   const chatButton = student.getByRole('button',{name:'채팅',exact:true});
   await student.getByLabel('채팅 메시지',{exact:true}).fill('작성 중인 질문');
   await chatButton.click();
@@ -158,13 +158,14 @@ async function readyStage(page) {
     await readyStage(student);
     await student.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
     assert.equal(await student.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true, 'Overflow at '+width);
-    assert.equal(await student.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true,'Page scroll at '+width);
+    const pageHeight = await student.evaluate(()=>({viewport:innerHeight,page:document.documentElement.scrollHeight}));
+    assert(pageHeight.page<=pageHeight.viewport,`Page scroll at ${width}×${height} (${pageHeight.page}px document, ${pageHeight.viewport}px viewport)`);
     if (width === 1440 && height === 680) {
       await waitUntil(async () => {
         const viewport = await student.locator('.auditorium-viewport').boundingBox();
         const floor = await student.locator('.classroom-floor').boundingBox();
         const screen = await student.locator('.classroom-board').boundingBox();
-        return floor.width >= viewport.width*.76 && screen.width >= viewport.width*.45
+        return floor.width >= viewport.width*.76 && screen.width >= viewport.width*.42
           && floor.width / floor.height <= 2.36;
       }, 'The stage and screen should use the available width in a short desktop window');
     }
@@ -188,7 +189,9 @@ async function readyStage(page) {
     const points = await student.locator('.classroom-seat').evaluateAll(items=>items.map(el=>({x:parseFloat(el.style.left), y:parseFloat(el.style.top)})));
     assert.equal(new Set(points.map(point=>point.x+'/'+point.y)).size,20,'Unique auditorium positions at '+width);
     assert(points.every(point=>point.x>0 && point.x<100 && point.y>0 && point.y<100),'All seats inside auditorium at '+width);
-    assert(points[0].y<points[1].y && points[3].y<points[2].y,'Projected first row curves around stage at '+width);
+    assert(points.slice(0,4).every(point=>Math.abs(point.y-points[0].y)<.05), 'The front row is aligned at '+width);
+    assert(points[0].x<points[1].x && points[1].x<50 && points[2].x>50 && points[2].x<points[3].x,
+      'The front row leaves a central aisle at '+width);
     assert.equal(await student.locator('.classroom-seat').count(), 20);
     const deskBottom = await student.locator('.classroom-seat').evaluateAll(items=>Math.max(...items.map(el=>el.getBoundingClientRect().bottom)));
     const footer = await student.locator('.classroom-seating-footer').boundingBox();
@@ -207,7 +210,7 @@ async function readyStage(page) {
     await student.screenshot({path:width === 1440 && height === 680 ? '.local/screenshots/auditorium-wide-short.png' : '.local/screenshots/student-'+width+'.png',fullPage:true});
   }
   await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
-  await page.getByRole('button',{name:'강당',exact:true}).click();
+  await page.getByRole('button',{name:'강의실',exact:true}).click();
   await readyStage(page);
   await page.screenshot({path:'.local/screenshots/teacher-desktop.png',fullPage:true});
   await page.setViewportSize({width:320,height:1000}); assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,'Teacher overflow at 320');
@@ -314,6 +317,49 @@ async function readyStage(page) {
   await page.setViewportSize({width:1440,height:900});
   await page.goto(base+'/host?room='+code);
   await page.getByRole('heading',{name:'실시간 기능 검증 수업'}).waitFor();
+  await readyStage(page);
+
+  const peerInstructor = student.locator('.classroom-walker.is-instructor[title="강사"]');
+  await peerInstructor.waitFor();
+  const instructorHome = await peerInstructor.evaluate(element=>({left:element.style.left,top:element.style.top}));
+  await page.getByRole('button',{name:'움직이기',exact:true}).click();
+  const instructorFloor = page.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
+  const instructorFloorBounds = await instructorFloor.boundingBox();
+  const instructorDestination = {x:Math.round(instructorFloorBounds.width*.73),y:Math.round(instructorFloorBounds.height*.66)};
+  await instructorFloor.click({position:instructorDestination});
+  await waitUntil(async()=>{
+    const point = await peerInstructor.evaluate(element=>({left:parseFloat(element.style.left),top:parseFloat(element.style.top)}));
+    return Math.abs(point.left-instructorDestination.x/instructorFloorBounds.width*100)<1
+      && Math.abs(point.top-instructorDestination.y/instructorFloorBounds.height*100)<1;
+  },'Instructor movement must reach the student in normalized classroom coordinates');
+  await page.getByRole('button',{name:'칠판 앞으로',exact:true}).click();
+  await waitUntil(async()=>peerInstructor.evaluate((element,home)=>element.style.left===home.left&&element.style.top===home.top,instructorHome),
+    'Returning to the chalkboard must also return the instructor for the student');
+
+  const moveMode = student.getByLabel('캐릭터 이동 방식',{exact:true});
+  await moveMode.selectOption('wander');
+  await walker.waitFor();
+  const firstWanderPoint = await walker.evaluate(element=>element.style.left+','+element.style.top);
+  await waitUntil(async()=>await walker.evaluate(element=>element.style.left+','+element.style.top)!==firstWanderPoint,
+    'A peer must see the student continue moving in autonomous mode');
+  const manualMovement = student.waitForResponse(response=>{
+    const request = response.request();
+    if (request.method()!=='POST'||response.url()!==roomURL) return false;
+    const action = request.postDataJSON();
+    return action?.type==='move'&&!action.wander&&Boolean(action.position);
+  });
+  await moveMode.selectOption('manual');
+  const manualResponse = await manualMovement;
+  assert.equal(manualResponse.status(),200);
+  const manualSeat = (await manualResponse.json()).seats.find(seat=>seat.mine);
+  assert(manualSeat?.position&&!manualSeat.wanderSince,'Switching to manual must keep the current position and stop wandering');
+  await waitUntil(async()=>{
+    const point = await walker.evaluate(element=>({x:parseFloat(element.style.left)/100,y:parseFloat(element.style.top)/100}));
+    return Math.abs(point.x-manualSeat.position.x)<.0002&&Math.abs(point.y-manualSeat.position.y)<.0002;
+  },'Peers must receive the position when the student stops wandering');
+  await student.getByRole('button',{name:'내 자리로',exact:true}).click();
+  await waitUntil(async()=>await walker.count()===0,'A student leaving autonomous mode must be able to return to their seat');
+
   await student.getByRole('button',{name:'활동',exact:true}).click();
   const activities = student.getByRole('dialog',{name:'교실 활동',exact:true});
   await activities.getByRole('button',{name:'질문 있어요',exact:true}).click();
@@ -349,21 +395,48 @@ async function readyStage(page) {
   const hostActivities = page.getByRole('dialog',{name:'교실 활동',exact:true});
   await hostActivities.getByRole('button',{name:'응답 완료',exact:true}).click();
   await waitUntil(async()=>await second.locator('.raised-hand').count() === 0,'Instructor can acknowledge raised hand');
-  await hostActivities.getByLabel('문제',{exact:true}).fill('AI는 실무에 활용할 수 있다.');
-  await hostActivities.getByRole('button',{name:'OX 퀴즈 시작',exact:true}).click();
   await hostActivities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
-  await student.getByRole('button',{name:'O 선택',exact:true}).click();
-  await second.locator('.classroom-walker[title="몽실구름"]').waitFor();
-  await waitUntil(async()=>parseFloat(await second.locator('.classroom-walker[title="몽실구름"]').evaluate(el=>el.style.left))<50,'Quiz answer moves character to O zone');
-  await student.getByRole('button',{name:'전체 보기',exact:true}).click();
-  const quizDeskBottom = await student.locator('.classroom-seat').evaluateAll(items=>Math.max(...items.map(el=>el.getBoundingClientRect().bottom)));
-  const quizFooter = await student.locator('.classroom-seating-footer').boundingBox();
-  assert(quizDeskBottom <= quizFooter.y+1,'Quiz desks must not overlap activity controls');
-  await student.screenshot({path:'.local/screenshots/classroom-quiz-mobile.png'});
-  await page.getByRole('button',{name:'정답 공개',exact:true}).click();
-  await student.getByText('정답은 O · 참여 1명',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'퀴즈 닫기',exact:true}).click();
-  await student.getByRole('button',{name:'내 자리로',exact:true}).click();
+
+  const prompt = 'AI를 환경업무에 활용할 첫 과제는 무엇인가요?';
+  const answer = '습도 센서 기록을 먼저 확인하겠습니다.';
+  await page.getByRole('button',{name:'질문 출제',exact:true}).click();
+  const hostQuestion = page.getByRole('dialog',{name:/^질문 (출제|관리)$/});
+  await hostQuestion.getByLabel('질문',{exact:true}).fill(prompt);
+  await hostQuestion.getByRole('button',{name:'질문 열기',exact:true}).click();
+  await student.getByRole('button',{name:'질문 답하기',exact:true}).click();
+  const studentQuestion = student.getByRole('dialog',{name:'질문 답하기',exact:true});
+  await studentQuestion.getByText(prompt,{exact:true}).waitFor();
+  await studentQuestion.getByLabel('내 답변',{exact:true}).fill(answer);
+  await studentQuestion.getByRole('button',{name:'답변 보내기',exact:true}).click();
+  await studentQuestion.getByRole('button',{name:'답변 수정',exact:true}).waitFor();
+  await student.screenshot({path:'.local/screenshots/classroom-question-mobile.png'});
+  await studentQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+
+  await second.getByRole('button',{name:'채팅',exact:true}).click();
+  await second.getByRole('button',{name:'질문 답하기',exact:true}).click();
+  const peerQuestion = second.getByRole('dialog',{name:'질문 답하기',exact:true});
+  await peerQuestion.getByText(prompt,{exact:true}).waitFor();
+  assert.equal(await peerQuestion.getByText(answer,{exact:true}).count(),0);
+  assert.equal(await peerQuestion.getByLabel('내 답변',{exact:true}).inputValue(),'');
+  const peerOpenRound = (await (await studentB.request.get(roomURL)).json()).questionRound;
+  assert.equal(peerOpenRound.total,1);
+  assert.equal(peerOpenRound.myAnswer,null);
+  assert.equal('answers' in peerOpenRound,false,'Peer snapshots must withhold the answer list before publication');
+  await peerQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+
+  if (!await hostQuestion.isVisible()) await page.getByRole('button',{name:'질문 관리',exact:true}).click();
+  await hostQuestion.getByRole('region',{name:'수강생 답변',exact:true}).getByText(answer,{exact:true}).waitFor();
+  await hostQuestion.getByRole('button',{name:'질문 마감',exact:true}).click();
+  await second.getByRole('button',{name:'답변 보기',exact:true}).waitFor();
+  const peerClosedRound = (await (await studentB.request.get(roomURL)).json()).questionRound;
+  assert.equal(peerClosedRound.open,false);
+  assert.equal('answers' in peerClosedRound,false,'Closing the question must not publish peer answers');
+  await hostQuestion.getByRole('button',{name:'답변 공개',exact:true}).click();
+  await second.getByRole('button',{name:'답변 보기',exact:true}).click();
+  const publishedQuestion = second.getByRole('dialog',{name:'답변 보기',exact:true});
+  await publishedQuestion.getByRole('region',{name:'공개된 답변',exact:true}).getByText(answer,{exact:true}).waitFor();
+  await publishedQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
+  await hostQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
   await verifyAuditoriumCapacity(browser, teacher, base, waitUntil);
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
@@ -373,10 +446,11 @@ async function readyStage(page) {
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'full-width auditorium and separate desktop chat', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
-      'OX quiz, answer regions and correct-answer reveal', 'group-photo PNG download',
+      'short-answer questions in classroom and chat, private submission, close and publication', 'group-photo PNG download', 'instructor movement and return visible to students',
+      'student autonomous movement, manual takeover and return',
       '20 to 50 live WebGL seats', 'WebGL context loss, fallback and rendered restoration', 'browser errors']
   }, null, 2));
-  console.log('PASS: full-width WebGL auditorium, separate desktop and mobile chat, preserved drafts, teacher chalkboard, materials, voting and moderation.');
+  console.log('PASS: bright WebGL classroom, instructor movement, autonomous student movement, separate chat, teacher chalkboard, materials, voting and moderation.');
   await browser.close();
 })().catch(e=>{ console.error(e);process.exit(1); });
 
@@ -436,7 +510,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
       'The auditorium must render all fifty real connected students');
     await readyStage(instructor);
     assert.equal(await instructor.locator('.classroom-seat').count(),50);
-    await instructor.getByText('반원 강당 · 50석',{exact:true}).waitFor();
+    await instructor.getByText('3D 교실 · 50석',{exact:true}).waitFor();
     const positions = await instructor.locator('.classroom-seat').evaluateAll(seats=>seats.map(seat=>({
       x:parseFloat(seat.style.left),y:parseFloat(seat.style.top)
     })));
@@ -468,12 +542,15 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await activities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
 
     await student.setViewportSize({width:320,height:568});
+    await readyStage(student);
+    await student.locator('.classroom-pane').evaluate(element=>{element.scrollTop=0;});
     assert.equal(await student.locator('.classroom-greet-hit').count(),0,
       'Overview must not expose overlapping tiny avatar hit targets');
+    await student.screenshot({path:'.local/screenshots/auditorium-50-mobile-overview.png'});
     await student.getByRole('button',{name:'내 주변',exact:true}).click();
     await readyStage(student);
     const floor = student.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
-    const visibleFloor = student.getByRole('region',{name:'강당 객석',exact:true});
+    const visibleFloor = student.getByRole('region',{name:'교실 좌석',exact:true});
     const ownTarget = student.locator('.classroom-seat.is-mine .classroom-desk-hit');
     const targetRect = await ownTarget.boundingBox();
     assert(targetRect.width>=44&&targetRect.height>=44,
@@ -490,19 +567,28 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
       'Arrow movement in a scrolled nearby view must retain normalized screen coordinates');
 
     await visibleFloor.scrollIntoViewIfNeeded();
+    await visibleFloor.evaluate(element=>{
+      element.scrollLeft = (element.scrollWidth-element.clientWidth)/2;
+    });
+    await student.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const touchPoint = await visibleFloor.evaluate(element=>{
       const bounds = element.getBoundingClientRect();
-      for (const yRatio of [.2,.4,.6,.8]) for (const xRatio of [.2,.4,.6,.8]) {
+      const clearance = [-18,0,18];
+      for (const yRatio of [.5,.35,.65,.2,.8]) for (const xRatio of [.5,.4,.6,.2,.8]) {
         const x=bounds.x+bounds.width*xRatio,y=bounds.y+bounds.height*yRatio;
-        const hit=document.elementFromPoint(x,y);
-        if (hit?.closest('.classroom-floor')&&!hit.closest('button,.world-screen')) return {x,y};
+        // A touch close to a button may target that button even when the center hits the floor.
+        const clear = clearance.every(dx=>clearance.every(dy=>{
+          const hit = document.elementFromPoint(x+dx,y+dy);
+          return hit?.closest('.classroom-floor')&&!hit.closest('a,button,input,textarea,select,.world-screen');
+        }));
+        if (clear) return {x,y};
       }
       return null;
     });
     assert(touchPoint,'Nearby view needs a reachable floor area for touch movement');
     const touchFloorRect = await floor.boundingBox();
     const expectedTouchX = Math.max(.06,Math.min(.94,(touchPoint.x-touchFloorRect.x)/touchFloorRect.width));
-    const expectedTouchY = Math.max(.08,Math.min(.92,(touchPoint.y-touchFloorRect.y)/touchFloorRect.height));
+    const expectedTouchY = Math.max(.32,Math.min(.92,(touchPoint.y-touchFloorRect.y)/touchFloorRect.height));
     await student.touchscreen.tap(touchPoint.x,touchPoint.y);
     await waitUntil(async()=>{
       const actual=await walker.evaluate(element=>({x:parseFloat(element.style.left)/100,y:parseFloat(element.style.top)/100}));
@@ -555,7 +641,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await readyStage(laterStudent);
     await waitUntil(async()=>await laterStudent.locator('.classroom-own-seat b').innerText()==='51',
       'A later daily student must keep seat fifty-one instead of being renumbered');
-    await laterStudent.getByText('반원 강당 · 20석',{exact:true}).waitFor();
+    await laterStudent.getByText('3D 교실 · 20석',{exact:true}).waitFor();
     assert.equal(await laterStudent.locator('.classroom-seat').count(),20);
     assert.equal(await laterStudent.getByRole('button',{name:'앞 좌석 보기',exact:true}).isEnabled(),true);
     assert.deepEqual(pageErrors,[],'Live capacity transitions must not throw browser errors');

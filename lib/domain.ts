@@ -1,6 +1,8 @@
 const randomUUID = () => crypto.randomUUID();
-import { CHARACTERS, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type Room, type Snapshot } from './types.ts';
+import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
 import { auditoriumQuizPosition } from './auditorium.ts';
+
+const QUESTION_RESPONSE_LIMIT = 256;
 
 export class AppError extends Error {
   status: number;
@@ -61,7 +63,25 @@ export function safeUrl(value: unknown): string | null {
     return url.href;
   } catch { throw new AppError('http:// 또는 https://로 시작하는 링크를 입력해주세요.'); }
 }
-export function snapshot(room: Room, date: string, guest: string | null, mode: 'local' | 'cloud', onlineGuests?: Set<string>): Snapshot {
+function publicQuestion(day: Day, guest: string | null, viewerHost: boolean): PublicQuestionRound | undefined {
+  const round = day.questionRound;
+  if (!round) return undefined;
+  const entries = Object.entries(round.answers);
+  const question: PublicQuestionRound = {
+    id: round.id, prompt: round.prompt, open: round.open, published: round.published,
+    total: entries.length, myAnswer: guest ? round.answers[guest] ?? null : null
+  };
+  const participant = guest !== null && Object.hasOwn(day.participants ?? {}, guest);
+  if (viewerHost || (round.published && participant)) {
+    question.answers = entries.flatMap(([id, answer]) => {
+      const alias = day.participants?.[id];
+      return alias ? [{ seatNumber: seatNumber(alias), name: day.nicknames?.[id] ?? alias, text: answer }] : [];
+    }).sort((a, b) => a.seatNumber - b.seatNumber);
+  }
+  return question;
+}
+
+export function snapshot(room: Room, date: string, guest: string | null, mode: 'local' | 'cloud', onlineGuests?: Set<string>, instructorPresent = false, viewerHost = false): Snapshot {
   const day = room.days[date];
   if (!day) throw new AppError('이 날짜의 강의 기록이 없습니다.', 404);
   const currentDate = today();
@@ -72,13 +92,17 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     if (!name) return [];
     const number = seatNumber(name);
     return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number), ...(day.positions?.[id] ? { position: day.positions[id] } : {}),
+      ...(day.wanderers?.[id] ? { wanderSince: day.wanderers[id] } : {}),
       ...(day.activities?.[id] ? { activity: day.activities[id] } : {}),
       ...(day.quiz?.answers[id] ? { quizChoice: day.quiz.answers[id] } : {}) }];
   }).sort((a, b) => a.number - b.number);
+  const questionRound = publicQuestion(day, guest, viewerHost);
   return {
     code: room.code, title: room.title, demo: room.demo, date, today: currentDate,
     active: day.active && date === currentDate, dates: Object.keys(room.days).sort().reverse(),
     online: present.size, seats,
+    ...(instructorPresent ? { instructor: day.instructor ?? {} } : {}),
+    ...(questionRound ? { questionRound } : {}),
     ...(day.quiz ? { quiz: { id: day.quiz.id, question: day.quiz.question, open: day.quiz.open,
       ...(!day.quiz.open ? { answer: day.quiz.answer } : {}),
       counts: [Object.values(day.quiz.answers).filter(v => v === 'O').length, Object.values(day.quiz.answers).filter(v => v === 'X').length] as [number, number],
@@ -94,6 +118,35 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
   const date = today();
   if (action.date !== undefined && action.date !== date) throw new AppError('지난 강의 기록은 변경할 수 없습니다.', 409);
   const day = ensureDay(room, date);
+  if (action.type === 'question-answer') {
+    if (host) throw new AppError('수강생으로 참여해주세요.', 403);
+    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    const round = day.questionRound;
+    if (!day.active || !day.participants?.[guest] || !round?.open || round.id !== action.roundId) {
+      throw new AppError('현재 진행 중인 질문을 확인해주세요.', 409);
+    }
+    const answer = text(action.text, '답변', QUESTION_ANSWER_MAX_LENGTH);
+    if (!Object.hasOwn(round.answers, guest) && Object.keys(round.answers).length >= QUESTION_RESPONSE_LIMIT) {
+      throw new AppError('이 질문의 응답이 모두 찼어요.', 409);
+    }
+    round.answers[guest] = answer;
+    return;
+  }
+  if (action.type === 'question-start' || action.type === 'question-close' || action.type === 'question-publish') {
+    if (!host) throw new AppError('강사 로그인이 필요합니다.', 403);
+    if (!day.active) throw new AppError('강의가 종료됐어요.', 409);
+    const round = day.questionRound;
+    if (action.type === 'question-start') {
+      if (round?.open) throw new AppError('진행 중인 질문을 먼저 마감해주세요.', 409);
+      const prompt = text(action.prompt, '질문', QUESTION_PROMPT_MAX_LENGTH);
+      day.questionRound = { id: randomUUID(), prompt, open: true, published: false, answers: {} };
+    } else {
+      if (!round || round.id !== action.roundId) throw new AppError('현재 질문을 확인해주세요.', 409);
+      round.open = false;
+      if (action.type === 'question-publish') round.published = true;
+    }
+    return;
+  }
   if (['hand', 'reaction', 'greet', 'quiz-answer'].includes(String(action.type))) {
     if (host) throw new AppError('수강생으로 참여해주세요.', 403);
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
@@ -138,6 +191,8 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
       const question = text(action.question, 'OX 문제', 160);
       if (action.answer !== 'O' && action.answer !== 'X') throw new AppError('정답을 골라주세요.');
       day.quiz = { id: randomUUID(), question, answer: action.answer, open: true, answers: {} };
+      delete day.wanderers;
+      if (day.instructor) delete day.instructor.wanderSince;
     } else if (action.type === 'quiz-clear') {
       if (!day.quiz || action.quizId !== day.quiz.id) throw new AppError('현재 퀴즈를 확인해주세요.', 409);
       delete day.quiz;
@@ -150,19 +205,35 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     }
     return;
   }
-  if (action.type === 'move') {
-    if (host) throw new AppError('수강생 캐릭터만 움직일 수 있어요.', 403);
-    if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
-    if (!day.active || !day.participants?.[guest]) throw new AppError('진행 중인 강의실에서 움직일 수 있어요.', 409);
-    if (action.position === null) { delete day.positions?.[guest]; if (day.quiz?.open) delete day.quiz.answers[guest]; return; }
-    const position = action.position as { x?: unknown; y?: unknown } | undefined;
-    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number'
-      || !Number.isFinite(position.x) || !Number.isFinite(position.y)
-      || position.x < 0.06 || position.x > 0.94 || position.y < 0.08 || position.y > 0.92) {
-      throw new AppError('교실 안에서 이동할 위치를 골라주세요.');
+  if (action.type === 'move' || action.type === 'instructor-move') {
+    if (action.type === 'instructor-move' && !host) throw new AppError('강사 로그인이 필요합니다.', 403);
+    if (action.type === 'move' && host) throw new AppError('수강생으로 참여해주세요.', 403);
+    if (!host && !guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
+    if (!day.active || (!host && !day.participants?.[guest!])) throw new AppError('진행 중인 강의실에서 움직일 수 있어요.', 409);
+    const legacyQuiz = action.ignoreLegacyQuiz === true ? undefined : day.quiz;
+    if (action.wander === true) {
+      if (legacyQuiz?.open) throw new AppError('OX 퀴즈가 끝나면 자율 이동을 켤 수 있어요.', 409);
+      if (host) {
+        day.instructor = { wanderSince: day.instructor?.wanderSince ?? Date.now() };
+      } else {
+        delete day.positions?.[guest!];
+        (day.wanderers ??= {})[guest!] ??= Date.now();
+      }
+      return;
     }
-    (day.positions ??= {})[guest] = { x: Math.round(position.x * 10000) / 10000, y: Math.round(position.y * 10000) / 10000 };
-    if (day.quiz?.open) day.quiz.answers[guest] = position.x < .5 ? 'O' : 'X';
+    const position = action.position === null ? null : movePosition(action.position);
+    if (host) {
+      if (position) day.instructor = { position };
+      else delete day.instructor;
+    } else {
+      delete day.wanderers?.[guest!];
+      if (position) (day.positions ??= {})[guest!] = position;
+      else delete day.positions?.[guest!];
+      if (legacyQuiz?.open) {
+        if (position) legacyQuiz.answers[guest!] = position.x < .5 ? 'O' : 'X';
+        else delete legacyQuiz.answers[guest!];
+      }
+    }
     return;
   }
   if (action.type === 'nickname') {
@@ -234,6 +305,11 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     case 'active':
       if (typeof action.active !== 'boolean') throw new AppError('강의 상태를 확인해주세요.');
       day.active = action.active;
+      if (!day.active) {
+        delete day.instructor;
+        delete day.wanderers;
+        if (day.questionRound) day.questionRound.open = false;
+      }
       break;
     case 'poll-toggle': {
       const poll = day.polls.find(p => p.id === action.id && !p.archived);
@@ -261,4 +337,14 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     }
     default: throw new AppError('지원하지 않는 요청입니다.');
   }
+}
+
+function movePosition(value: unknown) {
+  const position = value as { x?: unknown; y?: unknown } | undefined;
+  if (!position || typeof position.x !== 'number' || typeof position.y !== 'number'
+    || !Number.isFinite(position.x) || !Number.isFinite(position.y)
+    || position.x < .06 || position.x > .94 || position.y < .08 || position.y > .92) {
+    throw new AppError('교실 안에서 이동할 위치를 골라주세요.');
+  }
+  return { x: Math.round(position.x * 10000) / 10000, y: Math.round(position.y * 10000) / 10000 };
 }

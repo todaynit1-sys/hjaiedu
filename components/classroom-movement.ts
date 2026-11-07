@@ -1,18 +1,54 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import type { ClassroomPosition, ClassroomSeat } from '../lib/types';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import type { AvatarMotion, ClassroomMove, ClassroomPosition } from '../lib/types';
 
 const bounded = (x: number, y: number): ClassroomPosition => ({
   x: Math.min(.94, Math.max(.06, x)),
-  y: Math.min(.92, Math.max(.08, y))
+  y: Math.min(.92, Math.max(.32, y))
 });
 
-export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | undefined,
-  onMove?: (position: ClassroomPosition | null) => Promise<void>) {
+export const INSTRUCTOR_HOME = { x: .27, y: .335 };
+
+export function wanderingPosition(since: number | undefined, now: number, home: ClassroomPosition, number: number) {
+  if (!since || now < since) return undefined;
+  // Viewers replay the same route from the shared start time without sending position updates.
+  const step = Math.floor((now - since) / 2500);
+  const cycleLength = 12 + number % 6;
+  const rowGap = Math.min(.91, home.y + .05);
+  const beside = bounded(home.x, rowGap);
+  const aisle = { x: .5, y: rowGap };
+  const front = Math.floor(step / cycleLength) % 2 === 0 || home.y > .72;
+  const path = [beside, aisle, {x: .5, y: front ? .345 : .91}, aisle, beside, home];
+  return path[step % cycleLength];
+}
+
+export function useWanderClock(enabled: boolean, updatedAt: string) {
+  const [now, setNow] = useState(Date.now);
+  const clockOffset = useMemo(() => Date.parse(updatedAt) - Date.now(), [updatedAt]);
+  useEffect(() => {
+    if (!enabled) return;
+    let timer = 0;
+    function sync() {
+      clearInterval(timer);
+      if (document.hidden) return;
+      setNow(Date.now());
+      timer = window.setInterval(() => setNow(Date.now()), 500);
+    }
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', sync); };
+  }, [enabled]);
+  return now + clockOffset;
+}
+
+export function useClassroomMovement(roomDay: string, motion: AvatarMotion | undefined,
+  home: ClassroomPosition, wanderPosition: ClassroomPosition | undefined,
+  onMove?: (move: ClassroomMove) => Promise<void>) {
   const floor = useRef<HTMLDivElement>(null);
-  const [target, setTarget] = useState<ClassroomPosition | null | undefined>();
+  const [target, setTarget] = useState<ClassroomMove>();
   const [error, setError] = useState('');
-  const pending = useRef<{ position: ClassroomPosition | null } | null>(null);
-  const current = target === undefined ? seat?.position : target;
+  const pending = useRef<{ move: ClassroomMove } | null>(null);
+  const autonomous = target === undefined ? Boolean(motion?.wanderSince) : target === 'wander';
+  const current = target === undefined ? wanderPosition ?? motion?.position : target === 'wander' ? undefined : target;
   useEffect(() => {
     let live = true;
     let sending = false;
@@ -24,7 +60,7 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
       pending.current = null;
       sending = true;
       try {
-        await onMove(request.position);
+        await onMove(request.move);
         if (live && !pending.current) setTarget(undefined);
       } catch (cause) {
         if (live) {
@@ -37,26 +73,18 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
     return () => { live = false; pending.current = null; clearInterval(timer); };
   }, [roomDay, onMove]);
 
-  function move(position: ClassroomPosition | null) {
-    if (!onMove || !seat) return;
-    pending.current = { position };
-    setTarget(position);
+  function move(move: ClassroomMove) {
+    if (!onMove || !motion) return;
+    pending.current = { move };
+    setTarget(move);
     setError('');
   }
-  function home() {
-    const field = floor.current?.getBoundingClientRect();
-    const desk = floor.current?.querySelector('.classroom-seat.is-mine .classroom-desk')?.getBoundingClientRect();
-    if (!field || !desk || !field.width || !field.height) return bounded(.5, .5);
-    return bounded((desk.x + desk.width / 2 - field.x) / field.width,
-      (desk.y + desk.height * .35 - field.y) / field.height);
-  }
   function toggle() {
-    const seatPosition = home();
-    move(current ? null : bounded(seatPosition.x + (seatPosition.x < .5 ? .025 : -.025), seatPosition.y + .055));
+    move(current || autonomous ? null : bounded(home.x, home.y + .05));
     floor.current?.focus({ preventScroll: true });
   }
   function click(event: MouseEvent<HTMLDivElement>) {
-    if (!current || !onMove) return;
+    if ((!current && !autonomous) || !onMove) return;
     if (event.target instanceof Element && event.target.closest('a, button, input, textarea, select, .world-screen')) return;
     const field = event.currentTarget.getBoundingClientRect();
     move(bounded((event.clientX - field.x) / field.width, (event.clientY - field.y) / field.height));
@@ -72,8 +100,13 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
     const direction = directions[event.key] ?? directions[event.key.toLowerCase()];
     if (!direction) return;
     event.preventDefault();
-    const from = current ?? home();
+    const from = current ?? home;
     move(bounded(from.x + direction[0], from.y + direction[1]));
   }
-  return { floor, position: current, moving: Boolean(current), error, toggle, click, keyDown };
+  return { floor, position: current, moving: Boolean(current), autonomous, error, toggle, click, keyDown,
+    selectMode: (mode: 'manual' | 'wander') => {
+      if (mode === 'wander' && !autonomous) move('wander');
+      else if (mode === 'manual' && autonomous) move(current ?? null);
+    }
+  };
 }

@@ -3,13 +3,13 @@ import { Check, ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react
 import { Chalkboard } from './chalkboard';
 import { animalHeads } from './animal-heads';
 import { gardenHeads } from './garden-heads';
-import { useClassroomMovement } from './classroom-movement';
+import { INSTRUCTOR_HOME, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
-import { ActivityBadge, ClassroomActivities, QuizStatus, type ClassroomAction } from './classroom-activities';
+import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
 import { AuditoriumRenderer, type AuditoriumProjection } from './auditorium-renderer';
-import { AUDITORIUM_PAGE_SIZE, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
-import { CHARACTERS, defaultCharacter, type Character, type ClassroomPosition, type PublicMessage, type Snapshot } from '../lib/types';
+import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
+import { CHARACTERS, defaultCharacter, type Character, type ClassroomMove, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 import '../app/auditorium.css';
 
@@ -136,9 +136,10 @@ function DeskDrawing({ number, character, mine, name }: { number: number; charac
   return <svg className="classroom-desk" data-nickname={nickname || undefined} viewBox="0 0 90 78" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <g className="auditorium-seat-base">
     <ellipse cx="45" cy="67" rx="25" ry="5" fill="#283452" opacity=".1" stroke="none"/>
-    <path d="M26 43V32q0-8 8-8h22q8 0 8 8v11" className="classroom-empty-chair"/>
-    <path d="M21 49v8q0 9 24 9t24-9v-8" className="classroom-desk-front"/>
-    <ellipse cx="45" cy="49" rx="24" ry="10" className="classroom-desk-front"/>
+    <path d="M25 43V31q0-7 7-7h26q7 0 7 7v12Z" className="classroom-empty-chair"/>
+    <path d="m19 52-2 13m54-13 2 13M25 55v8m40-8v8" stroke="#6c583e" strokeWidth="3"/>
+    <path d="M16 44l5-6h48l5 6v9H16Z" className="classroom-desk-front"/>
+    <path d="M16 44h58" stroke="#ad7949"/>
     </g>
     {character && <>
       <path d="M33 42q12-8 24 0l3 10q-15 8-30 0Z" fill="#d5e7de"/>
@@ -146,6 +147,16 @@ function DeskDrawing({ number, character, mine, name }: { number: number; charac
     </>}
     <text x="45" y="75" textAnchor="middle" fill="currentColor" stroke="none" fontSize={nickname ? 10 : 11} fontWeight="750">{nickname ? label.slice(0, 5).join('') + (label.length > 5 ? '…' : '') : seatLabel(number)}</text>
     {mine && <ellipse cx="45" cy="55" rx="30" ry="13" stroke="#4656a5" strokeWidth="2" strokeDasharray="3 4"/>}
+  </svg>;
+}
+
+function WalkerBody({ character }: { character: Character }) {
+  return <svg viewBox="16 -2 60 66" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <ellipse cx="45" cy="60" rx="17" ry="3.5" fill="#10182e" opacity=".22" stroke="none"/>
+    <ellipse className="walker-foot left" cx="38" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
+    <ellipse className="walker-foot right" cx="52" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
+    <path className="walker-shirt" d="M34 37q11-6 22 0l3 13q-14 9-28 0Z" fill="#d5e7de"/>
+    <StudentHead character={character} />
   </svg>;
 }
 
@@ -172,7 +183,7 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange, onMove, host = false, onActivity }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (position: ClassroomPosition | null) => Promise<void>; host?: boolean; onActivity?: ClassroomAction }) {
+export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange, onMove, host = false, visible, onActivity }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (move: ClassroomMove) => Promise<void>; host?: boolean; visible: boolean; onActivity?: ClassroomAction }) {
   const seats = data.seats ?? [];
   const mySeat = seats.find(seat => seat.mine);
   const [choosingCharacter, setChoosingCharacter] = useState(false);
@@ -198,25 +209,32 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const movement = useClassroomMovement(roomDay, mySeat, onMove);
   const page = selectedPage?.roomDay === roomDay && pages.includes(selectedPage.page)
     ? selectedPage.page : mySeat ? seatPage(mySeat.number) : 0;
   const pageIndex = pages.indexOf(page);
-  const canMoveHere = Boolean(onMove && mySeat && seatPage(mySeat.number) === page);
+  const ownMotion = host ? data.instructor : mySeat;
+  const onOwnPage = host || Boolean(mySeat && seatPage(mySeat.number) === page);
+  const canMoveHere = Boolean(onMove && ownMotion && onOwnPage);
   const firstSeat = page * PAGE_SIZE + 1;
   const pageSeats = seats.filter(seat => seatPage(seat.number) === page);
   const capacity = auditoriumCapacity(Math.max(1, ...pageSeats.map(seat => seat.number - page * PAGE_SIZE)));
   const world = projection?.seats.length === capacity ? projection : null;
-  function fallbackSeat(index: number) {
-    const point = auditoriumSeat(index, capacity);
-    return {...point, y:.38 + point.y * .55};
-  }
+  const seatPoint = (index: number) => world?.seats[index] ?? auditoriumSeat(index, capacity);
+  const wandering = data.active;
+  const now = useWanderClock(visible && wandering && Boolean(data.instructor?.wanderSince || pageSeats.some(seat => seat.wanderSince)), data.updatedAt);
+  const wander = (since: number | undefined, home: {x: number; y: number}, number: number) =>
+    wandering ? wanderingPosition(since, now, home, number) : undefined;
+  const ownNumber = host ? 0 : mySeat?.number ?? 0;
+  const ownHome = host ? INSTRUCTOR_HOME : onOwnPage ? seatPoint(ownNumber - firstSeat) : {x: .5, y: .5};
+  const movement = useClassroomMovement(roomDay, ownMotion, ownHome,
+    wander(ownMotion?.wanderSince, ownHome, ownNumber), canMoveHere ? onMove : undefined);
+  const instructorPosition = host ? movement.position : wander(data.instructor?.wanderSince, INSTRUCTOR_HOME, 0) ?? data.instructor?.position;
+  const studentPositions = new Map(pageSeats.map(seat => [seat.number, seat.mine ? movement.position :
+    wander(seat.wanderSince, seatPoint(seat.number - firstSeat), seat.number) ?? seat.position]));
   const headsInteractive = view === 'near';
   function centerNearView() {
     if (!viewport.current || !movement.floor.current) return;
-    const point = mySeat && seatPage(mySeat.number) === page
-      ? movement.position ?? world?.seats[mySeat.number - firstSeat] ?? fallbackSeat(mySeat.number - firstSeat)
-      : {x: .5, y: .5};
+    const point = onOwnPage ? movement.position ?? ownHome : {x: .5, y: .5};
     const field = movement.floor.current;
     const visibleFloor = viewport.current;
     visibleFloor.scrollTo({left: point.x * field.clientWidth - visibleFloor.clientWidth / 2,
@@ -229,28 +247,29 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   // Old instructor posts and the seeded demo cards predate the author field.
   const teacher = data.messages.reduce<PublicMessage | undefined>(
     (latest, message) => message.author === 'student' ? latest : message, undefined);
-  const messageKey = `${data.quiz?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}`;
+  const currentQuestion = data.questionRound?.open ? data.questionRound : undefined;
+  const messageKey = `${currentQuestion?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}`;
   const boardExpanded = expandedMessage === messageKey;
   const recordExpansion = useCallback((expanded: boolean) => {
     if (expanded) setExpandedMessage(messageKey);
   }, [messageKey]);
   const latest = data.messages.at(-1);
   const turnPage = (offset: number) => setSelectedPage({ roomDay, page: pages[pageIndex + offset] });
-  const screenBounds = world?.screen ?? {left:.22, top:.04, width:.56, height:.26};
+  const screenBounds = world?.screen ?? AUDITORIUM_SCREEN;
   const screenStyle = {
     left:`${screenBounds.left*100}%`, top:`${screenBounds.top*100}%`, width:`${screenBounds.width*100}%`,
-    '--screen-height':world ? `${screenBounds.height*world.height}px` : '26cqh'
+    '--screen-height': `${screenBounds.height*100}cqh`
   } as CSSProperties;
   const screen = <div className={`auditorium-stage world-screen${boardExpanded ? ' is-expanded' : ''}`} style={screenStyle}>
-    <Chalkboard message={data.quiz ? {id: data.quiz.id, text: data.quiz.question, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher}
+    <Chalkboard message={currentQuestion ? {id: currentQuestion.id, text: currentQuestion.prompt, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher}
       code={data.code} active={data.active} onExpanded={recordExpansion}/>
   </div>;
 
-  return <section className={`classroom-scene auditorium-scene${data.quiz ? ' has-quiz' : ''}`} data-world={world ? 'ready' : 'fallback'} aria-labelledby="classroom-title">
+  return <section className="classroom-scene auditorium-scene" data-world={world ? 'ready' : 'fallback'} aria-labelledby="classroom-title">
     <div className="auditorium-topbar">
     <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2>{mood}</div>
-    <div className="auditorium-toolbar"><span>{canMoveHere && movement.moving ? '바닥을 눌러 이동' : view === 'near' ? '밀어서 둘러보기' : `반원 강당 · ${capacity}석`}</span>
-      <div role="group" aria-label="강당 보기">
+    <div className="auditorium-toolbar"><span>{canMoveHere && movement.autonomous ? '자율 이동 중' : canMoveHere && movement.moving ? '바닥을 눌러 이동' : view === 'near' ? '밀어서 둘러보기' : `3D 교실 · ${capacity}석`}</span>
+      <div role="group" aria-label="교실 보기">
         <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')}>전체 보기</button>
         <button type="button" aria-pressed={view === 'near'} title="캐릭터를 크게 보고 눌러 인사하기" onClick={() => { if (view === 'near') centerNearView(); else setView('near'); }}>내 주변</button>
       </div>
@@ -258,25 +277,23 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
     </div>
     <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
     {boardExpanded && screen}
-    <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
     <p id="auditorium-view-hint" className="sr-only">내 주변에서는 화면을 밀어 둘러보고 캐릭터를 눌러 인사할 수 있어요.</p>
-    <div ref={viewport} className="auditorium-viewport" data-view={view} aria-label="강당 객석" aria-describedby="auditorium-view-hint" role="region">
-    <div ref={movement.floor} className="classroom-floor" data-moving={movement.moving && Boolean(onMove) || undefined}
+    <div ref={viewport} className="auditorium-viewport" data-view={view} aria-label="교실 좌석" aria-describedby="auditorium-view-hint" role="region">
+    <div ref={movement.floor} className="classroom-floor" data-moving={canMoveHere && (movement.moving || movement.autonomous) || undefined}
       style={{'--auditorium-columns':capacity / 5} as CSSProperties}
       role="group" aria-label="캐릭터 이동 영역" aria-describedby={onMove ? 'classroom-move-hint' : undefined}
       tabIndex={canMoveHere ? 0 : undefined} onClick={canMoveHere ? movement.click : undefined} onKeyDown={canMoveHere ? movement.keyDown : undefined}>
     <AuditoriumRenderer capacity={capacity} onLayout={setProjection}/>
     {!world && <AuditoriumArt/>}
     {!boardExpanded && screen}
-    {data.quiz?.open && <div className="classroom-quiz-zones" aria-hidden="true"><span>O</span><span>X</span></div>}
     <ol className="classroom-seats" aria-label={`강의실 좌석 ${firstSeat}번부터 ${firstSeat + capacity - 1}번까지`} start={firstSeat}>
       {Array.from({ length: capacity }, (_, index) => {
         const number = firstSeat + index;
         const seat = seats.find(item => item.number === number);
         const bubble = seat && bubbles.get(number);
         const character = seat && (seat.character ?? defaultCharacter(number));
-        const walking = seat?.mine ? movement.moving : Boolean(seat?.position);
-        const point = world?.seats[index] ?? fallbackSeat(index);
+        const walking = Boolean(studentPositions.get(number));
+        const point = seatPoint(index);
         return <li key={number} data-character={character} title={seat?.name}
           style={{left:`${point.x * 100}%`,top:`${point.y * 100}%`,zIndex:Math.round(point.y*100),
             ...(world ? {width:`${world.seats[index].scale*100}%`} : {})}}
@@ -295,21 +312,22 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
         </li>;
       })}
     </ol>
+    {data.instructor && <WalkingAvatar position={instructorPosition ?? INSTRUCTOR_HOME} origin={INSTRUCTOR_HOME}
+      floor={movement.floor} mine={host} instructor name="강사">
+      <WalkerBody character="glasses" />
+      <span className="classroom-walker-name">강사</span>
+      {host && canMoveHere && !movement.moving && !movement.autonomous && <button className="classroom-walker-greet" type="button"
+        aria-label="강사 캐릭터 움직이기" onClick={event => { event.stopPropagation(); movement.toggle(); }} />}
+    </WalkingAvatar>}
     {pageSeats.map(seat => {
-      const position = seat.mine ? movement.position : seat.position;
+      const position = studentPositions.get(seat.number);
       if (!position) return null;
       const bubble = bubbles.get(seat.number);
       const index = seat.number - firstSeat;
-      return <WalkingAvatar key={seat.number} position={position} origin={world?.seats[index] ?? fallbackSeat(index)}
+      return <WalkingAvatar key={seat.number} position={position} origin={seatPoint(index)}
         floor={movement.floor} mine={seat.mine} number={seat.number} name={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id}><span>{bubble.text}</span></div>}
-        <svg viewBox="16 -2 60 66" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <ellipse cx="45" cy="60" rx="17" ry="3.5" fill="#10182e" opacity=".22" stroke="none"/>
-          <ellipse className="walker-foot left" cx="38" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
-          <ellipse className="walker-foot right" cx="52" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
-          <path d="M34 37q11-6 22 0l3 13q-14 9-28 0Z" fill="#d5e7de"/>
-          <StudentHead character={seat.character ?? defaultCharacter(seat.number)} />
-        </svg>
+        <WalkerBody character={seat.character ?? defaultCharacter(seat.number)} />
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
         {headsInteractive && !seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
@@ -322,7 +340,17 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
       <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat" title={mySeat.name}>내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
         {mySeat && onNicknameChange && <button className="classroom-character-trigger" type="button" aria-label="닉네임 설정" aria-haspopup="dialog" onClick={() => setEditingNickname(true)}><Pencil size={15} aria-hidden="true" />닉네임</button>}
         {mySeat && onCharacterChange && <button className="classroom-character-trigger" type="button" aria-label="캐릭터 선택" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터</button>}
-        {mySeat && onMove && seatPage(mySeat.number) === page && <button className="classroom-character-trigger" type="button" aria-pressed={movement.moving} onClick={movement.toggle}>{movement.moving ? '내 자리로' : '움직이기'}</button>}
+        {canMoveHere && <>
+          <button className="classroom-character-trigger" type="button" onClick={movement.toggle}>
+            {movement.moving || movement.autonomous ? host ? '칠판 앞으로' : '내 자리로' : '움직이기'}
+          </button>
+          <select className="classroom-move-mode" aria-label="캐릭터 이동 방식"
+            value={movement.autonomous ? 'wander' : 'manual'}
+            onChange={event => movement.selectMode(event.target.value === 'wander' ? 'wander' : 'manual')}>
+            <option value="manual">직접 조종</option>
+            <option value="wander">자율 이동</option>
+          </select>
+        </>}
         <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={character=><StudentHead character={character}/>}/>
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
@@ -332,7 +360,10 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
         <button type="button" aria-label="뒤 좌석 보기" disabled={pageIndex === pages.length - 1} onClick={() => turnPage(1)}><ChevronRight size={17} aria-hidden="true" /></button>
       </div>}
     </div>
-    {onMove && <p id="classroom-move-hint" className={movement.moving ? 'classroom-move-hint' : 'sr-only'}>내 캐릭터를 눌러 일어나기 · 바닥을 터치하거나 방향키로 이동 · Esc로 착석</p>}
+    {onMove && <p id="classroom-move-hint" className={movement.moving || movement.autonomous ? 'classroom-move-hint' : 'sr-only'}>
+      {movement.autonomous ? '통로를 걷고 제자리로 돌아와요. 바닥을 누르거나 방향키로 직접 조종할 수 있어요.'
+        : `바닥을 터치하거나 방향키로 이동 · Esc로 ${host ? '칠판 앞으로' : '착석'}`}
+    </p>}
     {movement.error && <p role="alert" className="error">{movement.error}</p>}
     {activityError && <p role="alert" className="error">{activityError}</p>}
     {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}

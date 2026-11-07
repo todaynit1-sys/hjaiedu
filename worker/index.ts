@@ -104,7 +104,7 @@ export class ClassBoard extends DurableObject<Env> {
         const existing = this.files.existing(id);
         if (existing) {
           if (existing.room !== code || existing.date !== date || existing.digest !== digest || existing.name !== name) throw new AppError('파일 요청이 중복되었어요. 파일을 다시 선택해주세요.', 409);
-          return json(this.view(room, null));
+          return json(this.view(room, null, true));
         }
         this.files.checkCapacity(code, size);
         mutate(room, { type: 'message', text: caption.trim() || name, url, date }, null, true);
@@ -112,7 +112,7 @@ export class ClassBoard extends DurableObject<Env> {
         room.days[date].messages.at(-1)!.attachment = file;
         checkRoomSize(room);
         this.files.save(room, date, file, bytes, digest); this.broadcast(room);
-        return json(this.view(room, null));
+        return json(this.view(room, null, true));
       });
     } finally { this.pendingUploads--; }
   }
@@ -149,14 +149,17 @@ export class ClassBoard extends DurableObject<Env> {
     await this.prepareClassroom(room, arriving);
     return room;
   }
-  private connectedGuests(code: string, excluding?: WebSocket) {
-    const presence = new Set<string>();
+  private attendance(code: string, excluding?: WebSocket) {
+    const guests = new Set<string>();
+    let instructor = false;
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === excluding || ws.readyState !== 1) continue;
       const peer = ws.deserializeAttachment() as Connection;
-      if (peer.code === code && peer.guest && peer.exp > Date.now()) presence.add(peer.guest);
+      if (peer.code !== code || peer.exp <= Date.now()) continue;
+      if (peer.guest) guests.add(peer.guest);
+      else instructor = true;
     }
-    return presence;
+    return { guests, instructor };
   }
   private async prepareClassroom(room: Room, arriving?: string) {
     const date = today();
@@ -164,24 +167,24 @@ export class ClassBoard extends DurableObject<Env> {
     let changed = !oldDay || Object.keys(room.days).length !== 1 || oldDay.polls.some(poll => poll.kind === 'break');
     const day = ensureDay(room, date);
     // Include hibernated sockets across deployments and at the Seoul midnight rollover.
-    const present = this.connectedGuests(room.code);
+    const present = this.attendance(room.code).guests;
     if (arriving) present.add(arriving);
     for (const id of present) {
       if (!day.participants?.[id]) { participantName(day, id); changed = true; }
     }
     if (changed) { checkRoomSize(room); await this.ctx.storage.put(`room:${room.code}`, room); }
   }
-  private view(room: Room, guest: string | null, present = this.connectedGuests(room.code)) {
-    return snapshot(room, today(), guest, 'cloud', present);
+  private view(room: Room, guest: string | null, viewerHost: boolean, present = this.attendance(room.code)) {
+    return snapshot(room, today(), guest, 'cloud', present.guests, present.instructor, viewerHost);
   }
   private broadcast(room: Room, excluding?: WebSocket) {
-    const present = this.connectedGuests(room.code, excluding);
+    const present = this.attendance(room.code, excluding);
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === excluding || ws.readyState !== 1) continue;
       const peer = ws.deserializeAttachment() as Connection;
       if (peer.exp <= Date.now()) { ws.close(1008, '다시 참여해주세요.'); continue; }
       if (peer.code !== room.code) continue;
-      try { ws.send(JSON.stringify({ type: 'snapshot', data: this.view(room, peer.guest, present) })); } catch { /* Closing clients reconnect themselves. */ }
+      try { ws.send(JSON.stringify({ type: 'snapshot', data: this.view(room, peer.guest, peer.guest === null, present) })); } catch { /* Closing clients reconnect themselves. */ }
     }
   }
   async fetch(request: Request): Promise<Response> {
@@ -265,7 +268,7 @@ export class ClassBoard extends DurableObject<Env> {
           return new Response(null, { status: 101, webSocket: client, ...(ticketAuth ? { headers: { 'Sec-WebSocket-Protocol': 'classroom-live' } } : {}) });
         }
         let room = await this.room(code);
-        if (request.method === 'GET') return json(this.view(room, host ? null : guest));
+        if (request.method === 'GET') return json(this.view(room, host ? null : guest, Boolean(host)));
         if (request.method !== 'POST') throw new AppError('지원하지 않는 요청입니다.', 405);
         let setCookie: string | undefined;
         if (input.type === 'join') {
@@ -280,7 +283,7 @@ export class ClassBoard extends DurableObject<Env> {
           checkRoomSize(room);
           this.files.saveRoom(room); this.broadcast(room);
         }
-        return json(this.view(room, host ? null : guest), 200, setCookie);
+        return json(this.view(room, host ? null : guest, Boolean(host)), 200, setCookie);
       } catch (error) {
         if (!(error instanceof AppError)) console.error('Classroom request failed', error);
         return json({ error: error instanceof AppError ? error.message : '연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.' }, error instanceof AppError ? error.status : 500);

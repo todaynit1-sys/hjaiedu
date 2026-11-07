@@ -223,7 +223,7 @@ test('reset requires host, validates targets and cannot clear a new day from a s
   assert.deepEqual(room, before);
 });
 
-test('auditorium expands from twenty to fifty distinct curved seats in bounds', () => {
+test('auditorium expands from twenty to fifty seats in five straight rows with an aisle', () => {
   assert.equal(AUDITORIUM_PAGE_SIZE, 50);
   for (const [highest, expected] of [[0, 20], [1, 20], [20, 20], [21, 30], [30, 30], [31, 40], [40, 40], [41, 50], [50, 50], [500, 50]]) {
     assert.equal(auditoriumCapacity(highest), expected);
@@ -235,8 +235,10 @@ test('auditorium expands from twenty to fifty distinct curved seats in bounds', 
     for (let row = 0; row < 5; row++) {
       const current = seats.filter(seat => seat.row === row);
       assert.equal(current.length, capacity / 5);
-      assert(current.at(-1)!.x > .5 && current[0].x < .5);
-      assert(current[Math.floor(current.length / 2) - 1].y > current[0].y);
+      assert(current.every(seat => seat.y === current[0].y));
+      assert.equal(current.filter(seat => seat.x <= .4).length, capacity / 10);
+      assert.equal(current.filter(seat => seat.x >= .6).length, capacity / 10);
+      if (row > 0) assert(current[0].y > seats.find(seat => seat.row === row - 1)!.y);
     }
   }
 });

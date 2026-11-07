@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import type { ClassroomPosition } from '../lib/types';
 
-export function WalkingAvatar({ position, origin, floor, mine, number, name, children }: {
+export function WalkingAvatar({ position, origin, floor, mine, number, instructor, name, children }: {
   position: ClassroomPosition; origin: ClassroomPosition; floor: RefObject<HTMLDivElement | null>;
-  mine: boolean; number: number; name: string; children: ReactNode;
+  mine: boolean; number?: number; instructor?: boolean; name: string; children: ReactNode;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const previous = useRef(origin);
@@ -24,9 +24,9 @@ export function WalkingAvatar({ position, origin, floor, mine, number, name, chi
     const from = {x: old.x + (offset[0] || 0) / width, y: old.y + (offset[1] || 0) / height};
     const points = [from];
     // Long trips across the seating blocks meet at the central aisle.
-    if ((from.x < .5) !== (position.x < .5) && Math.abs(from.x - position.x) > .24
+    if ((from.x - .5) * (position.x - .5) < 0 && Math.abs(from.x - position.x) > .24
       && from.y > .42 && position.y > .42) {
-      points.push({x:.5, y:Math.min(.81, Math.max(.61, (from.y + position.y) / 2))});
+      points.push({x:.5, y:(from.y + position.y) / 2});
     }
     points.push(position);
     const distances = [0];
@@ -46,7 +46,7 @@ export function WalkingAvatar({ position, origin, floor, mine, number, name, chi
       if (animation.current === walk) delete node.dataset.walking;
     };
   }, [position.x, position.y, floor]);
-  return <div ref={element} className={`classroom-walker${mine ? ' is-mine' : ''}`} data-seat={number} title={name}
+  return <div ref={element} className={`classroom-walker${mine ? ' is-mine' : ''}${instructor ? ' is-instructor' : ''}`} data-seat={number} title={name}
     style={{left:`${position.x*100}%`, top:`${position.y*100}%`, zIndex:Math.round(position.y*100)+1}}>
     {children}
   </div>;

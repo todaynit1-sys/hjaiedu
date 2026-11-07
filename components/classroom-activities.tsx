@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CircleHelp, Hand, Heart, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
-import type { Character, ClassroomSeat, ReactionKind, Snapshot } from '../lib/types';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CircleHelp, Hand, Heart, MessageSquare, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
+import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type Character, type ClassroomSeat, type ReactionKind, type Snapshot } from '../lib/types';
 import '../app/classroom-activities.css';
 
 export type ClassroomAction = (input: Record<string, unknown>) => Promise<void>;
@@ -34,31 +34,137 @@ export function ActivityBadge({ seat, updatedAt }: { seat: ClassroomSeat; update
   </span>;
 }
 
-export function QuizStatus({ data, onAction, host }: { data: Snapshot; onAction?: ClassroomAction; host: boolean }) {
-  const quiz = data.quiz;
+export function ClassroomQuestion({ data, onAction, host }: {
+  data: Snapshot; onAction?: ClassroomAction; host: boolean;
+}) {
+  const round = data.questionRound;
+  const [open, setOpen] = useState(false);
+  if (!host && !round) return null;
+
+  const label = host ? (round ? '질문 관리' : '질문 출제') : (round?.open ? '질문 답하기' : '답변 보기');
+  return <>
+    <button className="classroom-question-trigger" type="button" aria-haspopup="dialog"
+      onClick={() => setOpen(true)}>
+      <MessageSquare size={16} aria-hidden="true" />{label}
+    </button>
+    {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host}
+      onAction={onAction} onClose={() => setOpen(false)} />}
+  </>;
+}
+
+function QuestionDialog({ round, host, onAction, onClose }: {
+  round: Snapshot['questionRound']; host: boolean; onAction?: ClassroomAction; onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const requestPending = useRef(false);
+  const titleId = useId();
+  const promptId = useId();
+  const answerId = useId();
+  const visibilityId = useId();
+  const [prompt, setPrompt] = useState('');
+  const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  if (!quiz) return null;
-  async function send(input: Record<string, unknown>) {
-    if (!onAction || busy) return;
-    setBusy(true); setError('');
-    try { await onAction({ ...input, quizId: quiz!.id }); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '다시 시도해주세요.'); }
-    finally { setBusy(false); }
+  const answer = draft ?? round?.myAnswer ?? '';
+
+  useEffect(() => {
+    const previous = document.activeElement;
+    const element = dialog.current;
+    element?.showModal();
+    return () => {
+      element?.close();
+      if (previous instanceof HTMLElement) previous.focus();
+    };
+  }, []);
+
+  async function send(input: Record<string, unknown>, message?: string) {
+    if (!onAction || requestPending.current) return;
+    requestPending.current = true;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await onAction(input);
+      if (input.type === 'question-answer') setDraft(null);
+      if (message) setNotice(message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '다시 시도해주세요.');
+    } finally {
+      requestPending.current = false;
+      setBusy(false);
+    }
   }
-  return <div className="classroom-quiz-status" aria-label="OX 퀴즈" aria-live="polite">
-    <span>{quiz.open ? '캐릭터를 O·X 구역으로 옮겨 답해요.' : `정답은 ${quiz.answer} · 참여 ${quiz.counts[0] + quiz.counts[1]}명`}</span>
-    <span>O {quiz.counts[0]}명 · X {quiz.counts[1]}명</span>
-    {quiz.open && !host && onAction && <div className="quiz-actions">
-      {(['O', 'X'] as const).map(choice => <button key={choice} type="button" aria-pressed={quiz.myAnswer === choice} disabled={busy}
-        onClick={() => send({ type: 'quiz-answer', choice })}>{choice} 선택</button>)}
-    </div>}
-    {host && onAction && <div className="quiz-actions">
-      {quiz.open && <button type="button" disabled={busy} onClick={() => send({type:'quiz-reveal'})}>정답 공개</button>}
-      <button type="button" disabled={busy} onClick={() => send({type:'quiz-clear'})}>퀴즈 닫기</button>
-    </div>}
-    {error && <span role="alert" className="error">{error}</span>}
-  </div>;
+
+  return <dialog ref={dialog} className="classroom-character-dialog classroom-question-dialog" aria-labelledby={titleId}
+    onCancel={event => { event.preventDefault(); if (!requestPending.current) onClose(); }}>
+    <div className="classroom-picker-heading">
+      <h2 id={titleId}>{host ? (round ? '질문 관리' : '질문 출제') : (round?.open ? '질문 답하기' : '답변 보기')}</h2>
+      <button className="icon-button" aria-label="질문 창 닫기" type="button" disabled={busy} onClick={onClose}><X size={20}/></button>
+    </div>
+    <div className="classroom-question-content">
+      {round && <div className="question-summary">
+        <p className="question-prompt">{round.prompt}</p>
+        <p role="status" className="question-meta">
+          {round.open ? '답변 받는 중' : round.published ? '답변 공개됨' : '마감됨'} · 답변 {round.total}개
+        </p>
+      </div>}
+
+      {!host && round?.open && <form className="question-form"
+        onSubmit={event => { event.preventDefault(); if (answer.trim()) void send({type:'question-answer', roundId:round.id, text:answer.trim()}, '답변을 저장했어요.'); }}>
+        <label htmlFor={answerId}>내 답변</label>
+        <textarea id={answerId} value={answer} maxLength={QUESTION_ANSWER_MAX_LENGTH} rows={3} required disabled={busy || !onAction}
+          aria-describedby={visibilityId} onChange={event => setDraft(event.target.value)} placeholder="짧게 적어주세요." />
+        <p id={visibilityId} className="question-meta">공개 전에는 강사와 본인만 볼 수 있어요. 공개하면 이름과 답변이 모두에게 보여요.</p>
+        <div className="question-actions">
+          <button type="submit" className="primary" disabled={busy || !onAction || !answer.trim()}>
+            {round.myAnswer ? '답변 수정' : '답변 보내기'}
+          </button>
+          <span className="question-meta">{answer.length}/{QUESTION_ANSWER_MAX_LENGTH}</span>
+        </div>
+      </form>}
+
+      {!host && round && !round.open && <section className="question-responses" aria-label="내 답변">
+        <h3>내 답변</h3>
+        <p className={round.myAnswer ? 'question-answer-text' : 'question-meta'}>{round.myAnswer ?? '제출한 답변이 없어요.'}</p>
+        {!round.published && <p className="question-meta">강사가 공개하면 다른 답변도 볼 수 있어요.</p>}
+      </section>}
+
+      {host && round && !round.published && onAction && <div className="question-actions">
+        {round.open && <button type="button" disabled={busy}
+          onClick={() => void send({type:'question-close', roundId:round.id}, '질문을 마감했어요.')}>질문 마감</button>}
+        <button type="button" className="primary" disabled={busy}
+          onClick={() => void send({type:'question-publish', roundId:round.id}, '답변을 공개했어요.')}>답변 공개</button>
+        <p className="question-meta">{round.open ? '공개하면 질문을 마감하고 이름과 답변을 모두에게 보여줘요.' : '공개하면 이름과 답변을 모두에게 보여줘요.'}</p>
+      </div>}
+
+      {host && !round?.open && onAction && <form className="question-form"
+        onSubmit={event => { event.preventDefault(); if (prompt.trim()) void send({type:'question-start', prompt:prompt.trim()}); }}>
+        <label htmlFor={promptId}>{round ? '새 질문' : '질문'}</label>
+        <textarea id={promptId} value={prompt} maxLength={QUESTION_PROMPT_MAX_LENGTH} rows={2} required disabled={busy}
+          onChange={event => setPrompt(event.target.value)} placeholder="수강생에게 물어볼 질문을 적어주세요." />
+        {round && <p className="question-meta">새 질문을 출제하면 이전 질문과 답변을 대체해요.</p>}
+        <div className="question-actions">
+          <button type="submit" className="primary" disabled={busy || !prompt.trim()}>질문 열기</button>
+          <span className="question-meta">{prompt.length}/{QUESTION_PROMPT_MAX_LENGTH}</span>
+        </div>
+      </form>}
+
+      {round && (host || round.published) && <section className="question-responses" aria-label={host ? '수강생 답변' : '공개된 답변'}>
+        <h3>{host ? '수강생 답변' : '공개된 답변'}</h3>
+        {round.answers?.length ? <ul className="question-answer-list">{round.answers.map(item => (
+          <li key={item.seatNumber}>
+            <b>{item.name}</b>
+            <p className="question-answer-text">{item.text}</p>
+          </li>
+        ))}</ul> : <p className="question-meta">아직 답변이 없어요.</p>}
+      </section>}
+
+      {!onAction && (host || round?.open) && <p className="question-meta">강의실에 다시 연결되면 질문을 진행할 수 있어요.</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {notice && <p className="question-meta" role="status">{notice}</p>}
+    </div>
+  </dialog>;
 }
 
 export function ClassroomActivities({ data, host, onAction, renderHead }: {
@@ -82,8 +188,6 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
   const [takingPhoto, setTakingPhoto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState<'O' | 'X'>('O');
   const mySeat = data.seats.find(seat => seat.mine);
   const photoSeats = data.seats;
   const rows = Math.max(1, Math.ceil(photoSeats.length / 6));
@@ -144,14 +248,6 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
       {host && <section aria-label="질문 대기"><h3>손든 순서 · {hands.length}명</h3>
         {hands.length ? <ol className="activity-hand-queue">{hands.map(seat => <li key={seat.number}><span>{String(seat.number).padStart(2,'0')} · {seat.name}</span>
           <button type="button" disabled={busy || !onAction} onClick={() => run({type:'hand-lower',seatNumber:seat.number})}>응답 완료</button></li>)}</ol> : <p>손을 든 수강생이 여기에 표시돼요.</p>}
-      </section>}
-      {host && <section aria-label="OX 퀴즈 만들기"><h3>칠판 OX 퀴즈</h3>
-        <form onSubmit={event => { event.preventDefault(); void run({type:'quiz-start', question, answer}); }}>
-          <label htmlFor="ox-question">문제</label><input id="ox-question" value={question} onChange={event=>setQuestion(event.target.value)} required maxLength={160} placeholder="O 또는 X로 답할 문제를 적어주세요."/>
-          <label htmlFor="ox-answer">정답</label><select id="ox-answer" value={answer} onChange={event=>setAnswer(event.target.value as 'O'|'X')}><option value="O">O</option><option value="X">X</option></select>
-          <button type="submit" className="primary" disabled={busy || !onAction || !question.trim()}>OX 퀴즈 시작</button>
-        </form>
-        {data.quiz && <QuizStatus key={data.quiz.id} data={data} host={host} onAction={onAction}/>}
       </section>}
       <section aria-label="수업 단체사진"><h3>오늘의 단체사진</h3><p>지금 접속한 {photoSeats.length}명의 캐릭터와 닉네임을 사진에 담아요.</p>
         <button type="button" disabled={busy} onClick={()=>setTakingPhoto(value=>!value)}>{takingPhoto ? '사진 접기' : '단체사진 미리보기'}</button>

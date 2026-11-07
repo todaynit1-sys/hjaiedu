@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
+import { ClassroomQuestion } from './classroom-activities';
 import { ClassroomMood } from './classroom-mood';
 import { ClassroomPolls } from './classroom-polls';
 import { Brand } from './brand';
@@ -15,7 +16,7 @@ import { MaterialsDialog } from './materials-dialog';
 import { api, dateLabel, timeLabel, uploadFile } from '../lib/client';
 import { fileSize, MAX_FILE_BYTES } from '../lib/files';
 import { SURVEY_RESPONSES_URL, SURVEY_URL } from '../lib/survey';
-import type { PublicMessage, ResetTarget, Snapshot } from '../lib/types';
+import type { ClassroomMove, PublicMessage, ResetTarget, Snapshot } from '../lib/types';
 import '../app/view-tabs.css';
 
 function MessageText({ text }: { text: string }) {
@@ -136,10 +137,12 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   }, [code, date, host]);
   const action = useCallback(async (input: Record<string, unknown>, success: string) => { setBusy(true); try { const value = await api<Snapshot>(`/api/rooms/${code}`, { ...input, date }); if (input.type === 'message') forceBottom.current = true; setData(value); setConnected(true); setError(''); notify(success); } catch (e) { setError((e as Error).message); throw e; } finally { setBusy(false); } }, [code, date]);
   const safeAction = useCallback(async (input: Record<string, unknown>, success: string) => { try { await action(input, success); } catch { /* visible room error */ } }, [action]);
-  const moveCharacter = useCallback(async (position: import('../lib/types').ClassroomPosition | null) => {
-    const value = await api<Snapshot>(`/api/rooms/${code}`, { type: 'move', position, date });
+  const moveCharacter = useCallback(async (move: ClassroomMove) => {
+    const value = await api<Snapshot>(`/api/rooms/${code}`, {
+      type: host ? 'instructor-move' : 'move', date, ignoreLegacyQuiz: true, ...(move === 'wander' ? {wander: true} : {position: move})
+    });
     setData(current => !current || (current.code === value.code && current.date === value.date && Date.parse(value.updatedAt) >= Date.parse(current.updatedAt)) ? value : current);
-  }, [code, date]);
+  }, [code, date, host]);
   const classroomActivity = useCallback(async (input: Record<string, unknown>) => {
     const value = await api<Snapshot>(`/api/rooms/${code}`, { ...input, date });
     setData(current => !current || (current.code === value.code && current.date === value.date && Date.parse(value.updatedAt) >= Date.parse(current.updatedAt)) ? value : current);
@@ -213,15 +216,18 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         <h1 className="room-accessible-title">{data.title}</h1>
         <div className="classroom-mobile-tools classroom-view-tools">
           <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
-            <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강당</button>
+            <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강의실</button>
             <button aria-label="채팅" aria-pressed={view === 'chat'} aria-controls="chat-pane" aria-describedby={hasNewChat ? 'new-chat-hint' : undefined} onClick={() => setView('chat')}><MessageCircle size={18} aria-hidden="true" />채팅{hasNewChat && <span className="view-chat-badge" aria-hidden="true">새 메시지</span>}</button>
           </div>
-          {materialsButton}
+          <div className="classroom-view-actions">
+            <ClassroomQuestion data={data} host={host} onAction={active ? classroomActivity : undefined} />
+            {materialsButton}
+          </div>
         </div>
         <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
         <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
-          <ClassroomScene data={data} host={host} onActivity={active ? classroomActivity : undefined} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
-            onMove={!host && active ? moveCharacter : undefined}
+          <ClassroomScene data={data} host={host} visible={view === 'classroom'} onActivity={active ? classroomActivity : undefined} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+            onMove={active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
             {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 {customPolls.length}개 보기</button>}
