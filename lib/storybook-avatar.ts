@@ -3,6 +3,13 @@ import type { Character } from './types';
 
 export type StorybookAvatarId = 'cardigan' | 'beanie';
 export type StorybookPose = 'idle' | 'step' | 'seated';
+export type StorybookBounds = [number, number, number, number];
+export type StorybookLandmarks = {
+  head: StorybookBounds;
+  face: StorybookBounds;
+  eyes: readonly StorybookBounds[];
+  mouth?: StorybookBounds;
+};
 
 export const STORYBOOK_AVATARS: ReadonlyArray<{id: StorybookAvatarId; label: string; avatar: AvatarCustomization}> = [
   {
@@ -25,4 +32,9 @@ export function storybookAvatar(character: Character, avatar?: AvatarCustomizati
 
 export function storybookSprite(id: StorybookAvatarId, pose: StorybookPose) {
   return `/classroom/avatar-${id}-${pose}.webp`;
+}
+
+export function rosterSprite(hair: AvatarCustomization['hair'], pose: StorybookPose) {
+  const base = `/classroom/roster/${hair}-${pose}`;
+  return { art: `${base}.webp`, mask: `${base}-mask.png` };
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, u
 import { ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
 import { AvatarEditor } from './avatar-editor';
 import { Chalkboard } from './chalkboard';
-import { AvatarArt } from './classroom-avatar';
+import { StorybookAvatarArt } from './storybook-avatar-art';
 import { INSTRUCTOR_HOME, seatExit, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
 import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
@@ -266,7 +266,7 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
             <option value="wander">자율 이동</option>
           </select>
         </>}
-        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={seat=><AvatarArt character={seat.character} avatar={seat.avatar} pose="portrait"/>}/>
+        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={seat=><StorybookAvatarArt character={seat.character} avatar={seat.avatar} pose="idle"/>}/>
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">

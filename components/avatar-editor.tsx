@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Palette, Shirt, Smile, Sparkles, X } from 'lucide-react';
 import { AVATAR_OPTIONS, type AvatarCustomization } from '../lib/avatar-customization';
-import { STORYBOOK_AVATARS, storybookAvatar, storybookSprite } from '../lib/storybook-avatar';
+import { STORYBOOK_AVATARS, storybookSprite } from '../lib/storybook-avatar';
 import type { Character } from '../lib/types';
 import { avatarPalettes, starterAvatar } from './classroom-avatar';
 import { AvatarPreview } from './avatar-preview';
@@ -33,6 +33,11 @@ const categoryOptions = {
 } as const;
 const optionValues: { [Key in keyof AvatarCustomization]: readonly AvatarCustomization[Key][] } = AVATAR_OPTIONS;
 const swatches: Partial<Record<keyof AvatarCustomization, Record<string, readonly [string, string]>>> = avatarPalettes;
+const customizationFields = Object.keys(AVATAR_OPTIONS) as Array<keyof AvatarCustomization>;
+
+function sameAvatar(left: AvatarCustomization, right: AvatarCustomization) {
+  return customizationFields.every(key => left[key] === right[key]);
+}
 
 export function AvatarEditor({ character, current, onSave, onClose }: {
   character: Character; current?: AvatarCustomization;
@@ -45,9 +50,8 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
   const [category, setCategory] = useState<(typeof categories)[number]['id']>('hair');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const changed = (Object.keys(draft) as Array<keyof AvatarCustomization>).some(key => draft[key] !== initial[key]);
+  const changed = !sameAvatar(draft, initial);
   const previewAvatar = changed ? draft : current;
-  const selectedStorybook = storybookAvatar(character, previewAvatar);
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -107,10 +111,10 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
       </figure>
       <div className="avatar-editor-controls">
         <fieldset className="avatar-storybook-options">
-          <legend>그림 캐릭터</legend>
-          <div className="avatar-storybook-choices" role="group" aria-label="그림 캐릭터 빠른 선택">
+          <legend>추천 조합</legend>
+          <div className="avatar-storybook-choices">
             {STORYBOOK_AVATARS.map(({ id, label, avatar }) => <button type="button" key={id}
-              aria-pressed={selectedStorybook === id} disabled={saving}
+              aria-pressed={sameAvatar(draft, avatar)} disabled={saving}
               onClick={() => { setDraft({ ...avatar }); setError(''); }}>
               <span className="avatar-storybook-thumb" aria-hidden="true"
                 style={{ backgroundImage: `url('${storybookSprite(id, 'idle')}')` }} />

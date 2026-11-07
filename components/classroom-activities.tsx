@@ -4,7 +4,7 @@ import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type ClassroomS
 import '../app/classroom-activities.css';
 import { saveClassroomMemory } from '../lib/classroom-portfolio';
 import { ClassroomPortfolio, photoReflectionLines, renderGroupPhoto, useDownloadPhoto } from './classroom-portfolio';
-import { AvatarArt } from './classroom-avatar';
+import { StorybookAvatarArt } from './storybook-avatar-art';
 
 export type ClassroomAction = (input: Record<string, unknown>) => Promise<void>;
 const reactions = {
@@ -205,7 +205,7 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
   const photoSeats = data.seats;
   const includeInstructor = host || Boolean(data.instructor);
   const photoMembers = [
-    ...(includeInstructor ? [{ id: 'instructor', name: '강사', head: <AvatarArt character="glasses" pose="portrait" /> }] : []),
+    ...(includeInstructor ? [{ id: 'instructor', name: '강사', head: <StorybookAvatarArt character="glasses" instructor pose="idle" /> }] : []),
     ...photoSeats.map(seat => ({ id: String(seat.number), name: seat.name, head: renderHead(seat) }))
   ];
   const rows = Math.max(1, Math.ceil(photoMembers.length / 6));

@@ -135,37 +135,54 @@
   border: 1.5px solid #e8fbff; border-radius: 50%;
   box-shadow: 0 0 0 1px #4fcbef, 0 0 8px #71dcf9a0; background: #71dcf925;
 }
+@property --actor-depth {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
 .storybook-actor-art {
-  position: absolute; inset: auto -11% 6%; height: 117%; pointer-events: none;
+  position: absolute; inset: auto -14% 6%; height: 123%; pointer-events: none;
   visibility: hidden; transform-origin: 50% 100%; scale: var(--actor-depth);
+  transition: transform 160ms ease-in-out, clip-path 140ms ease;
 }
 .classroom-actor[data-illustrated] .storybook-actor-art { visibility: visible; }
-.storybook-actor-art img {
+.storybook-gait { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.storybook-actor-art [data-frame] {
   display: block; position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: contain; object-position: center bottom; opacity: 0;
+  opacity: 0; transition: opacity 110ms linear;
 }
 .classroom-actor[data-pose="standing"] .storybook-actor-art [data-frame="idle"],
 .classroom-actor[data-pose="seated"] .storybook-actor-art [data-frame="seated"] { opacity: 1; }
-.classroom-actor[data-pose="standing"][data-facing="left"] .storybook-actor-art,
-.classroom-actor[data-pose="seated"][data-seat-side="left"] .storybook-actor-art { transform: scaleX(-1); }
-.classroom-actor[data-pose="seated"] .storybook-actor-art {
-  height: 88%; bottom: 12%; clip-path: inset(0 0 30%);
+.classroom-actor[data-pose="standing"][data-facing="left"] .storybook-actor-art { transform: perspective(240px) rotateY(180deg); }
+.classroom-actor[data-seat-side="left"] .storybook-actor-art [data-frame="seated"] { transform: scaleX(-1); }
+.storybook-actor-art [data-frame="seated"] {
+  inset: auto 0 5%; height: 72%; clip-path: inset(0 0 30%);
 }
+.classroom-actor[data-at-lectern] .storybook-actor-art { clip-path: inset(0 0 29%); }
 @media (prefers-reduced-motion: no-preference) {
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="idle"] {
-    animation: storybook-idle 300ms steps(1, end) infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait {
+    animation: storybook-weight 480ms ease-in-out infinite;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="step"] {
-    animation: storybook-step 300ms steps(1, end) infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="idle"] {
+    animation: storybook-idle 480ms linear infinite;
+  }
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="step"][data-art-ready] {
+    animation: storybook-step 480ms linear infinite;
   }
 }
 @keyframes storybook-idle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%, 22%, 76%, 100% { opacity: 1; }
+  33%, 65% { opacity: 0; }
 }
 @keyframes storybook-step {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
+  0%, 22%, 76%, 100% { opacity: 0; }
+  33%, 65% { opacity: 1; }
+}
+@keyframes storybook-weight {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3%) rotate(-2.5deg); }
+  52% { transform: translateY(0) rotate(2deg); }
+  76% { transform: translateY(-2.6%) rotate(-1.5deg); }
 }
 .classroom-actor[data-facing="left"][data-pose="standing"] .classroom-actor-sprite { transform: scaleX(-1); }
 .classroom-actor .classroom-actor-body { transform-origin: 45px 50px; transition: transform 145ms ease-out; }
@@ -181,6 +198,7 @@
 @keyframes walker-step { from { transform: translateY(1px); } to { transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) {
   .classroom-actor[data-walking] .walker-foot { animation: none; }
+  .storybook-actor-art, .storybook-actor-art [data-frame] { transition: none; }
   .classroom-actor .classroom-actor-sprite, .classroom-actor .classroom-actor-body,
   .classroom-actor :is(.classroom-actor-legs, .classroom-actor-standing-arms, .classroom-actor-seated-arms, .classroom-actor-shadow) { transition: none; }
 }

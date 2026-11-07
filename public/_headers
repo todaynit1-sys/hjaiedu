@@ -6,6 +6,9 @@
 /classroom/avatar-*.webp
   Content-Type: image/webp
 
+/classroom/roster/*.webp
+  Content-Type: image/webp
+
 /materials/virtual-company.pdf
   Content-Type: application/pdf
   Content-Disposition: attachment; filename="virtual-company.pdf"; filename*=UTF-8''%EA%B0%80%EC%83%81%EA%B8%B0%EC%97%85_%ED%95%99%EC%8A%B5%EC%9E%90%EB%A3%8C.pdf

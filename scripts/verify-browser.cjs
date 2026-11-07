@@ -82,8 +82,9 @@ async function readyStage(page) {
   await customize.click();
   const editor = student.getByRole('dialog',{name:'내 캐릭터 꾸미기',exact:true});
   const categories = editor.getByRole('group',{name:'꾸미기 종류',exact:true});
-  const preview = editor.locator('.avatar-preview-art canvas[data-ready="true"]');
+  const preview = editor.locator('.avatar-preview-illustration[data-art-ready="true"]');
   await preview.waitFor();
+  assert.equal(await editor.locator('.avatar-preview-art canvas').count(), 0, 'All editor previews use the classroom illustration');
   const defaultPreview = await preview.screenshot();
   const avatarChoices = [
     ['머리', ['단발','분홍']], ['얼굴', ['꿀빛','꾸벅꾸벅']],
@@ -100,13 +101,13 @@ async function readyStage(page) {
       await option.click();
       assert.equal(await option.getAttribute('aria-pressed'),'true');
     }
-    assert(await preview.evaluate(canvas => {
-      const art = canvas.getBoundingClientRect();
-      const workspace = canvas.closest('.avatar-editor-workspace').getBoundingClientRect();
+    assert(await preview.evaluate(element => {
+      const art = element.getBoundingClientRect();
+      const workspace = element.closest('.avatar-editor-workspace').getBoundingClientRect();
       return art.top >= workspace.top-1 && art.bottom <= workspace.bottom+1;
-    }), 'The full 3D preview must remain visible while choosing '+category+' at 320px');
+    }), 'The illustrated preview must remain visible while choosing '+category+' at 320px');
   }
-  assert(!(await preview.screenshot()).equals(defaultPreview),'The rendered 3D preview must react to the avatar draft');
+  assert(!(await preview.screenshot()).equals(defaultPreview),'The classroom illustration must react to the avatar draft');
   await student.screenshot({path:'.local/screenshots/avatar-editor-mobile.png'});
   const expectedAvatar = {hair:'bob',hairColor:'pink',skin:'honey',expression:'sleepy',clothing:'knit',clothingColor:'sky',accessory:'cat'};
   const pendingSnapshot = await (await studentB.request.get(roomURL)).json();
@@ -773,8 +774,8 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await fallback.locator('.auditorium-seat-base').first().waitFor();
     assert(await fallback.locator('img.auditorium-backdrop').isVisible(),
       'A context loss must keep the painted classroom behind the SVG furniture');
-    assert(await fallback.locator('.classroom-actor-sprite').first().isVisible(),
-      'A context loss must show the SVG avatar fallback');
+    assert(await fallback.locator('.classroom-actor[data-illustrated] .storybook-actor-art').first().isVisible(),
+      'A context loss must retain the visible illustrated avatars');
     await instructor.setViewportSize({width:1280,height:810});
     await instructor.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.notEqual((await canvas.boundingBox()).width,widthBeforeLoss,'The lost canvas must be resized during this check');
