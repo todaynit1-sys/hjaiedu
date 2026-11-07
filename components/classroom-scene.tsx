@@ -229,7 +229,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   // Old instructor posts and the seeded demo cards predate the author field.
   const teacher = data.messages.reduce<PublicMessage | undefined>(
     (latest, message) => message.author === 'student' ? latest : message, undefined);
-  const messageKey = data.quiz?.id ?? teacher?.id ?? 'welcome';
+  const messageKey = `${data.quiz?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}`;
   const boardExpanded = expandedMessage === messageKey;
   const recordExpansion = useCallback((expanded: boolean) => {
     if (expanded) setExpandedMessage(messageKey);
@@ -247,16 +247,18 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   </div>;
 
   return <section className={`classroom-scene auditorium-scene${data.quiz ? ' has-quiz' : ''}`} data-world={world ? 'ready' : 'fallback'} aria-labelledby="classroom-title">
+    <div className="auditorium-topbar">
     <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2>{mood}</div>
-    <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
-    {boardExpanded && screen}
-    <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
     <div className="auditorium-toolbar"><span>{canMoveHere && movement.moving ? '바닥을 눌러 이동' : view === 'near' ? '밀어서 둘러보기' : `반원 강당 · ${capacity}석`}</span>
       <div role="group" aria-label="강당 보기">
         <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')}>전체 보기</button>
         <button type="button" aria-pressed={view === 'near'} title="캐릭터를 크게 보고 눌러 인사하기" onClick={() => { if (view === 'near') centerNearView(); else setView('near'); }}>내 주변</button>
       </div>
     </div>
+    </div>
+    <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
+    {boardExpanded && screen}
+    <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
     <p id="auditorium-view-hint" className="sr-only">내 주변에서는 화면을 밀어 둘러보고 캐릭터를 눌러 인사할 수 있어요.</p>
     <div ref={viewport} className="auditorium-viewport" data-view={view} aria-label="강당 객석" aria-describedby="auditorium-view-hint" role="region">
     <div ref={movement.floor} className="classroom-floor" data-moving={movement.moving && Boolean(onMove) || undefined}

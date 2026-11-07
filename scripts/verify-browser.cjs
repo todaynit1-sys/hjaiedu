@@ -153,12 +153,21 @@ async function readyStage(page) {
   await page.getByRole('button',{name:'참여 링크',exact:true}).click(); await page.getByAltText('강의실 '+code+' 참여 QR코드').waitFor();
   assert.equal(await page.locator('dialog').evaluate(el=>el.open),true);
   await page.screenshot({path:'.local/screenshots/share-qr.png',fullPage:true}); await page.keyboard.press('Escape'); assert.equal(await page.locator('dialog').count(),0);
-  for (const [width,height] of [[1440,900],[810,535],[390,844],[320,568]]) {
+  for (const [width,height] of [[1440,900],[1440,680],[810,535],[390,844],[320,568]]) {
     await student.setViewportSize({width,height});
     await readyStage(student);
     await student.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
     assert.equal(await student.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true, 'Overflow at '+width);
     assert.equal(await student.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true,'Page scroll at '+width);
+    if (width === 1440 && height === 680) {
+      await waitUntil(async () => {
+        const viewport = await student.locator('.auditorium-viewport').boundingBox();
+        const floor = await student.locator('.classroom-floor').boundingBox();
+        const screen = await student.locator('.classroom-board').boundingBox();
+        return floor.width >= viewport.width*.76 && screen.width >= viewport.width*.45
+          && floor.width / floor.height <= 2.36;
+      }, 'The stage and screen should use the available width in a short desktop window');
+    }
     if (width >= 761) {
       assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).isVisible(),false,'Desktop auditorium reserves its full view for the stage');
       await chatButton.click();
@@ -195,7 +204,7 @@ async function readyStage(page) {
     const mood = await moods.boundingBox();
     assert(mood && mood.y <= heading.y+heading.height+16, 'Mood choices placed with the heading at '+width);
     for (const choice of await moods.getByRole('button').all()) assert(await choice.isVisible());
-    await student.screenshot({path:'.local/screenshots/student-'+width+'.png',fullPage:true});
+    await student.screenshot({path:width === 1440 && height === 680 ? '.local/screenshots/auditorium-wide-short.png' : '.local/screenshots/student-'+width+'.png',fullPage:true});
   }
   await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
   await page.getByRole('button',{name:'강당',exact:true}).click();
@@ -250,11 +259,14 @@ async function readyStage(page) {
   assert.equal(await content.locator('p').textContent(), longNote);
   for (const width of [320,390,1440]) {
     await student.setViewportSize({ width, height: width === 320 ? 568 : 900 });
-    await waitUntil(async () => (await boardMetrics()).fits, 'Clipped long chalkboard post at '+width);
-    const seatsBelowBoard = await student.locator('.classroom-seats').boundingBox();
-    const boardBounds = await board.boundingBox();
-    assert(seatsBelowBoard.height > 100 && seatsBelowBoard.y >= boardBounds.y + boardBounds.height - 1,
-      'Expanded board must preserve all desk rows below the message at '+width);
+    await waitUntil(async () => await student.locator('.auditorium-scene').evaluate(scene => {
+      const board = scene.querySelector('.classroom-board');
+      const content = board?.querySelector('.classroom-board-content');
+      if (!board || !content) return false;
+      const seats = scene.querySelector('.classroom-seats').getBoundingClientRect();
+      const frame = board.getBoundingClientRect();
+      return seats.height > 100 && seats.top >= frame.bottom - 1 && content.getBoundingClientRect().bottom <= frame.bottom + 1;
+    }), 'Expanded board must preserve all desk rows below the message at '+width);
   }
   await student.setViewportSize({ width: 320, height: 568 });
   await postNote(shortNote);
@@ -477,6 +489,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await waitUntil(async()=>Math.abs(parseFloat(await walker.evaluate(element=>element.style.left))/100-expectedArrowX)<.0002,
       'Arrow movement in a scrolled nearby view must retain normalized screen coordinates');
 
+    await visibleFloor.scrollIntoViewIfNeeded();
     const touchPoint = await visibleFloor.evaluate(element=>{
       const bounds = element.getBoundingClientRect();
       for (const yRatio of [.2,.4,.6,.8]) for (const xRatio of [.2,.4,.6,.8]) {

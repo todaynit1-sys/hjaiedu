@@ -10,7 +10,11 @@
   color: #edf2ff;
   box-shadow: 0 18px 60px #111d3420;
 }
-.auditorium-scene .classroom-scene-heading { margin-bottom: 8px; }
+.auditorium-topbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 4px 16px; margin-bottom: 6px;
+}
+.auditorium-scene .classroom-scene-heading { margin-bottom: 0; }
 .auditorium-scene .classroom-scene-heading h2 { color: #f4f5ff; font-size: 24px; letter-spacing: -.04em; }
 .auditorium-scene .mood-caption, .auditorium-scene .mood-total { color: #c6d0e9; }
 .auditorium-toolbar {
@@ -24,19 +28,20 @@
 }
 .auditorium-toolbar button[aria-pressed="true"] { border-color: #7890ba; background: #eef2ff; color: #25345c; font-weight: 700; }
 .auditorium-viewport {
+  --overview-min-height: clamp(340px, 33vw, 440px);
   position: relative; display: grid; place-items: center; width: 100%;
-  height: clamp(300px, calc(100dvh - 350px), 880px);
-  min-height: 300px; flex: 1 0 auto; overflow: auto; overscroll-behavior: auto;
+  height: clamp(var(--overview-min-height), calc(100dvh - 310px), 880px);
+  min-height: var(--overview-min-height); flex: 1 0 auto; overflow: auto; overscroll-behavior: auto;
   scrollbar-width: thin; border-radius: 16px; background: #10182e;
 }
 .auditorium-scene .classroom-floor {
   position: relative; display: block; flex: none; container-type: size;
-  width: min(100%, calc(var(--available-height, 500px) * 1.6));
-  height: auto; aspect-ratio: 8 / 5; min-height: 0; isolation: isolate;
+  width: min(100%, calc(var(--available-height, 500px) * 2.35));
+  height: 100%; min-height: 0; isolation: isolate;
   background: #10182e;
 }
 .auditorium-viewport[data-view="near"] { display: block; }
-.auditorium-viewport[data-view="near"] > .classroom-floor { width: max(100%, 1280px); min-width: 1280px; min-height: 800px; aspect-ratio: 8 / 5; }
+.auditorium-viewport[data-view="near"] > .classroom-floor { width: max(100%, 1280px); height: auto; min-width: 1280px; min-height: 800px; aspect-ratio: 8 / 5; }
 .auditorium-world, .auditorium-art { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
 .auditorium-world { opacity: 0; }
 .auditorium-world[data-ready="true"] { opacity: 1; }
@@ -81,7 +86,7 @@
 .classroom-seat.is-mine .auditorium-seat-caption { background: #edf0ff; outline: 1px solid #697ac7; }
 .auditorium-scene .classroom-desk-hit { min-width: 44px; min-height: 44px; width: 100%; border-radius: 12px; }
 .auditorium-scene .classroom-seat-bubble { max-width: 135px; min-width: 65px; width: max-content; font-size: 11px; padding: 3px 6px; bottom: calc(100% - 4px); }
-.auditorium-scene .classroom-walker { width: 54px; transform: translate(-50%, -35%); transition: none; }
+.auditorium-scene .classroom-walker { width: clamp(54px, 6cqw, 74px); transform: translate(-50%, -35%); transition: none; }
 .auditorium-scene .classroom-walker > svg { animation: none; }
 .classroom-walker[data-walking] .walker-foot { animation: walker-step 260ms ease-in-out infinite alternate; }
 .classroom-walker[data-walking] .walker-foot.right { animation-direction: alternate-reverse; }
@@ -89,7 +94,7 @@
 @media (prefers-reduced-motion: reduce) {
   .classroom-walker[data-walking] .walker-foot { animation: none; }
 }
-.auditorium-viewport[data-view="near"] .classroom-walker { width: 58px; }
+.auditorium-viewport[data-view="near"] .classroom-walker { width: 64px; }
 .auditorium-scene .classroom-walker-name { font-size: 10px; max-width: 100px; }
 .auditorium-scene .classroom-activity-badge { top: -9px; right: -5px; }
 .auditorium-scene .classroom-seating-footer { flex: none; margin-top: 8px; min-height: 44px; }
@@ -100,12 +105,13 @@
 .auditorium-toolbar button:focus-visible, .auditorium-viewport:focus-visible { outline: 2px solid #c2d0ff; outline-offset: -2px; }
 @media (max-width: 760px) {
   .classroom-workspace .classroom-pane > .auditorium-scene { padding: 12px 8px 8px; border-radius: 14px; }
-  .auditorium-scene .classroom-scene-heading { gap: 5px; }
+  .auditorium-topbar { display: block; margin-bottom: 0; }
+  .auditorium-scene .classroom-scene-heading { gap: 5px; margin-bottom: 8px; }
   .auditorium-scene .classroom-scene-heading h2 { font-size: 20px; }
   .auditorium-toolbar { min-height: 44px; font-size: 11px; }
   .auditorium-toolbar button { padding-inline: 8px; font-size: 11px; }
   .auditorium-viewport { height: auto; min-height: 0; display: block; }
-  .auditorium-scene .classroom-floor { width: 100%; height: auto; min-height: 0; }
+  .auditorium-scene .classroom-floor { width: 100%; height: auto; min-height: 0; aspect-ratio: 8 / 5; }
   .auditorium-viewport[data-view="near"] { height: clamp(240px, calc(100dvh - 345px), 520px); }
   .auditorium-viewport[data-view="near"] > .classroom-floor { width: 1280px; min-width: 1280px; min-height: 800px; }
   .auditorium-scene .classroom-seat-bubble { font-size: 10px; min-width: 54px; max-width: 90px; }
