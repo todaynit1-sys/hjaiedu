@@ -15,8 +15,9 @@
   position: relative; width: min(100%, 172px); aspect-ratio: 172/180;
 }
 .avatar-preview-art::before {
-  content: ''; position: absolute; bottom: 8%; left: 19%; right: 19%; height: 10%;
-  border-radius: 50%; background: #c79f704d; border: 1px solid #bd8c55a3;
+  content: ''; position: absolute; bottom: 3%; left: 19%; right: 19%; height: 9%;
+  border-radius: 50%; background: radial-gradient(ellipse, #53331f55, #53331f06 74%);
+  border: 1px solid #eaffff; box-shadow: 0 0 5px #55c9deaa, inset 0 0 4px #55c9de77;
 }
 .avatar-preview-art canvas, .avatar-preview-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .avatar-preview-art canvas { visibility: hidden; }
@@ -57,6 +58,6 @@
   .avatar-editor.classroom-character-dialog { padding: 10px; }
   .avatar-editor-workspace { grid-template: auto minmax(0, 1fr) / minmax(0, 1fr); gap: 7px; margin-block: 5px 8px; }
   .avatar-editor-preview { min-height: 0; padding: 3px; }
-  .avatar-preview-art { width: 91px; }
+  .avatar-preview-art { width: clamp(96px, 29vw, 115px); }
   .avatar-category-list { margin-bottom: 7px; }
 }

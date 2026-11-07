@@ -16,8 +16,8 @@ export type AuditoriumActorFrame = {
   seated: boolean;
 };
 
-type Shape = 'ball' | 'head' | 'body' | 'hair' | 'lock' | 'block' | 'brim' | 'dome' | 'ring' | 'arch' | 'smile' | 'point' | 'star';
-type Finish = 'skin' | 'cloth' | 'hair' | 'crown' | 'leather' | 'detail';
+type Shape = 'ball' | 'head' | 'body' | 'hair' | 'lock' | 'block' | 'brim' | 'dome' | 'ring' | 'arch' | 'smile' | 'mouth' | 'point' | 'star';
+type Finish = 'skin' | 'face' | 'cloth' | 'hair' | 'crown' | 'leather' | 'detail';
 type Bone = 'root' | 'torso' | 'head' | 'leftArm' | 'rightArm' | 'leftForearm' | 'rightForearm' |
   'leftThigh' | 'rightThigh' | 'leftShin' | 'rightShin' | 'leftFoot' | 'rightFoot';
 type Tint = string | THREE.Color;
@@ -71,11 +71,11 @@ function scalpGeometry() {
     for (let segment = 0; segment <= segments; segment++) {
       const angle = segment / segments * Math.PI * 2;
       const front = Math.sin(angle);
-      const rim = 1.83 - .60 * front + .056 * Math.sin(angle * 5);
+      const rim = 1.83 - .69 * front + .035 * Math.sin(angle * 5);
       const arc = Math.max(.001, t * rim);
       const radius = 1 + .015 * Math.sin(angle * 9) * Math.sin(arc);
       points.push(Math.cos(angle) * Math.sin(arc) * radius, Math.cos(arc), front * Math.sin(arc) * radius);
-      const value = .90 - t * .24 + .05 * Math.cos(angle * 8 + t * 3);
+      const value = 1 - t * .16 + .014 * Math.cos(angle * 8 + t * 3);
       shade.push(value, value, value);
       if (row && segment) {
         const current = row * (segments + 1) + segment;
@@ -92,19 +92,27 @@ function scalpGeometry() {
 }
 
 function shapedBall(kind: 'head' | 'lock') {
-  const geometry = new THREE.SphereGeometry(1, kind === 'head' ? 20 : 12, kind === 'head' ? 14 : 8);
+  const geometry = new THREE.SphereGeometry(1, kind === 'head' ? 26 : 14, kind === 'head' ? 18 : 10);
   const position = geometry.attributes.position;
+  const colors: number[] = [];
   for (let index = 0; index < position.count; index++) {
+    const x = position.getX(index);
     const y = position.getY(index);
+    const z = position.getZ(index);
     if (kind === 'head') {
-      const jaw = y < -.25 ? 1 + (y + .25) * .19 : 1;
-      position.setX(index, position.getX(index) * jaw);
-      position.setZ(index, position.getZ(index) * (y < 0 ? 1 + y * .09 : 1));
+      const jaw = y < -.18 ? 1 + (y + .18) * .10 : 1;
+      position.setX(index, x * jaw);
+      position.setZ(index, z * (y < 0 ? 1 + y * .04 : 1));
+      const cheek = Math.exp(-32 * (Math.abs(x) - .55) ** 2 - 22 * (y + .39) ** 2) * Math.max(0, z);
+      const lowerShade = .93 + .07 * (y + 1) / 2;
+      colors.push(lowerShade, lowerShade - cheek * .24, lowerShade - cheek * .22);
     } else {
-      position.setX(index, position.getX(index) * (.80 + .18 * (y + 1)));
-      position.setZ(index, position.getZ(index) + (1 - y) ** 2 * .125);
+      const taper = (1 - y) / 2;
+      position.setX(index, x * (1.09 - taper * .37) - .59 * taper ** 2);
+      position.setZ(index, z * (1.04 - taper * .23) + .30 * taper ** 2);
     }
   }
+  if (kind === 'head') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -130,34 +138,57 @@ function createGeometry(): Record<Shape, THREE.BufferGeometry> {
     new THREE.Vector3(0, -.91, .10),
     new THREE.Vector3(.93, .19, 0)
   );
+  const mouth = new THREE.Shape();
+  mouth.moveTo(-1, .22);
+  mouth.quadraticCurveTo(0, -.04, 1, .28);
+  mouth.bezierCurveTo(.98, -.38, .48, -.92, 0, -.90);
+  mouth.bezierCurveTo(-.54, -.89, -.99, -.39, -1, .22);
   return {
     ball: new THREE.SphereGeometry(1, 12, 8),
     head: shapedBall('head'),
     lock: shapedBall('lock'),
     hair: scalpGeometry(),
     body: new THREE.LatheGeometry([
-      [0, -1], [.69, -1], [.92, -.90], [.96, -.54], [.89, -.10],
-      [1, .50], [.93, .77], [.71, .91], [.44, 1], [0, 1]
-    ].map(([x, y]) => new THREE.Vector2(x, y)), 16),
-    block: new RoundedBoxGeometry(2, 2, 2, 1, .28),
+      [0, -1], [.67, -.99], [.87, -.90], [.97, -.71], [1, -.34], [.99, .08],
+      [.94, .50], [.83, .73], [.63, .91], [.38, .99], [0, 1]
+    ].map(([x, y]) => new THREE.Vector2(x, y)), 24),
+    block: new RoundedBoxGeometry(2, 2, 2, 2, .35),
     brim: new THREE.CylinderGeometry(1, 1, 2, 20),
     dome: new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2),
     ring: new THREE.TorusGeometry(1, .083, 6, 22),
     arch: new THREE.TorusGeometry(1, .063, 6, 22, Math.PI),
     smile: new THREE.TubeGeometry(smilePath, 10, .17, 5, false),
+    mouth: new THREE.ShapeGeometry(mouth, 10),
     point: new THREE.ConeGeometry(1, 2, 4),
     star: starGeometry()
   };
 }
 
 function createMaterials(): Record<Finish, THREE.MeshStandardMaterial> {
+  // A tiny repeatable height map gives the knit a soft grain in the close-up.
+  const size = 24;
+  const texels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const index = (y * size + x) * 4;
+    const weave = Math.cos(x / size * 4 * Math.PI + .54 * Math.cos(y / size * 2 * Math.PI));
+    const value = Math.round(128 + 30 * weave + 17 * Math.cos((y + x) / size * 4 * Math.PI));
+    texels.set([value, value, value, 255], index);
+  }
+  const knit = new THREE.DataTexture(texels, size, size);
+  knit.wrapS = knit.wrapT = THREE.RepeatWrapping;
+  knit.repeat.set(9, 8);
+  knit.magFilter = THREE.LinearFilter;
+  knit.minFilter = THREE.LinearMipmapLinearFilter;
+  knit.generateMipmaps = true;
+  knit.needsUpdate = true;
   return {
-    skin: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .75}),
-    cloth: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .97}),
-    hair: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .84}),
-    crown: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .84, vertexColors: true}),
-    leather: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .66}),
-    detail: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .61})
+    skin: new THREE.MeshStandardMaterial({roughness: .88}),
+    face: new THREE.MeshStandardMaterial({roughness: .9, vertexColors: true}),
+    cloth: new THREE.MeshStandardMaterial({roughness: .97, bumpMap: knit, bumpScale: .014}),
+    hair: new THREE.MeshStandardMaterial({roughness: .82}),
+    crown: new THREE.MeshStandardMaterial({roughness: .87, vertexColors: true}),
+    leather: new THREE.MeshStandardMaterial({roughness: .78}),
+    detail: new THREE.MeshStandardMaterial({roughness: .84})
   };
 }
 
@@ -168,8 +199,9 @@ function mix(first: Tint, second: Tint, amount: number) {
 type Lock = [x: number, y: number, z: number, width: number, height: number, depth: number, tilt: number];
 
 const FRINGES: Record<ReturnType<typeof avatarAppearance>['hair'], Lock[]> = {
-  waves: [[-.282,.229,.265,.125,.222,.119,-.50],[-.170,.300,.309,.125,.188,.105,-.62],
-    [-.046,.315,.325,.117,.185,.105,-.56],[.103,.306,.318,.129,.187,.107,-.39],[.251,.234,.270,.132,.207,.106,.28]],
+  waves: [[-.306,.202,.249,.127,.177,.117,-.58],[-.220,.310,.280,.153,.203,.132,-.79],
+    [-.078,.352,.315,.153,.213,.125,-.72],[.096,.348,.322,.149,.197,.115,-.60],
+    [.251,.270,.289,.145,.172,.107,.55],[.334,.171,.219,.100,.147,.106,.44]],
   crop: [[-.271,.255,.264,.112,.128,.092,-.35],[-.132,.316,.309,.121,.124,.100,-.40],
     [.020,.330,.311,.118,.123,.104,-.21],[.158,.314,.290,.123,.126,.098,.27],[.282,.258,.263,.109,.125,.090,.44]],
   spiky: [[-.300,.278,.218,.120,.224,.115,-.72],[-.174,.359,.275,.129,.218,.108,-.55],
@@ -192,7 +224,6 @@ function actorParts(frame: AuditoriumActorFrame) {
   const transform = new THREE.Object3D();
   const skin = mix(appearance.skin, appearance.skinShade, .07);
   const warmSkin = mix(appearance.skin, appearance.skinShade, .37);
-  const blush = mix(appearance.skinShade, '#eeb2a7', .48);
   const darkHair = new THREE.Color(appearance.hairDark);
   const midHair = mix(appearance.hairDark, appearance.hairLight, .48);
   const brightHair = mix(appearance.hairDark, appearance.hairLight, .73);
@@ -200,7 +231,7 @@ function actorParts(frame: AuditoriumActorFrame) {
   const shirtShade = new THREE.Color(appearance.shirtShade);
   const pants = appearance.pants;
   const shoes = appearance.shoes;
-  const ink = '#352c2b';
+  const ink = '#352523';
 
   function part(bone: Bone, shape: Shape, finish: Finish, color: Tint,
     x: number, y: number, z: number, width: number, height: number, depth: number,
@@ -213,45 +244,42 @@ function actorParts(frame: AuditoriumActorFrame) {
       local: transform.matrix.clone(), world: new THREE.Matrix4() });
   }
 
-  // Oversized head, visible cheeks, and small natural facial contours.
-  part('head', 'head', 'skin', skin, 0, 0, 0, .389, .429, .352);
+  // Smooth clay-like face with the blush baked into the cheek vertices.
+  part('head', 'head', 'face', skin, 0, 0, 0, .417, .405, .357);
   for (const side of SIDES) {
-    part('head', 'ball', 'skin', skin, side * .377, -.055, .027, .073, .094, .057, 0, 0, side * -.14);
-    part('head', 'ball', 'skin', warmSkin, side * .405, -.052, .053, .032, .053, .022);
-    part('head', 'ball', 'skin', blush, side * .243, -.151, .239, .061, .035, .018, 0, side * .49);
-    part('head', 'ball', 'detail', midHair, side * .139, .109, .322, .060, .013, .016, 0, side * .19, side * .16);
+    part('head', 'ball', 'skin', skin, side * .397, -.093, .060, .074, .089, .073, 0, 0, side * -.18);
+    part('head', 'ball', 'skin', warmSkin, side * .426, -.095, .113, .030, .048, .014, 0, side * .24);
+    part('head', 'smile', 'detail', midHair, side * .152, .040, .334, .048, .035, .024, 0, side * .22, Math.PI + side * .14);
     if (appearance.expression === 'sleepy') {
-      part('head', 'smile', 'detail', ink, side * .139, -.016, .331, .066, .028, .025, 0, side * .19, Math.PI);
+      part('head', 'smile', 'detail', ink, side * .150, -.058, .339, .054, .030, .025, 0, side * .23, Math.PI);
     } else {
-      part('head', 'ball', 'detail', '#5b413d', side * .140, -.018, .323, .073, .084, .020, 0, side * .24);
-      part('head', 'ball', 'detail', '#fff8ed', side * .140, -.022, .334, .065, .073, .020, 0, side * .24);
-      part('head', 'ball', 'detail', '#473433', side * .137, -.027, .352, .046, .062, .021, 0, side * .21);
-      part('head', 'ball', 'detail', '#272528', side * .138, -.025, .367, .028, .042, .013);
-      part('head', 'ball', 'detail', '#fff9eb', side * .137 - .016, -.003, .380, .013, .016, .005);
-      part('head', 'ball', 'detail', '#e1bf9b', side * .137 + .015, -.050, .374, .006, .008, .004);
+      part('head', 'ball', 'detail', ink, side * .150, -.061, .331, .037, .052, .021, -.13, side * .26, side * .12);
+      part('head', 'ball', 'detail', '#a37866', side * .150 - .010, -.043, .351, .009, .012, .004);
     }
   }
-  part('head', 'ball', 'skin', skin, 0, -.110, .335, .040, .029, .044);
+  part('head', 'ball', 'skin', skin, 0, -.131, .334, .027, .021, .024);
   if (appearance.expression === 'grin') {
-    part('head', 'ball', 'detail', '#6c3e38', 0, -.198, .313, .059, .032, .022);
-    part('head', 'ball', 'detail', '#efafa6', 0, -.214, .331, .029, .010, .007);
+    part('head', 'mouth', 'detail', '#793a2d', 0, -.198, .309, .071, .058, 1, .53);
+    part('head', 'ball', 'detail', '#cc7868', 0, -.234, .296, .042, .014, .008, .53);
   } else {
-    part('head', 'smile', 'detail', '#6a4239', 0, -.193, .322, .056, .031, .025);
+    part('head', 'smile', 'detail', '#773f35', 0, -.200, .309, .051, .041, .025, .50);
   }
 
   // Scalp shading and overlapping locks remain visible from the back rows.
   const short = appearance.hair === 'crop';
-  part('head', 'hair', 'crown', brightHair, 0, .033, -.031, .419, short ? .438 : .461, .393);
+  part('head', 'hair', 'crown', midHair, 0, .057, -.036, .440, short ? .415 : .447, .406);
   if (appearance.hair !== 'crop') {
     for (const side of SIDES) {
-      part('head', 'lock', 'hair', darkHair, side * .277, -.083, -.175, .157, .278, .182, -.09, 0, side * .16);
-      part('head', 'lock', 'hair', midHair, side * .199, .012, -.293, .153, .287, .130, -.10, 0, side * .14);
+      part('head', 'lock', 'hair', midHair, side * .310, -.026, -.176, .150, .287, .197, -.16, side * .25, side * .31);
+      part('head', 'lock', 'hair', brightHair, side * .188, .113, -.281, .181, .335, .152, -.22, side * .19, side * .30);
     }
-    part('head', 'lock', 'hair', midHair, 0, .037, -.338, .161, .289, .109, -.10);
+    part('head', 'lock', 'hair', midHair, 0, .077, -.356, .169, .328, .117, -.20, 0, -.29);
+    part('head', 'lock', 'hair', brightHair, -.118, .360, -.151, .159, .218, .131, -.86, -.26, -.38);
+    part('head', 'lock', 'hair', midHair, .095, .376, -.158, .165, .206, .123, -.77, .19, -.29);
   }
   FRINGES[appearance.hair].forEach(([x, y, z, width, height, depth, tilt], index) => {
-    part('head', 'lock', 'hair', index % 3 === 1 ? brightHair : midHair,
-      x, y, z, width, height, depth, -.11, x * .55, tilt);
+    part('head', 'lock', 'hair', index % 3 === 0 ? midHair : brightHair,
+      x, y + .025, z, width, height, depth, -.16, x * .55, tilt);
   });
   if (appearance.hair === 'bob' || appearance.hair === 'long') {
     const long = appearance.hair === 'long';
@@ -278,10 +306,10 @@ function actorParts(frame: AuditoriumActorFrame) {
   }
 
   // A softly rounded jacket, shaped sleeves and contrasting shoe soles.
-  part('torso', 'ball', 'skin', warmSkin, 0, .557, 0, .094, .109, .085);
-  part('torso', 'body', 'cloth', shirt, 0, .244, 0, .258, .269, .176);
-  part('torso', 'ball', 'cloth', shirtShade, 0, .032, 0, .222, .062, .160);
-  part('torso', 'ball', 'cloth', '#efe5d6', 0, .494, .116, .118, .044, .060, -.22);
+  part('torso', 'ball', 'skin', warmSkin, 0, .523, 0, .095, .095, .085);
+  part('torso', 'body', 'cloth', shirt, 0, .235, 0, .257, .260, .181);
+  part('torso', 'body', 'cloth', shirtShade, 0, .043, 0, .239, .053, .174);
+  part('torso', 'ball', 'cloth', '#efe5d6', 0, .466, .111, .112, .060, .067, -.22);
   part('torso', 'ball', 'cloth', pants, 0, -.046, 0, .205, .091, .140);
   for (const side of SIDES) {
     const arm = side < 0 ? 'leftArm' : 'rightArm';
@@ -289,30 +317,34 @@ function actorParts(frame: AuditoriumActorFrame) {
     const thigh = side < 0 ? 'leftThigh' : 'rightThigh';
     const shin = side < 0 ? 'leftShin' : 'rightShin';
     const foot = side < 0 ? 'leftFoot' : 'rightFoot';
-    part(arm, 'ball', 'cloth', shirt, 0, -.095, 0, .092, .160, .095);
+    part(arm, 'ball', 'cloth', shirt, -side * .016, -.094, 0, .104, .170, .101);
     part(forearm, 'ball', 'cloth', shirt, 0, -.004, 0, .078, .078, .080);
     part(forearm, 'ball', 'cloth', shirt, 0, -.083, 0, .079, .136, .083);
-    part(forearm, 'ball', 'cloth', shirtShade, 0, -.170, 0, .074, .038, .079);
-    part(forearm, 'ball', 'skin', skin, 0, -.217, .013, .062, .075, .056);
+    part(forearm, 'body', 'cloth', shirtShade, 0, -.169, 0, .079, .046, .083);
+    part(forearm, 'ball', 'skin', skin, 0, -.228, .013, .067, .069, .061);
     part(forearm, 'ball', 'skin', warmSkin, -side * .045, -.202, .036, .025, .039, .023, .18, 0, side * -.33);
     part(thigh, 'ball', 'cloth', pants, 0, -.128, 0, .111, .173, .108);
-    part(shin, 'ball', 'cloth', pants, 0, -.005, .003, .095, .084, .091);
-    part(shin, 'ball', 'cloth', pants, 0, -.109, 0, .086, .145, .086);
-    part(shin, 'ball', 'cloth', mix(pants, '#b3ad9e', .22), 0, -.226, 0, .084, .026, .086);
-    part(foot, 'block', 'leather', '#817064', 0, -.053, .069, .091, .026, .149);
-    part(foot, 'ball', 'leather', shoes, 0, -.013, .076, .086, .071, .146);
-    part(foot, 'ball', 'leather', mix(shoes, '#c0a68a', .24), 0, .013, .145, .074, .034, .066);
-    part(foot, 'ball', 'detail', '#d9ccbe', 0, .047, .065, .048, .009, .009, .06, 0, side * .05);
+    part(shin, 'ball', 'cloth', pants, 0, -.011, .003, .091, .092, .091);
+    part(shin, 'body', 'cloth', pants, 0, -.113, 0, .086, .145, .088, 0, 0, Math.PI);
+    part(shin, 'body', 'cloth', mix(pants, '#b3ad9e', .19), 0, -.220, 0, .090, .040, .090);
+    part(foot, 'block', 'leather', '#ecdac1', 0, -.053, .080, .104, .029, .167);
+    part(foot, 'ball', 'leather', shoes, 0, -.010, .078, .098, .072, .158);
+    part(foot, 'ball', 'leather', mix(shoes, '#c0a68a', .29), 0, .011, .156, .085, .035, .070);
+    part(foot, 'ball', 'detail', '#f3e4ce', 0, .058, .088, .056, .012, .014, .08, 0, side * .08);
+    part(foot, 'ball', 'detail', '#f3e4ce', 0, .050, .128, .058, .011, .012, .20, 0, side * -.04);
   }
 
   if (appearance.detail === 'cardigan' || frame.instructor) {
-    part('torso', 'block', 'cloth', shirtShade, 0, .258, .168, .021, .184, .009);
-    for (let button = 0; button < 4; button++) {
-      part('torso', 'ball', 'detail', '#d3b28e', 0, .133 + button * .091, .184, .018, .019, .010);
+    const edging = mix(shirt, shirtShade, .56);
+    part('torso', 'block', 'cloth', edging, .018, .167, .176, .026, .107, .021);
+    for (let button = 0; button < 2; button++) {
+      part('torso', 'ball', 'leather', '#93643d', .020, .125 + button * .107, .200, .024, .024, .013);
+      part('torso', 'ball', 'detail', '#bc8950', .017, .129 + button * .107, .209, .013, .013, .006);
     }
     for (const side of SIDES) {
-      part('torso', 'block', 'cloth', mix(shirt, shirtShade, .34), side * .125, .145, .159, .053, .054, .014, 0, side * .19);
-      part('torso', 'ball', 'cloth', '#e8d5bb', side * .075, .450, .145, .032, .075, .016, .08, side * .17, side * .53);
+      part('torso', 'block', 'cloth', mix(shirt, shirtShade, .25), side * .133, .140, .157, .052, .043, .026, 0, side * .30);
+      part('torso', 'block', 'cloth', edging, side * .132, .177, .171, .054, .011, .017, 0, side * .30);
+      part('torso', 'block', 'cloth', edging, side * .064, .386, .159, .026, .125, .025, -.26, side * .16, -side * .44);
     }
   } else if (appearance.detail === 'puffer') {
     for (let band = 0; band < 3; band++) {
@@ -320,19 +352,16 @@ function actorParts(frame: AuditoriumActorFrame) {
         .247 - band * .004, .077, .185);
     }
   } else if (appearance.detail === 'knit') {
-    for (const side of SIDES) {
-      part('torso', 'smile', 'cloth', mix(shirt, shirtShade, .31), side * .106, .294, .173,
-        .040, .125, .032, 0, side * .22, side * .13);
-    }
+    part('torso', 'ball', 'cloth', mix(shirt, shirtShade, .37), 0, .472, .112, .127, .042, .072, -.22);
   }
 
   const accessory = appearance.accessory;
   if (accessory === 'glasses' || frame.instructor) {
     for (const side of SIDES) {
-      part('head', 'ring', 'detail', '#59473e', side * .143, -.024, .382, .102, .100, .061, 0, side * .19);
-      part('head', 'ball', 'detail', '#ad8d75', side * .227, .008, .366, .029, .012, .015);
+      part('head', 'ring', 'detail', '#59473e', side * .149, -.053, .366, .094, .090, .065, -.08, side * .22);
+      part('head', 'ball', 'detail', '#ad8d75', side * .228, -.022, .355, .029, .012, .015);
     }
-    part('head', 'ball', 'detail', '#695044', 0, -.024, .391, .057, .013, .011);
+    part('head', 'ball', 'detail', '#695044', 0, -.051, .379, .060, .010, .013);
   } else if (accessory === 'headphones' || accessory === 'earmuffs') {
     const cushion = accessory === 'earmuffs' ? '#e2b893' : '#6683a1';
     part('head', 'arch', 'detail', '#62556b', 0, .091, -.018, .410, .421, .13);
@@ -440,7 +469,7 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
     pose.root.copy(transform.matrix);
     joint(pose, 'torso', 'root', 0, hips, -.023 * sit,
       lerp(.035 * Number(walking), .036, sit), -.064 * swing, -.045 * swing);
-    joint(pose, 'head', 'torso', 0, .964, .012,
+    joint(pose, 'head', 'torso', 0, .899, .025,
       lerp(-.012, -.039, sit), .043 * swing, .028 * swing);
 
     for (const side of SIDES) {
@@ -552,6 +581,7 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
       mesh.dispose();
     }
     for (const geometry of Object.values(geometries)) geometry.dispose();
+    materials.cloth.bumpMap?.dispose();
     for (const material of Object.values(materials)) material.dispose();
     batches.clear();
     actors.clear();

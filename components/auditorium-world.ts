@@ -18,16 +18,16 @@ export type AuditoriumWorld = {
 export function createAvatarPreviewWorld(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setSize(172, 180, false);
+  renderer.setSize(215, 225, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera(-1.14, 1.14, 1.19, -1.19, .1, 15);
-  camera.position.set(2.3, 2.3, 6);
-  camera.lookAt(0, 1.03, 0);
-  scene.add(new THREE.HemisphereLight('#fff9ed', '#879bbb', 2.1));
-  const sunlight = new THREE.DirectionalLight('#fff0d2', 2.4);
-  sunlight.position.set(-3, 5, 6);
+  const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.10, -1.10, .1, 15);
+  camera.position.set(2.1, 1.84, 6.1);
+  camera.lookAt(0, 1.01, 0);
+  scene.add(new THREE.HemisphereLight('#fff7ec', '#948c8a', 1.65));
+  const sunlight = new THREE.DirectionalLight('#fff1dc', 2.5);
+  sunlight.position.set(-3.2, 4, 4.6);
   scene.add(sunlight);
   const actors = createAuditoriumActors(scene);
   return {
