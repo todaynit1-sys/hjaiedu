@@ -43,9 +43,9 @@ export function ClassroomQuestion({ data, onAction, host }: {
 
   const label = host ? (round ? '질문 관리' : '질문 출제') : (round?.open ? '질문 답하기' : '답변 보기');
   return <>
-    <button className="classroom-question-trigger" type="button" aria-haspopup="dialog"
+    <button className="classroom-question-trigger" type="button" aria-haspopup="dialog" aria-label={label} title={label}
       onClick={() => setOpen(true)}>
-      <MessageSquare size={16} aria-hidden="true" />{label}
+      <MessageSquare size={16} aria-hidden="true" /><span>{label}</span>
     </button>
     {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host}
       onAction={onAction} onClose={() => setOpen(false)} />}

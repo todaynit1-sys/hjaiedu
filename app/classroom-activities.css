@@ -52,9 +52,9 @@
 .classroom-walker-greet { position: absolute; inset: 0; border: 0; background: transparent; pointer-events: auto; min-width: 44px; min-height: 44px; }
 .classroom-floor[data-moving] .classroom-desk-hit.classroom-greet-hit { pointer-events: auto; }
 .classroom-group-photo { display: block; width: 100%; height: auto; margin: 12px 0; }
-.classroom-seat:has(.classroom-activity-badge[data-kind="understood"]) .classroom-head { animation: classroom-nod 600ms ease-in-out 3; }
-.classroom-seat:has(.classroom-activity-badge[data-kind="wave"]) .classroom-head { animation: classroom-nod 700ms ease-in-out 2; }
-.classroom-seat:has(.classroom-activity-badge[data-kind="clap"]) .classroom-head { animation: classroom-hop 500ms ease-in-out 4; }
+.classroom-actor:has(.classroom-activity-badge[data-kind="understood"]) .classroom-actor-face { animation: classroom-nod 600ms ease-in-out 3; }
+.classroom-actor:has(.classroom-activity-badge[data-kind="wave"]) .classroom-actor-face { animation: classroom-nod 700ms ease-in-out 2; }
+.classroom-actor:has(.classroom-activity-badge[data-kind="clap"]) .classroom-actor-face { animation: classroom-hop 500ms ease-in-out 4; }
 @keyframes classroom-nod { 50% { transform: translateY(2px) rotate(6deg); } }
 @keyframes classroom-hop { 50% { transform: translateY(-4px); } }
 @media (max-width: 760px) {
@@ -68,5 +68,5 @@
   .classroom-character-trigger > svg { width: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .classroom-seat:has(.classroom-activity-badge) .classroom-head { animation: none; }
+  .classroom-actor:has(.classroom-activity-badge) .classroom-actor-face { animation: none; }
 }

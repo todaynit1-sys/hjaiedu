@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LocateFixed, LogOut, Maximize, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
 import { ClassroomQuestion } from './classroom-activities';
 import { ClassroomPolls } from './classroom-polls';
@@ -72,6 +72,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const [data, setData] = useState<Snapshot | null>(null); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [connected, setConnected] = useState(true); const [busy, setBusy] = useState(false);
   const [share, setShare] = useState(false); const [questions, setQuestions] = useState(false); const [tab, setTab] = useState<'all' | 'links'>('all'); const [notice, setNotice] = useState(''); const [unread, setUnread] = useState(false);
   const [view, setView] = useState<'classroom' | 'chat'>('classroom');
+  const [sceneView, setSceneView] = useState<'overview' | 'near'>('overview');
+  const [nearRequest, setNearRequest] = useState(0);
   const [hasNewChat, setHasNewChat] = useState(false);
   const observedChat = useRef<{ date: string; id?: string } | null>(null);
   const [pollView, setPollView] = useState<'custom' | 'history' | null>(null);
@@ -170,7 +172,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
   const previousPolls = data?.polls.filter(poll => poll.kind === 'custom' && poll.archived) ?? [];
-  const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" aria-haspopup="dialog">
+  const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" title="참고자료" aria-haspopup="dialog">
     <BookOpen size={15} aria-hidden="true" /><span>참고자료</span>
   </button>;
   const roomControls = data && <div className="live-room-actions">
@@ -210,19 +212,25 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       {error && <div className="live-error" role="alert"><WifiOff size={17} /><span>{error}</span><button aria-label="오류 메시지 닫기" onClick={() => setError('')}><X size={16} /></button></div>}
       <main id="main" className="classroom-workspace room-view-workspace" data-view={view}>
         <h1 className="room-accessible-title">{data.title}</h1>
-        <div className="classroom-mobile-tools classroom-view-tools">
+        <div className="classroom-view-tools">
           <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
             <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강의실</button>
             <button aria-label="채팅" aria-pressed={view === 'chat'} aria-controls="chat-pane" aria-describedby={hasNewChat ? 'new-chat-hint' : undefined} onClick={() => setView('chat')}><MessageCircle size={18} aria-hidden="true" />채팅{hasNewChat && <span className="view-chat-badge" aria-hidden="true">새 메시지</span>}</button>
           </div>
           <div className="classroom-view-actions">
+            {view === 'classroom' && <div className="classroom-camera-tools" role="group" aria-label="교실 보기">
+              <button type="button" aria-label="전체 보기" title="전체 보기" aria-pressed={sceneView === 'overview'}
+                onClick={() => setSceneView('overview')}><Maximize size={16} aria-hidden="true" /><span>전체 보기</span></button>
+              <button type="button" aria-label="내 주변" title="내 주변" aria-pressed={sceneView === 'near'}
+                onClick={() => { setSceneView('near'); setNearRequest(request => request + 1); }}><LocateFixed size={16} aria-hidden="true" /><span>내 주변</span></button>
+            </div>}
             <ClassroomQuestion data={data} host={host} onAction={active ? classroomActivity : undefined} />
             {materialsButton}
           </div>
         </div>
         <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
         <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
-          <ClassroomScene data={data} host={host} visible={view === 'classroom'} onActivity={active ? classroomActivity : undefined} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+          <ClassroomScene data={data} host={host} visible={view === 'classroom'} view={sceneView} nearRequest={nearRequest} onActivity={active ? classroomActivity : undefined} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
             onMove={active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
@@ -234,7 +242,6 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           <div className="live-chat-heading"><h2 id="chat-title"><MessageCircle size={20} />실시간 채팅</h2>
             <div className="chat-header-tools">
               <button className="classroom-link-filter" aria-label="링크만 보기" aria-pressed={tab === 'links'} onClick={() => setTab(tab === 'links' ? 'all' : 'links')}><Link2 size={14} />링크만</button>
-              {materialsButton}
             </div>
           </div>
           {pinned && <div className="chat-pinned"><Pin size={14} /><span>고정</span>{pinned.url ? <a href={pinned.url} target="_blank" rel="noopener noreferrer">{pinned.text}</a> : <p>{pinned.text}</p>}{pinned.url && <ExternalLink size={13} />}</div>}

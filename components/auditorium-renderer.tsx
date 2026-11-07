@@ -7,10 +7,16 @@ export type AuditoriumProjection = {
   height: number;
 };
 
-export function AuditoriumRenderer({capacity, onLayout}: {
-  capacity: number; onLayout: (layout: AuditoriumProjection | null) => void;
+export function AuditoriumRenderer({capacity, backdrop, onLayout}: {
+  capacity: number; backdrop: boolean; onLayout: (layout: AuditoriumProjection | null) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const activeWorld = useRef<import('./auditorium-world').AuditoriumWorld | null>(null);
+  const currentBackdrop = useRef(backdrop);
+  useEffect(() => {
+    currentBackdrop.current = backdrop;
+    activeWorld.current?.setBackdrop(backdrop);
+  }, [backdrop]);
   useEffect(() => {
     const element = canvas.current;
     const floor = element?.parentElement;
@@ -46,6 +52,8 @@ export function AuditoriumRenderer({capacity, onLayout}: {
     void import('./auditorium-world').then(module => {
       if (stopped) return;
       world = module.createAuditoriumWorld(element);
+      activeWorld.current = world;
+      world.setBackdrop(currentBackdrop.current);
       resize();
       observer = new ResizeObserver(() => {
         if (!frame) frame = requestAnimationFrame(resize);
@@ -60,6 +68,7 @@ export function AuditoriumRenderer({capacity, onLayout}: {
       cancelAnimationFrame(frame);
       element.removeEventListener('webglcontextlost', contextLost);
       element.removeEventListener('webglcontextrestored', contextRestored);
+      activeWorld.current = null;
       world?.dispose();
     };
   }, [capacity, onLayout]);

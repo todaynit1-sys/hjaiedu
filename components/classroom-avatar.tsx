@@ -103,16 +103,17 @@ function Face({ sleepy, delighted, shade }: { sleepy: boolean; delighted: boolea
 
 export const AvatarArt = memo(function AvatarArt({ character, pose, instructor = false }: {
   character: Character;
-  pose: 'portrait' | 'seated' | 'walking';
+  pose: 'portrait' | 'seated' | 'walking' | 'actor';
   instructor?: boolean;
 }) {
   const id = useId();
   const outfit = instructor ? teacher : avatars[character];
-  const walking = pose === 'walking';
+  const standingArms = pose === 'walking' || pose === 'actor';
+  const seatedArms = pose === 'seated' || pose === 'actor';
   const sleeve = `url(#${id}-shirt)`;
   const skin = `url(#${id}-skin)`;
   const hair = `url(#${id}-hair)`;
-  return <g stroke="#58413a" strokeWidth="1.05" strokeLinecap="round" strokeLinejoin="round">
+  return <g fill="none" stroke="#58413a" strokeWidth="1.05" strokeLinecap="round" strokeLinejoin="round">
     <defs>
       <linearGradient id={`${id}-hair`} x1="0" y1="0" x2="1" y2=".95" gradientUnits="objectBoundingBox">
         <stop offset="0" stopColor={outfit.hairLight} /><stop offset="1" stopColor={outfit.hairDark} />
@@ -124,11 +125,14 @@ export const AvatarArt = memo(function AvatarArt({ character, pose, instructor =
         <stop offset="0" stopColor={outfit.shirt} /><stop offset="1" stopColor={outfit.shirtShade} />
       </linearGradient>
     </defs>
-    {walking && <g>
-      <ellipse cx="45" cy="60.1" rx="16.2" ry="3.1" fill="#44302c" opacity=".2" stroke="none" />
-      <g className="walker-foot left"><path d="M35.5 49.5h8l-.5 7.2h-7Z" fill="#586074" /><path d="M35.8 55.7q3 1.6 7.5 0l.3 2.1q-1.5 2.5-8.5 1.2-2.5-.9.7-3.3Z" fill="#584c47" /><path d="M35.1 58.6q4.4.8 7.4-.1" stroke="#cbbba8" strokeWidth=".8" /></g>
-      <g className="walker-foot right"><path d="M46 49.5h8.5l-1 7.2h-7Z" fill="#6a7486" /><path d="M46.5 55.5q3.1 1.6 7.6.1 3 1.5 2.8 2.6-.8 1.8-9.3 1.1-2.1-.5-1.1-3.8Z" fill="#584c47" /><path d="M48 58.6q4.2.8 7.6-.2" stroke="#cbbba8" strokeWidth=".8" /></g>
-    </g>}
+    {standingArms && <>
+      <ellipse className="classroom-actor-shadow" cx="45" cy="60.1" rx="16.2" ry="3.1" fill="#44302c" opacity=".2" stroke="none" />
+      <g className="classroom-actor-legs">
+        <g className="walker-foot left"><path d="M35.5 49.5h8l-.5 7.2h-7Z" fill="#586074" /><path d="M35.8 55.7q3 1.6 7.5 0l.3 2.1q-1.5 2.5-8.5 1.2-2.5-.9.7-3.3Z" fill="#584c47" /><path d="M35.1 58.6q4.4.8 7.4-.1" stroke="#cbbba8" strokeWidth=".8" /></g>
+        <g className="walker-foot right"><path d="M46 49.5h8.5l-1 7.2h-7Z" fill="#6a7486" /><path d="M46.5 55.5q3.1 1.6 7.6.1 3 1.5 2.8 2.6-.8 1.8-9.3 1.1-2.1-.5-1.1-3.8Z" fill="#584c47" /><path d="M48 58.6q4.2.8 7.6-.2" stroke="#cbbba8" strokeWidth=".8" /></g>
+      </g>
+    </>}
+    <g className="classroom-actor-body">
     <path d="M30 46q0-6.5 7-8l7.4-2 9.3 2.6q5.4 1.8 6.1 8l-1.6 4.2q-12 4.6-25.8.4Z" fill={sleeve} />
     <path d="M33 48.8q11 3 24 0l-.5 2.4q-10.8 3.9-23.3.4Z" fill={outfit.shirtShade} stroke="none" opacity=".7" />
     <path d="M37 40q7.3 4.6 14.3 0" stroke="#fff7e6" strokeWidth="1.8" fill="none" opacity=".8" />
@@ -136,11 +140,10 @@ export const AvatarArt = memo(function AvatarArt({ character, pose, instructor =
     {outfit.detail === 'knit' && <path d="m36 44 2 1.6 2-1.4 2 1.6 2-1.4 2 1.6 2-1.5 2 1.2 2-1.8" fill="none" stroke={outfit.shirtShade} strokeWidth=".8" />}
     {outfit.detail === 'puffer' && <path d="M34 44.7q10 2.8 21-.4M34.3 47.7q9 2.7 20.5-.3" fill="none" stroke="#fff5e2" strokeWidth=".65" opacity=".46" />}
     {outfit.detail === 'cardigan' && <g><path d="M44.7 43 45.3 52.4" fill="none" stroke={outfit.shirtShade} /><circle cx="46.7" cy="46.2" r=".64" fill="#f2d6a2" stroke="none" /><circle cx="46.9" cy="49.2" r=".64" fill="#f2d6a2" stroke="none" /></g>}
-    {walking
-      ? <g><path d="M31.5 42.1q-2 2.1-2.2 5.5-.2 2.2 2 2.7 2.1.4 2.7-2.4l1.1-4.3" fill={sleeve} /><path d="M55.3 42q2.8.2 4.5 3.2l1.7 2.1-2.3 2.1q-3-.6-4.3-4.4" fill={sleeve} /><path d="M29.4 48q2.6 1 4.3.1l-.2 2.2q-.8 1.5-2.4 1.1-1.8-.5-1.7-3.4Zm30.8-2q1.5-2 3.3-.8 1.1 1.1-.3 3.2-1 1.3-3.6 1Z" fill={skin} strokeWidth=".8" /></g>
-      : pose === 'seated' && <g><path d="M31.4 43.5q.3 3.8 6.9 4.8m18.7-4q.7 3.4-4.4 4.2" fill="none" stroke={outfit.shirtShade} /><ellipse cx="39.2" cy="48.5" rx="2.7" ry="1.6" fill={skin} strokeWidth=".75" /><ellipse cx="51.8" cy="48.5" rx="2.7" ry="1.6" fill={skin} strokeWidth=".75" /></g>}
+    {standingArms && <g className="classroom-actor-standing-arms"><path d="M31.5 42.1q-2 2.1-2.2 5.5-.2 2.2 2 2.7 2.1.4 2.7-2.4l1.1-4.3" fill={sleeve} /><path d="M55.3 42q2.8.2 4.5 3.2l1.7 2.1-2.3 2.1q-3-.6-4.3-4.4" fill={sleeve} /><path d="M29.4 48q2.6 1 4.3.1l-.2 2.2q-.8 1.5-2.4 1.1-1.8-.5-1.7-3.4Zm30.8-2q1.5-2 3.3-.8 1.1 1.1-.3 3.2-1 1.3-3.6 1Z" fill={skin} strokeWidth=".8" /></g>}
+    {seatedArms && <g className="classroom-actor-seated-arms"><path d="M31.4 43.5q.3 3.8 6.9 4.8m18.7-4q.7 3.4-4.4 4.2" fill="none" stroke={outfit.shirtShade} /><ellipse cx="39.2" cy="48.5" rx="2.7" ry="1.6" fill={skin} strokeWidth=".75" /><ellipse cx="51.8" cy="48.5" rx="2.7" ry="1.6" fill={skin} strokeWidth=".75" /></g>}
     {instructor && <g><path d="m43 40 2.2 2.3 2.1-2.6m-2.1 2.6 1 6.3" fill="none" stroke="#e6e5d6" /><rect x="48.5" y="44.2" width="4.4" height="3.2" rx=".6" fill="#ebcc8d" strokeWidth=".65" /></g>}
-    <g transform={pose === 'seated' ? 'rotate(-3 45 28)' : undefined}>
+    <g className="classroom-actor-face" transform={pose === 'seated' ? 'rotate(-3 45 28)' : undefined}>
       {outfit.hair === 'bun' && <circle cx="37.7" cy="7.1" r="6.5" fill={hair} stroke={outfit.hairDark} />}
       <path d="M28 22q0-12 10-15 14-5 22 4 4 5 3 15l-3 8H30Z" fill={hair} stroke={outfit.hairDark} />
       <path d="M31 28q-5-4-6 1 .4 4.5 6.3 4.4m27.4-6.6q4.8-5 6.1-1 .9 4.7-5.1 6" fill={skin} stroke="#855847" strokeWidth=".95" />
@@ -151,5 +154,6 @@ export const AvatarArt = memo(function AvatarArt({ character, pose, instructor =
       <HairAccessory accessory={outfit.accessory} />
     </g>
     {outfit.accessory === 'scarf' && <path d="M36 39q8 2.7 18-1l1.5 3.7q-3 .8-4.1 1.3l1 5.8-4.1.7-1.5-5.7q-6 .8-11.4-2.4Z" fill="#d69279" stroke="#925b54" />}
+    </g>
   </g>;
 });

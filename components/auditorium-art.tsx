@@ -1,12 +1,12 @@
 import { useId } from 'react';
 import { AUDITORIUM_SCREEN } from '../lib/auditorium';
 
-const floorShape = 'M169 205H831L1000 406V600H0V406Z';
+const floorShape = 'M169 238H831L1000 406V600H0V406Z';
 const screenX = AUDITORIUM_SCREEN.left * 1000;
 const screenY = AUDITORIUM_SCREEN.top * 600;
 const screenWidth = AUDITORIUM_SCREEN.width * 1000;
 const screenHeight = AUDITORIUM_SCREEN.height * 600;
-const floorSeams = [229, 247, 268, 292, 320, 353, 390, 434, 485, 545];
+const floorSeams = [267, 285, 306, 330, 358, 391, 428, 472, 523, 580];
 const shelfBooks = [0, 1, 2, 3, 4, 5];
 const bookColors = ['#9ab8ce', '#d6ad81', '#c3988e', '#9bab96', '#b3a0bc'];
 
@@ -39,8 +39,8 @@ export function AuditoriumArt() {
   const linen = `${id}-linen`;
   const floorClip = `${id}-floor`;
   const sideWall = <g>
-    <path d="M0 0L169 44V206L0 410Z" fill="#c3d5eb"/>
-    <path d="M0 345L169 179V206L0 410Z" fill="#88a7cf"/>
+    <path d="M0 0L169 44V238L0 410Z" fill="#c3d5eb"/>
+    <path d="M0 345L169 179V238L0 410Z" fill="#88a7cf"/>
     <path d="M24 325V381M50 301V350M79 273V315M105 246V284M130 220V255M151 199V229" stroke="#6f93c1" strokeWidth="1.4"/>
     <path d="M0 346L169 179" fill="none" stroke="#f4f5f9" strokeWidth="5"/>
     <path d="M15 21L147 61V202L15 345Z" fill="#bd906a" stroke="#f2debf" strokeWidth="7"/>
@@ -95,12 +95,15 @@ export function AuditoriumArt() {
     </defs>
 
     <rect width="1000" height="600" fill="#dce7f4"/>
-    <path d="M0 0H1000L831 44H169Z" fill="#f4f4f3"/>
-    <path d="M169 44H831V206H169Z" fill="#e6edf7"/>
-    <path d="M169 160H831V205H169Z" fill="#9fb9db"/>
+    <path d="M0 0H1000L831 44H169Z" fill="#748fb9"/>
+    <path d="M83 0H917L831 34H169Z" fill={`url(#${timber})`}/>
+    <path d="M169 34H831V238H169Z" fill="#efe9e5"/>
+    <path d="M169 160H831V238H169Z" fill="#9fb9db"/>
     <path d="M169 159H831" fill="none" stroke="#f4f5f9" strokeWidth="5"/>
     {sideWall}
     <g transform="translate(1000 0) scale(-1 1)">{sideWall}</g>
+    <path d="M0 0L169 39H831L1000 0" fill="none" stroke="#b98762" strokeWidth="12"/>
+    <path d="M0 0L169 42H831L1000 0" fill="none" stroke="#f0bf91" strokeWidth="3"/>
 
     <path d={floorShape} fill={`url(#${maple})`}/>
     <g clipPath={`url(#${floorClip})`}>
@@ -116,14 +119,18 @@ export function AuditoriumArt() {
       {sunPatches}<g transform="translate(1000 0) scale(-1 1)">{sunPatches}</g>
     </g>
 
-    <path d="M166 177H834L873 210H127Z" fill={`url(#${stage})`} stroke="#a77659" strokeWidth="2"/>
-    <path d="M166 177H834L873 210H127Z" fill={`url(#${grain})`} opacity=".31"/>
-    <path d="M150 192H851M139 201H861M230 177L213 210M388 177L381 210M604 177L610 210M756 177L772 210"
-      fill="none" stroke="#986c54" strokeWidth=".8" opacity=".53"/>
-    <path d="M127 210H873V222H127Z" fill={`url(#${timber})`}/>
-    <path d="M116 223H884V230H116Z" fill="#ebc09a"/>
-    <path d="M116 230H884V239H116Z" fill="#a4775e"/>
-    <path d="M127 212H873M116 225H884" stroke="#ffe0ad" strokeWidth="1.5" opacity=".85"/>
+    <g transform="translate(0 37)">
+      <path d="M166 177H834L873 210H127Z" fill={`url(#${stage})`} stroke="#a77659" strokeWidth="2"/>
+      <path d="M166 177H834L873 210H127Z" fill={`url(#${grain})`} opacity=".31"/>
+      <path d="M150 192H851M139 201H861M230 177L213 210M388 177L381 210M604 177L610 210M756 177L772 210"
+        fill="none" stroke="#986c54" strokeWidth=".8" opacity=".53"/>
+      <path d="M172 185l41-4 31 10-43 5ZM222 181l43-3 31 8-45 5ZM209 199l43-5 25 10-44 3ZM260 192l44-5 27 9-46 7Z"
+        fill="#ffdfa0" opacity=".68"/>
+      <path d="M127 210H873V222H127Z" fill={`url(#${timber})`}/>
+      <path d="M116 223H884V230H116Z" fill="#ebc09a"/>
+      <path d="M116 230H884V239H116Z" fill="#a4775e"/>
+      <path d="M127 212H873M116 225H884" stroke="#ffe0ad" strokeWidth="1.5" opacity=".85"/>
+    </g>
     <rect x={screenX - 10} y={screenY - 7} width={screenWidth + 20} height={screenHeight + 17}
       rx="5" fill="#5d4b45" opacity=".21"/>
     <rect x={screenX - 9} y={screenY - 8} width={screenWidth + 18} height={screenHeight + 16}
@@ -140,7 +147,7 @@ export function AuditoriumArt() {
     <rect x={screenX + screenWidth - 122} y={screenY + screenHeight + 3} width="12" height="3" rx="1" fill="#f4efe6"/>
     <rect x={screenX + screenWidth - 106} y={screenY + screenHeight + 4} width="9" height="2.5" rx="1" fill="#e2cb83"/>
 
-    {[172, 786].map(x => <g key={x} transform={`translate(${x} 0)`}>
+    {[172, 786].map(x => <g key={x} transform={`translate(${x} 24)`}>
       <rect x="1" y="85" width="41" height="104" rx="2" fill={`url(#${timber})`} stroke="#996e53"/>
       <rect x="6" y="92" width="31" height="89" fill="#895e49"/>
       {[100, 123, 146].map((y, shelf) => <g key={y}>
@@ -156,7 +163,7 @@ export function AuditoriumArt() {
       <PottedPlant x={24} y={84} scale={.54}/>
       <PottedPlant x={21} y={205} scale={.72} flowers/>
     </g>)}
-    {[153, 837].map(x => <g key={x} transform={`translate(${x} 85)`}>
+    {[153, 837].map(x => <g key={x} transform={`translate(${x} 97)`}>
       <rect x="-2" y="0" width="13" height="27" rx="4" fill="#e7b56b" opacity=".24"/>
       <rect width="9" height="21" y="4" rx="2" fill="#f5ca7d" stroke="#9d7456" strokeWidth="2"/>
       <path d="M2 5H7M3 6V23" stroke="#fff3c6" strokeWidth="1.5"/>

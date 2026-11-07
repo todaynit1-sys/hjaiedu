@@ -1,25 +1,28 @@
 import type { ClassroomPosition } from './types.ts';
 
 export const AUDITORIUM_PAGE_SIZE = 50;
-export const AUDITORIUM_SCREEN = { left: .22, top: .055, width: .56, height: .235 };
+export const AUDITORIUM_SCREEN = { left: .222, top: .101, width: .556, height: .229 };
 
 export function auditoriumCapacity(highestSeatWithinPage: number): number {
   return Math.min(AUDITORIUM_PAGE_SIZE, Math.max(20, Math.ceil(highestSeatWithinPage / 10) * 10));
 }
 
-export function auditoriumSeat(index: number, capacity: number): ClassroomPosition & { row: number } {
+export function auditoriumSeat(index: number, capacity: number): ClassroomPosition & { row: number; scale: number } {
   const columns = capacity / 5;
   const half = columns / 2;
   const row = Math.floor(index / columns);
   const column = index % columns;
-  // Keep the aisle straight while the outside seats widen slightly toward the camera.
-  const outer = .12 - (capacity - 20) / 30 * .045 + (4 - row) / 4 * .025;
+  // The shared seat coordinate marks floor contact for the chair and its actor.
+  const far = .21 - (capacity - 20) / 30 * .027;
+  const near = .115 - (capacity - 20) / 30 * .04;
+  const outer = far + (near - far) * row / 4;
   const spacing = (.4 - outer) / (half - 1);
   const x = column < half
     ? outer + column * spacing
     : .6 + (column - half) * spacing;
-  const y = .42 + row * .109;
-  return { x, y, row };
+  const y = .55 + row * .0915;
+  const baseScale = capacity <= 20 ? .065 : capacity <= 30 ? .055 : .046;
+  return { x, y, row, scale: baseScale * (.88 + .06 * row) };
 }
 
 export function auditoriumQuizPosition(seatNumber: number, choice: 'O' | 'X'): ClassroomPosition {

@@ -16,13 +16,42 @@
   margin-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
-.classroom-view-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.classroom-view-actions,
+.classroom-camera-tools { display: flex; flex: none; align-items: center; gap: 6px; }
+.classroom-camera-tools {
+  padding-inline-end: 6px;
+  border-inline-end: 1px solid var(--line);
+}
+.classroom-camera-tools > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.classroom-camera-tools > button:hover,
+.classroom-camera-tools > button[aria-pressed="true"] {
+  border-color: var(--line);
+  color: var(--forest);
+  background: var(--mint);
+}
 .room-view-workspace .classroom-switch {
   display: flex;
   flex: none;
   align-self: stretch;
   gap: 4px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .room-view-workspace .classroom-switch button {
   display: inline-flex;
@@ -37,6 +66,7 @@
   color: var(--muted);
   font-size: 15px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .room-view-workspace .classroom-switch button[aria-pressed="true"] {
   color: var(--forest);
@@ -97,7 +127,6 @@
   padding: 7px 14px;
   font-size: 13px;
 }
-.room-view-workspace .chat-header-tools .materials-button { display: none; }
 @media (min-width: 761px) {
   .room-view-workspace .chat-scroll { padding: 24px clamp(16px, 4vw, 54px) 12px; }
   .room-view-workspace .chat-message-body { max-width: min(82%, 720px); }
@@ -118,7 +147,9 @@
     gap: 5px;
     font-size: 14px;
   }
-  .classroom-view-actions { gap: 5px; }
+  .classroom-view-actions,
+  .classroom-camera-tools { gap: 4px; }
+  .classroom-camera-tools { padding-inline-end: 4px; }
   .classroom-view-actions > .materials-button { padding: 5px 8px; font-size: 12px; }
   .room-view-workspace .classroom-switch button > svg { width: 15px; height: 15px; }
   .room-view-workspace .view-chat-badge {
@@ -131,6 +162,18 @@
     background: var(--forest);
   }
 }
-@media (max-width: 420px) {
-  .classroom-view-tools:has(.classroom-question-trigger) .classroom-switch button > svg { display: none; }
+@media (max-width: 580px) {
+  .room-view-workspace .classroom-switch button > svg,
+  .classroom-camera-tools > button > span,
+  .classroom-view-actions > :is(.materials-button, .classroom-question-trigger) > span { display: none; }
+  .classroom-view-actions > :is(.materials-button, .classroom-question-trigger),
+  .classroom-camera-tools > button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+  .classroom-view-actions > :is(.materials-button, .classroom-question-trigger) > svg {
+    width: 17px;
+    height: 17px;
+  }
 }

@@ -8,12 +8,11 @@ export type AuditoriumWorld = {
   resize(width: number, height: number): void;
   layout(capacity: number): AuditoriumAnchor[];
   screenBounds(): AuditoriumScreenBounds;
+  setBackdrop(enabled: boolean): void;
   dispose(): void;
 };
 
 const BACK_WALL_Z = -8.9;
-const CHAIR_ANCHOR_HEIGHT = 1.48;
-const SEAT_BACK_DEPTH = .28;
 const WALL_SLOPE = .16;
 const CAMERA_ASPECT = 1.6;
 const WOOD_TONES = ['#e0b18a', '#e5ba92', '#e8be97', '#e3b48c', '#ecc49e', '#dfaf84'];
@@ -67,6 +66,53 @@ function paintLinen(context: CanvasRenderingContext2D, width: number, height: nu
   }
 }
 
+function paintDesktop(context: CanvasRenderingContext2D, width: number, height: number) {
+  paintWood(context, width, height);
+  const finish = context.createLinearGradient(0, 0, width * .28, height);
+  finish.addColorStop(0, '#fff7e2c9');
+  finish.addColorStop(.17, '#fff4ce14');
+  finish.addColorStop(.72, '#b0804e15');
+  finish.addColorStop(1, '#99623753');
+  context.fillStyle = finish;
+  context.fillRect(0, 0, width, height);
+  context.lineWidth = 2;
+  context.strokeStyle = '#fff8e4b8';
+  context.strokeRect(6, 5, width - 12, height - 10);
+  context.strokeStyle = '#8e603b35';
+  context.strokeRect(11, 9, width - 22, height - 18);
+  for (let streak = 0; streak < 13; streak++) {
+    const y = 14 + streak * (height - 28) / 12;
+    context.beginPath();
+    context.moveTo(10 + streak % 5 * 21, y);
+    context.bezierCurveTo(width * .38, y - 6, width * .65, y + 7, width - 12 - streak % 4 * 29, y - 1);
+    context.strokeStyle = streak % 3 === 0 ? '#fff4d59f' : '#96623b32';
+    context.lineWidth = streak % 3 === 0 ? 1.4 : .8;
+    context.stroke();
+  }
+}
+
+function paintSeatTextile(context: CanvasRenderingContext2D, width: number, height: number) {
+  const shading = context.createRadialGradient(width * .24, height * .2, 3, width * .44, height * .41, width * .81);
+  shading.addColorStop(0, '#fcfcfc');
+  shading.addColorStop(.62, '#e3e6eb');
+  shading.addColorStop(1, '#a4adbf');
+  context.fillStyle = shading;
+  context.fillRect(0, 0, width, height);
+  for (let y = 0; y < height; y += 2) {
+    for (let x = (y / 2 % 2) * 2; x < width; x += 4) {
+      const grain = (Math.imul(x + 7, 11939) ^ Math.imul(y + 13, 48121)) & 255;
+      context.fillStyle = grain % 3 ? `rgba(245, 248, 253, ${grain / 1600})` : `rgba(41, 55, 80, ${grain / 1900})`;
+      context.fillRect(x, y, 2.5, 1);
+    }
+  }
+  context.strokeStyle = '#ffffff73';
+  context.lineWidth = 1.3;
+  context.strokeRect(6, 6, width - 12, height - 12);
+  context.strokeStyle = '#45536e50';
+  context.setLineDash([2, 2]);
+  context.strokeRect(10, 10, width - 20, height - 20);
+}
+
 function paintGarden(context: CanvasRenderingContext2D, width: number, height: number) {
   const sky = context.createLinearGradient(0, 0, 0, height);
   sky.addColorStop(0, '#88c8eb');
@@ -114,14 +160,16 @@ function paintSconceGlow(context: CanvasRenderingContext2D, width: number, heigh
 
 /** A fixed camera keeps furniture and accessible HTML overlays in one coordinate system. */
 export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorld {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  renderer.setClearColor('#000000', 0);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#d6e5f0');
+  const roomColor = new THREE.Color('#d6e5f0');
+  scene.background = roomColor;
   const camera = new THREE.PerspectiveCamera(38, CAMERA_ASPECT, .1, 100);
   camera.position.set(0, 18, 18);
   camera.lookAt(0, 1.8, -1);
@@ -130,16 +178,20 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.CanvasTexture>();
+  const architecture = new THREE.Group();
   const seating = new THREE.Group();
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   const roundedBox = new RoundedBoxGeometry(1, 1, 1, 1, .16);
+  const desktopBox = new RoundedBoxGeometry(1, 1, 1, 2, .085);
   const shadowPlane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   geometries.add(unitBox);
   geometries.add(roundedBox);
+  geometries.add(desktopBox);
   geometries.add(shadowPlane);
-  scene.add(seating);
-  const floorAnchorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -CHAIR_ANCHOR_HEIGHT);
+  scene.add(architecture, seating);
+  const floorAnchorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   let anchors: AuditoriumAnchor[] = [];
+  let backdropEnabled = false;
   let disposed = false;
 
   function matte(color: string, options: Partial<THREE.MeshStandardMaterialParameters> = {}) {
@@ -160,19 +212,19 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     textures.add(texture);
     return texture;
   }
-  function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D = scene) {
+  function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D = architecture) {
     geometries.add(geometry);
     const object = new THREE.Mesh(geometry, material);
     parent.add(object);
     return object;
   }
-  function box(width: number, height: number, depth: number, x: number, y: number, z: number, material: THREE.Material, parent: THREE.Object3D = scene) {
+  function box(width: number, height: number, depth: number, x: number, y: number, z: number, material: THREE.Material, parent: THREE.Object3D = architecture) {
     const object = mesh(unitBox, material, parent);
     object.scale.set(width, height, depth);
     object.position.set(x, y, z);
     return object;
   }
-  function instances(placements: BoxPlacement[], material: THREE.Material, parent: THREE.Object3D = scene, geometry: THREE.BufferGeometry = unitBox) {
+  function instances(placements: BoxPlacement[], material: THREE.Material, parent: THREE.Object3D = architecture, geometry: THREE.BufferGeometry = unitBox) {
     const instances = new THREE.InstancedMesh(geometry, material, placements.length);
     const transform = new THREE.Object3D();
     placements.forEach(({ width, height, depth, x, y, z, color, pitch = 0, roll = 0 }, index) => {
@@ -214,6 +266,8 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
 
   const woodGrain = paintedTexture(384, 128, paintWood);
   const wovenLinen = paintedTexture(96, 96, paintLinen);
+  const desktopGrain = paintedTexture(384, 160, paintDesktop);
+  const seatTextile = paintedTexture(128, 128, paintSeatTextile);
   const garden = paintedTexture(256, 384, paintGarden);
   const contactShade = paintedTexture(64, 64, paintShadow);
   const sconceGlow = paintedTexture(64, 64, paintSconceGlow);
@@ -226,9 +280,14 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   const mapleEdge = matte('#be8356', { map: woodGrain });
   const frameWood = matte('#915e43', { map: woodGrain });
   const stageMaple = matte('#c48b64', { map: woodGrain });
-  const blueFabric = matte('#5687bd', { map: wovenLinen });
-  const blueEdge = matte('#3f6b9d');
-  const steel = matte('#65717c');
+  const desktop = matte('#efab73', { map: desktopGrain, roughness: .68 });
+  const desktopLip = matte('#c98753', { map: woodGrain, roughness: .74 });
+  const deskFrame = matte('#7e7a77');
+  const blueFabric = matte('#4b70a7', { map: seatTextile, roughness: .94 });
+  const blueEdge = matte('#335a87');
+  const blueHighlight = matte('#6e96c4', { map: seatTextile, roughness: .93 });
+  const steel = matte('#616b79');
+  const footCaps = matte('#4e5260');
   const chalkGreen = matte('#234e43', { emissive: '#172f2a', emissiveIntensity: .22 });
   const terraCotta = matte('#eee0cb');
   const oak = matte('#ffffff', { map: woodGrain });
@@ -383,7 +442,7 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     const wall = new THREE.Group();
     wall.position.set(wallX(side, center), 0, center);
     wall.rotation.y = Math.atan2(wallX(side, front) - wallX(side, back), front - back);
-    scene.add(wall);
+    architecture.add(wall);
     const interior = -side;
     box(.24, 8.8, length, 0, 4.4, 0, powderBlue, wall);
     box(.12, 1.63, length, interior * .12, .815, 0, lowerWall, wall);
@@ -490,12 +549,19 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
         x: centerX, y: centerY, z: centerZ + .049 * scale });
     }
   }
-  instances(foliage, untinted, scene, leafGeometry);
-  instances(petals, untinted, scene, leafGeometry);
-  instances(stamens, matte('#e8b34f'), scene, leafGeometry);
+  instances(foliage, untinted, architecture, leafGeometry);
+  instances(petals, untinted, architecture, leafGeometry);
+  instances(stamens, matte('#e8b34f'), architecture, leafGeometry);
 
   function render() {
     if (!disposed) renderer.render(scene, camera);
+  }
+  function setBackdrop(enabled: boolean) {
+    if (disposed || backdropEnabled === enabled) return;
+    backdropEnabled = enabled;
+    architecture.visible = !enabled;
+    scene.background = enabled ? null : roomColor;
+    render();
   }
   function clearSeating() {
     for (const object of seating.children) {
@@ -507,44 +573,65 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     if (capacity === anchors.length) return anchors;
     clearSeating();
     const columns = capacity / 5;
-    const scale = capacity <= 20 ? .065 : capacity <= 30 ? .055 : .046;
     const points = Array.from({ length: capacity }, (_, index) => auditoriumSeat(index, capacity));
-    anchors = points.map(point => ({ ...point, scale }));
+    anchors = points;
     const locations = points.map(({ x, y }) => fromScreen(x, y, floorAnchorPlane));
     const desks: BoxPlacement[] = [];
+    const deskLips: BoxPlacement[] = [];
     const deskAprons: BoxPlacement[] = [];
-    const legs: BoxPlacement[] = [];
+    const deskLegs: BoxPlacement[] = [];
+    const chairLegs: BoxPlacement[] = [];
+    const feet: BoxPlacement[] = [];
     const chairPads: BoxPlacement[] = [];
     const chairEdges: BoxPlacement[] = [];
+    const chairTopSeams: BoxPlacement[] = [];
     const shadows: BoxPlacement[] = [];
 
     locations.forEach(({ x, z }, index) => {
       const column = index % columns;
       const sideEnd = column === columns / 2 - 1 || column === columns - 1;
       const neighbor = locations[index + (sideEnd ? -1 : 1)];
-      const width = Math.min(2.12, Math.abs(x - neighbor.x) * .88);
-      const deskZ = z - .90;
-      const deskDepth = .95;
-      shadows.push({ width: width * 1.26, height: 1, depth: 2.26, x: x + .08, y: .016, z: z - .47 });
-      desks.push({ width, height: .16, depth: deskDepth, x, y: 1.20, z: deskZ });
-      deskAprons.push({ width: width - .12, height: .19, depth: .19, x, y: 1.06, z: deskZ + .32 });
+      const width = Math.min(2.12, Math.abs(x - neighbor.x) * .92);
+      const deskZ = z - .65;
+      const deskDepth = .93;
+      const windowLight = points[index].x < .24 ? '#fff5e4' : points[index].x > .77 ? '#fff1e6' : '#f8e7db';
+      shadows.push({ width: width * 1.54, height: 1, depth: 2.33, x: x + .16, y: .016, z: z - .35 });
+      desks.push({ width, height: .16, depth: deskDepth, x, y: 1.155, z: deskZ, color: windowLight });
+      deskLips.push({ width: width * .99, height: .068, depth: deskDepth * .975, x, y: 1.076, z: deskZ });
+      deskAprons.push({ width: width - .24, height: .135, depth: .153, x, y: .974, z: deskZ + .342 });
+      deskAprons.push({ width: width - .28, height: .061, depth: .624, x, y: .81, z: deskZ - .041 });
       for (const legX of [-1, 1]) for (const legZ of [-1, 1]) {
-        legs.push({ width: .14, height: 1.10, depth: .14, x: x + legX * (width / 2 - .14), y: .56, z: deskZ + legZ * .34 });
-        legs.push({ width: .095, height: .55, depth: .095, x: x + legX * .34, y: .28, z: z + legZ * .29 });
+        const tableLegX = x + legX * (width / 2 - .131);
+        const tableLegZ = deskZ + legZ * .34;
+        const seatLegX = x + legX * .355;
+        const seatLegZ = z + legZ * .288;
+        deskLegs.push({ width: .157, height: 1.038, depth: .157, x: tableLegX, y: .531, z: tableLegZ });
+        chairLegs.push({ width: .116, height: .584, depth: .116, x: seatLegX, y: .303, z: seatLegZ, pitch: -.044 * legZ });
+        feet.push({ width: .169, height: .073, depth: .167, x: tableLegX, y: .045, z: tableLegZ });
+        feet.push({ width: .131, height: .064, depth: .128, x: seatLegX, y: .043, z: seatLegZ + legZ * .013 });
+        shadows.push({ width: .39, height: 1, depth: .43, x: tableLegX + .03, y: .017, z: tableLegZ });
+        shadows.push({ width: .33, height: 1, depth: .37, x: seatLegX + .027, y: .017, z: seatLegZ });
       }
-      legs.push({ width: .11, height: .64, depth: .11, x: x - .37, y: .83, z: z + SEAT_BACK_DEPTH });
-      legs.push({ width: .11, height: .64, depth: .11, x: x + .37, y: .83, z: z + SEAT_BACK_DEPTH });
-      chairEdges.push({ width: .90, height: .12, depth: .71, x, y: .59, z });
-      chairPads.push({ width: .86, height: .11, depth: .68, x, y: .69, z });
-      chairEdges.push({ width: .89, height: .58, depth: .16, x, y: 1.02, z: z + SEAT_BACK_DEPTH });
-      chairPads.push({ width: .82, height: .49, depth: .19, x, y: 1.06, z: z + SEAT_BACK_DEPTH });
+      for (const side of [-1, 1]) {
+        chairLegs.push({ width: .118, height: .764, depth: .108, x: x + side * .37, y: .865, z: z + .291, pitch: .078 });
+      }
+      chairLegs.push({ width: .794, height: .06, depth: .067, x, y: .485, z: z + .29 });
+      chairEdges.push({ width: .977, height: .123, depth: .755, x, y: .585, z: z + .016 });
+      chairPads.push({ width: .933, height: .135, depth: .725, x, y: .684, z: z + .019 });
+      chairEdges.push({ width: .990, height: .686, depth: .208, x, y: 1.058, z: z + .311, pitch: .076 });
+      chairPads.push({ width: .928, height: .624, depth: .155, x, y: 1.067, z: z + .403, pitch: .076 });
+      chairTopSeams.push({ width: .857, height: .033, depth: .087, x, y: 1.375, z: z + .399, pitch: .076 });
     });
     instances(shadows, furnitureShadow, seating, shadowPlane).renderOrder = 2;
-    instances(desks, maple, seating, roundedBox);
+    instances(desks, desktop, seating, desktopBox);
+    instances(deskLips, desktopLip, seating, desktopBox);
     instances(deskAprons, mapleEdge, seating);
-    instances(legs, steel, seating);
+    instances(deskLegs, deskFrame, seating, roundedBox);
+    instances(chairLegs, steel, seating, roundedBox);
+    instances(feet, footCaps, seating, roundedBox);
     instances(chairEdges, blueEdge, seating, roundedBox);
     instances(chairPads, blueFabric, seating, roundedBox);
+    instances(chairTopSeams, blueHighlight, seating, roundedBox);
     render();
     return anchors;
   }
@@ -569,5 +656,5 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   }
 
   resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
-  return { resize, layout, screenBounds: () => AUDITORIUM_SCREEN, dispose };
+  return { resize, layout, screenBounds: () => AUDITORIUM_SCREEN, setBackdrop, dispose };
 }

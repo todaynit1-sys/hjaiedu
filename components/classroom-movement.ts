@@ -3,21 +3,24 @@ import type { AvatarMotion, ClassroomMove, ClassroomPosition } from '../lib/type
 
 const bounded = (x: number, y: number): ClassroomPosition => ({
   x: Math.min(.94, Math.max(.06, x)),
-  y: Math.min(.92, Math.max(.32, y))
+  y: Math.min(.92, Math.max(.365, y))
 });
 
-export const INSTRUCTOR_HOME = { x: .27, y: .335 };
+export const INSTRUCTOR_HOME = { x: .285, y: .425 };
+
+export function seatExit(home: ClassroomPosition) {
+  return bounded(home.x + (home.x < .5 ? .022 : -.022), home.y + (home.y > .89 ? -.036 : .038));
+}
 
 export function wanderingPosition(since: number | undefined, now: number, home: ClassroomPosition, number: number) {
   if (!since || now < since) return undefined;
   // Viewers replay the same route from the shared start time without sending position updates.
   const step = Math.floor((now - since) / 2500);
   const cycleLength = 12 + number % 6;
-  const rowGap = Math.min(.91, home.y + .05);
-  const beside = bounded(home.x, rowGap);
-  const aisle = { x: .5, y: rowGap };
+  const beside = seatExit(home);
+  const aisle = { x: .5, y: beside.y };
   const front = Math.floor(step / cycleLength) % 2 === 0 || home.y > .72;
-  const path = [beside, aisle, {x: .5, y: front ? .345 : .91}, aisle, beside, home];
+  const path = [beside, aisle, {x: .5, y: front ? .48 : .91}, aisle, beside];
   return path[step % cycleLength];
 }
 
@@ -80,7 +83,7 @@ export function useClassroomMovement(roomDay: string, motion: AvatarMotion | und
     setError('');
   }
   function toggle() {
-    move(current || autonomous ? null : bounded(home.x, home.y + .05));
+    move(current || autonomous ? null : seatExit(home));
     floor.current?.focus({ preventScroll: true });
   }
   function click(event: MouseEvent<HTMLDivElement>) {
