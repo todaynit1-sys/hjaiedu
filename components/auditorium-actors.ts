@@ -17,7 +17,7 @@ export type AuditoriumActorFrame = {
 };
 
 type Shape = 'ball' | 'head' | 'body' | 'hair' | 'lock' | 'block' | 'brim' | 'dome' | 'ring' | 'arch' | 'smile' | 'mouth' | 'point' | 'star';
-type Finish = 'skin' | 'face' | 'cloth' | 'hair' | 'crown' | 'leather' | 'detail';
+type Finish = 'skin' | 'face' | 'cloth' | 'knit' | 'hair' | 'crown' | 'strand' | 'leather' | 'detail';
 type Bone = 'root' | 'torso' | 'head' | 'leftArm' | 'rightArm' | 'leftForearm' | 'rightForearm' |
   'leftThigh' | 'rightThigh' | 'leftShin' | 'rightShin' | 'leftFoot' | 'rightFoot';
 type Tint = string | THREE.Color;
@@ -75,8 +75,10 @@ function scalpGeometry() {
       const arc = Math.max(.001, t * rim);
       const radius = 1 + .015 * Math.sin(angle * 9) * Math.sin(arc);
       points.push(Math.cos(angle) * Math.sin(arc) * radius, Math.cos(arc), front * Math.sin(arc) * radius);
-      const value = 1 - t * .16 + .014 * Math.cos(angle * 8 + t * 3);
-      shade.push(value, value, value);
+      const sweep = Math.cos(angle * 9 + t * (2.2 + front));
+      const strands = .052 * sweep * Math.sin(t * Math.PI);
+      const value = 1 - t * .16 + strands;
+      shade.push(value, value * .985, value * .97);
       if (row && segment) {
         const current = row * (segments + 1) + segment;
         indices.push(current, current - 1, current - segments - 2, current, current - segments - 2, current - segments - 1);
@@ -110,9 +112,14 @@ function shapedBall(kind: 'head' | 'lock') {
       const taper = (1 - y) / 2;
       position.setX(index, x * (1.09 - taper * .37) - .59 * taper ** 2);
       position.setZ(index, z * (1.04 - taper * .23) + .30 * taper ** 2);
+      // The broad highlight bends down the lock and fades at the tip.
+      const crest = x + .26 + .28 * taper ** 2;
+      const highlight = Math.exp(-16 * crest ** 2) * Math.sqrt(Math.max(0, 1 - y * y)) * Math.max(0, z);
+      const value = .98 - taper * .14 + highlight * .16 + .027 * Math.cos(x * 17 + taper * 3);
+      colors.push(value, value * .99, value * .974);
     }
   }
-  if (kind === 'head') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -165,28 +172,42 @@ function createGeometry(): Record<Shape, THREE.BufferGeometry> {
 }
 
 function createMaterials(): Record<Finish, THREE.MeshStandardMaterial> {
-  // A tiny repeatable height map gives the knit a soft grain in the close-up.
-  const size = 24;
+  // The shared textures leave the garment tint fully customizable.
+  const size = 32;
   const texels = new Uint8Array(size * size * 4);
+  const stitches = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const index = (y * size + x) * 4;
     const weave = Math.cos(x / size * 4 * Math.PI + .54 * Math.cos(y / size * 2 * Math.PI));
     const value = Math.round(128 + 30 * weave + 17 * Math.cos((y + x) / size * 4 * Math.PI));
     texels.set([value, value, value, 255], index);
+    const band = Math.abs(y - 22.5);
+    const diamond = band + Math.abs(x % 8 - 3.5);
+    const textile = band < 3.5 ? (diamond < 3.5 ? 255 : 207) : Math.round(247 + 5 * weave);
+    stitches.set([textile, textile, textile, 255], index);
   }
-  const knit = new THREE.DataTexture(texels, size, size);
-  knit.wrapS = knit.wrapT = THREE.RepeatWrapping;
-  knit.repeat.set(9, 8);
-  knit.magFilter = THREE.LinearFilter;
-  knit.minFilter = THREE.LinearMipmapLinearFilter;
-  knit.generateMipmaps = true;
-  knit.needsUpdate = true;
+  function fabricTexture(data: Uint8Array) {
+    const texture = new THREE.DataTexture(data, size, size);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
+  }
+  const fabric = fabricTexture(texels);
+  fabric.repeat.set(7, 6);
+  const stitchPattern = fabricTexture(stitches);
+  stitchPattern.repeat.x = 3;
+  stitchPattern.colorSpace = THREE.SRGBColorSpace;
   return {
     skin: new THREE.MeshStandardMaterial({roughness: .88}),
     face: new THREE.MeshStandardMaterial({roughness: .9, vertexColors: true}),
-    cloth: new THREE.MeshStandardMaterial({roughness: .97, bumpMap: knit, bumpScale: .014}),
-    hair: new THREE.MeshStandardMaterial({roughness: .82}),
-    crown: new THREE.MeshStandardMaterial({roughness: .87, vertexColors: true}),
+    cloth: new THREE.MeshStandardMaterial({roughness: .97, bumpMap: fabric, bumpScale: .015}),
+    knit: new THREE.MeshStandardMaterial({roughness: .98, bumpMap: fabric, bumpScale: .015, map: stitchPattern}),
+    hair: new THREE.MeshStandardMaterial({roughness: .9}),
+    crown: new THREE.MeshStandardMaterial({roughness: .91, vertexColors: true}),
+    strand: new THREE.MeshStandardMaterial({roughness: .89, vertexColors: true}),
     leather: new THREE.MeshStandardMaterial({roughness: .78}),
     detail: new THREE.MeshStandardMaterial({roughness: .84})
   };
@@ -229,6 +250,7 @@ function actorParts(frame: AuditoriumActorFrame) {
   const brightHair = mix(appearance.hairDark, appearance.hairLight, .73);
   const shirt = new THREE.Color(appearance.shirt);
   const shirtShade = new THREE.Color(appearance.shirtShade);
+  const textileEdge = mix(shirtShade, '#70513d', .13);
   const pants = appearance.pants;
   const shoes = appearance.shoes;
   const ink = '#352523';
@@ -244,7 +266,7 @@ function actorParts(frame: AuditoriumActorFrame) {
       local: transform.matrix.clone(), world: new THREE.Matrix4() });
   }
 
-  // Smooth clay-like face with the blush baked into the cheek vertices.
+  // Warm cheek shading and small painted expression marks.
   part('head', 'head', 'face', skin, 0, 0, 0, .417, .405, .357);
   for (const side of SIDES) {
     part('head', 'ball', 'skin', skin, side * .397, -.093, .060, .074, .089, .073, 0, 0, side * -.18);
@@ -270,23 +292,23 @@ function actorParts(frame: AuditoriumActorFrame) {
   part('head', 'hair', 'crown', midHair, 0, .057, -.036, .440, short ? .415 : .447, .406);
   if (appearance.hair !== 'crop') {
     for (const side of SIDES) {
-      part('head', 'lock', 'hair', midHair, side * .310, -.026, -.176, .150, .287, .197, -.16, side * .25, side * .31);
-      part('head', 'lock', 'hair', brightHair, side * .188, .113, -.281, .181, .335, .152, -.22, side * .19, side * .30);
+      part('head', 'lock', 'strand', midHair, side * .310, -.026, -.176, .150, .287, .197, -.16, side * .25, side * .31);
+      part('head', 'lock', 'strand', brightHair, side * .188, .113, -.281, .181, .335, .152, -.22, side * .19, side * .30);
     }
-    part('head', 'lock', 'hair', midHair, 0, .077, -.356, .169, .328, .117, -.20, 0, -.29);
-    part('head', 'lock', 'hair', brightHair, -.118, .360, -.151, .159, .218, .131, -.86, -.26, -.38);
-    part('head', 'lock', 'hair', midHair, .095, .376, -.158, .165, .206, .123, -.77, .19, -.29);
+    part('head', 'lock', 'strand', midHair, 0, .077, -.356, .169, .328, .117, -.20, 0, -.29);
+    part('head', 'lock', 'strand', brightHair, -.118, .360, -.151, .159, .218, .131, -.86, -.26, -.38);
+    part('head', 'lock', 'strand', midHair, .095, .376, -.158, .165, .206, .123, -.77, .19, -.29);
   }
   FRINGES[appearance.hair].forEach(([x, y, z, width, height, depth, tilt], index) => {
-    part('head', 'lock', 'hair', index % 3 === 0 ? midHair : brightHair,
+    part('head', 'lock', 'strand', index % 3 === 0 ? midHair : brightHair,
       x, y + .025, z, width, height, depth, -.16, x * .55, tilt);
   });
   if (appearance.hair === 'bob' || appearance.hair === 'long') {
     const long = appearance.hair === 'long';
     for (const side of SIDES) {
-      part('head', 'lock', 'hair', midHair, side * .345, long ? -.235 : -.135, .087,
+      part('head', 'lock', 'strand', midHair, side * .345, long ? -.235 : -.135, .087,
         .102, long ? .352 : .224, .137, -.10, 0, side * .10);
-      if (long) part('head', 'lock', 'hair', darkHair, side * .236, -.229, -.238,
+      if (long) part('head', 'lock', 'strand', darkHair, side * .236, -.229, -.238,
         .163, .349, .163, -.12, 0, side * .10);
     }
   }
@@ -300,16 +322,18 @@ function actorParts(frame: AuditoriumActorFrame) {
   }
   if (appearance.hair === 'bun') {
     part('head', 'ball', 'hair', darkHair, -.059, .360, -.297, .192, .176, .189);
-    part('head', 'lock', 'hair', brightHair, -.073, .418, -.334, .160, .148, .145, .20, -.12, -.51);
-    part('head', 'lock', 'hair', midHair, .026, .383, -.350, .100, .165, .108, -.11, .27, -.64);
+    part('head', 'lock', 'strand', brightHair, -.073, .418, -.334, .160, .148, .145, .20, -.12, -.51);
+    part('head', 'lock', 'strand', midHair, .026, .383, -.350, .100, .165, .108, -.11, .27, -.64);
     part('head', 'ball', 'cloth', '#b78c82', -.041, .306, -.269, .157, .038, .155, .32);
   }
 
-  // A softly rounded jacket, shaped sleeves and contrasting shoe soles.
-  part('torso', 'ball', 'skin', warmSkin, 0, .523, 0, .095, .095, .085);
-  part('torso', 'body', 'cloth', shirt, 0, .235, 0, .257, .260, .181);
-  part('torso', 'body', 'cloth', shirtShade, 0, .043, 0, .239, .053, .174);
-  part('torso', 'ball', 'cloth', '#efe5d6', 0, .466, .111, .112, .060, .067, -.22);
+  // A longer coat silhouette and a collar that also reads from the back.
+  part('torso', 'ball', 'skin', warmSkin, 0, .533, 0, .095, .096, .085);
+  part('torso', 'body', appearance.detail === 'knit' ? 'knit' : 'cloth',
+    shirt, 0, .244, 0, .257, .277, .181);
+  part('torso', 'body', 'cloth', textileEdge, 0, .037, 0, .241, .050, .173);
+  part('torso', 'ball', 'cloth', textileEdge, 0, .489, -.026, .137, .036, .115, .13);
+  part('torso', 'ball', 'cloth', '#efe5d6', 0, .480, .105, .114, .056, .066, -.22);
   part('torso', 'ball', 'cloth', pants, 0, -.046, 0, .205, .091, .140);
   for (const side of SIDES) {
     const arm = side < 0 ? 'leftArm' : 'rightArm';
@@ -320,7 +344,7 @@ function actorParts(frame: AuditoriumActorFrame) {
     part(arm, 'ball', 'cloth', shirt, -side * .016, -.094, 0, .104, .170, .101);
     part(forearm, 'ball', 'cloth', shirt, 0, -.004, 0, .078, .078, .080);
     part(forearm, 'ball', 'cloth', shirt, 0, -.083, 0, .079, .136, .083);
-    part(forearm, 'body', 'cloth', shirtShade, 0, -.169, 0, .079, .046, .083);
+    part(forearm, 'body', 'cloth', textileEdge, 0, -.168, 0, .083, .042, .086);
     part(forearm, 'ball', 'skin', skin, 0, -.228, .013, .067, .069, .061);
     part(forearm, 'ball', 'skin', warmSkin, -side * .045, -.202, .036, .025, .039, .023, .18, 0, side * -.33);
     part(thigh, 'ball', 'cloth', pants, 0, -.128, 0, .111, .173, .108);
@@ -335,16 +359,16 @@ function actorParts(frame: AuditoriumActorFrame) {
   }
 
   if (appearance.detail === 'cardigan' || frame.instructor) {
-    const edging = mix(shirt, shirtShade, .56);
-    part('torso', 'block', 'cloth', edging, .018, .167, .176, .026, .107, .021);
+    const edging = mix(shirt, textileEdge, .64);
+    part('torso', 'block', 'cloth', edging, .018, .169, .176, .025, .119, .021);
     for (let button = 0; button < 2; button++) {
       part('torso', 'ball', 'leather', '#93643d', .020, .125 + button * .107, .200, .024, .024, .013);
       part('torso', 'ball', 'detail', '#bc8950', .017, .129 + button * .107, .209, .013, .013, .006);
     }
     for (const side of SIDES) {
-      part('torso', 'block', 'cloth', mix(shirt, shirtShade, .25), side * .133, .140, .157, .052, .043, .026, 0, side * .30);
-      part('torso', 'block', 'cloth', edging, side * .132, .177, .171, .054, .011, .017, 0, side * .30);
-      part('torso', 'block', 'cloth', edging, side * .064, .386, .159, .026, .125, .025, -.26, side * .16, -side * .44);
+      part('torso', 'block', 'cloth', mix(shirt, shirtShade, .19), side * .133, .137, .158, .056, .044, .027, 0, side * .30);
+      part('torso', 'block', 'cloth', textileEdge, side * .132, .175, .177, .059, .010, .015, 0, side * .30);
+      part('torso', 'block', 'cloth', edging, side * .064, .397, .158, .026, .125, .025, -.26, side * .16, -side * .44);
     }
   } else if (appearance.detail === 'puffer') {
     for (let band = 0; band < 3; band++) {
@@ -352,7 +376,7 @@ function actorParts(frame: AuditoriumActorFrame) {
         .247 - band * .004, .077, .185);
     }
   } else if (appearance.detail === 'knit') {
-    part('torso', 'ball', 'cloth', mix(shirt, shirtShade, .37), 0, .472, .112, .127, .042, .072, -.22);
+    part('torso', 'ball', 'cloth', mix(shirt, shirtShade, .36), 0, .482, .111, .127, .040, .071, -.22);
   }
 
   const accessory = appearance.accessory;
@@ -376,9 +400,9 @@ function actorParts(frame: AuditoriumActorFrame) {
       part('head', 'point', 'cloth', '#d997aa', side * .242, .445, .106, .062, .080, .036, -.07, side * .19, side * -.23);
     }
   } else if (accessory === 'ribbon') {
-    part('head', 'ball', 'cloth', '#bd7280', -.285, .370, .227, .126, .067, .041, -.10, -.20, .38);
-    part('head', 'ball', 'cloth', '#df9396', -.099, .370, .227, .115, .063, .041, -.10, -.20, -.37);
-    part('head', 'ball', 'cloth', '#ba707e', -.195, .370, .262, .049, .044, .030);
+    part('head', 'ball', 'cloth', '#d9c3a3', -.424, .353, -.258, .118, .077, .040, -.16, -.72, .47);
+    part('head', 'ball', 'cloth', '#f0ddbb', -.273, .362, -.356, .118, .068, .040, -.16, -.68, -.42);
+    part('head', 'ball', 'cloth', '#ead2ae', -.350, .355, -.322, .050, .047, .045, -.12, -.70);
   } else if (accessory === 'beanie') {
     part('head', 'dome', 'cloth', '#e6d4b5', 0, .224, -.021, .430, .313, .396);
     part('head', 'brim', 'cloth', '#cdb89d', 0, .224, -.018, .433, .066, .398);
@@ -469,7 +493,7 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
     pose.root.copy(transform.matrix);
     joint(pose, 'torso', 'root', 0, hips, -.023 * sit,
       lerp(.035 * Number(walking), .036, sit), -.064 * swing, -.045 * swing);
-    joint(pose, 'head', 'torso', 0, .899, .025,
+    joint(pose, 'head', 'torso', 0, lerp(.934, .899, sit), .025,
       lerp(-.012, -.039, sit), .043 * swing, .028 * swing);
 
     for (const side of SIDES) {
@@ -479,7 +503,7 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
       const shin = side < 0 ? 'leftShin' : 'rightShin';
       const foot = side < 0 ? 'leftFoot' : 'rightFoot';
       const step = side * swing;
-      joint(pose, arm, 'torso', side * .255, .434, .011, lerp(.56 * step, -.48, sit), 0, side * .16);
+      joint(pose, arm, 'torso', side * .255, lerp(.447, .434, sit), .011, lerp(.56 * step, -.48, sit), 0, side * .16);
       joint(pose, forearm, arm, 0, -UPPER_ARM_LENGTH, 0, lerp(-.12 - Math.max(0, -step) * .44, -.78, sit));
       const thighPitch = lerp(-.62 * step, -1.39, sit);
       const kneePitch = lerp(.036 + Math.max(0, -step) * .89, 1.49, sit);
@@ -582,6 +606,7 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
     }
     for (const geometry of Object.values(geometries)) geometry.dispose();
     materials.cloth.bumpMap?.dispose();
+    materials.knit.map?.dispose();
     for (const material of Object.values(materials)) material.dispose();
     batches.clear();
     actors.clear();

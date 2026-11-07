@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Palette, Shirt, Smile, Sparkles, X } from 'lucide-react';
 import { AVATAR_OPTIONS, type AvatarCustomization } from '../lib/avatar-customization';
+import { STORYBOOK_AVATARS, storybookAvatar, storybookSprite } from '../lib/storybook-avatar';
 import type { Character } from '../lib/types';
 import { avatarPalettes, starterAvatar } from './classroom-avatar';
 import { AvatarPreview } from './avatar-preview';
@@ -45,6 +46,8 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const changed = (Object.keys(draft) as Array<keyof AvatarCustomization>).some(key => draft[key] !== initial[key]);
+  const previewAvatar = changed ? draft : current;
+  const selectedStorybook = storybookAvatar(character, previewAvatar);
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -99,10 +102,22 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
     </div>
     <div className="avatar-editor-workspace">
       <figure className="avatar-editor-preview">
-        <AvatarPreview character={character} avatar={draft} />
+        <AvatarPreview character={character} avatar={previewAvatar} />
         <figcaption>미리 보기</figcaption>
       </figure>
       <div className="avatar-editor-controls">
+        <fieldset className="avatar-storybook-options">
+          <legend>그림 캐릭터</legend>
+          <div className="avatar-storybook-choices" role="group" aria-label="그림 캐릭터 빠른 선택">
+            {STORYBOOK_AVATARS.map(({ id, label, avatar }) => <button type="button" key={id}
+              aria-pressed={selectedStorybook === id} disabled={saving}
+              onClick={() => { setDraft({ ...avatar }); setError(''); }}>
+              <span className="avatar-storybook-thumb" aria-hidden="true"
+                style={{ backgroundImage: `url('${storybookSprite(id, 'idle')}')` }} />
+              <span>{label}</span>
+            </button>)}
+          </div>
+        </fieldset>
         <div className="avatar-category-list" role="group" aria-label="꾸미기 종류">
           {categories.map(({ id, label, Icon }) => <button className="avatar-category" key={id} type="button"
             aria-pressed={category === id} disabled={saving} onClick={() => setCategory(id)}><Icon size={16} aria-hidden="true" />{label}</button>)}

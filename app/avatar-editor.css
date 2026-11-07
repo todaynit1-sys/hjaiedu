@@ -19,11 +19,27 @@
   border-radius: 50%; background: radial-gradient(ellipse, #53331f55, #53331f06 74%);
   border: 1px solid #eaffff; box-shadow: 0 0 5px #55c9deaa, inset 0 0 4px #55c9de77;
 }
-.avatar-preview-art canvas, .avatar-preview-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.avatar-preview-art :is(canvas, svg, .avatar-preview-illustration) { position: absolute; inset: 0; width: 100%; height: 100%; }
 .avatar-preview-art canvas { visibility: hidden; }
 .avatar-preview-art canvas[data-ready="true"] { visibility: visible; }
 .avatar-preview-art canvas[data-ready="true"] + svg { visibility: hidden; }
+.avatar-preview-illustration { object-fit: contain; object-position: center bottom; }
+.avatar-preview-illustration:not([data-loaded="true"]),
+.avatar-preview-art:has(.avatar-preview-illustration[data-loaded="true"]) :is(canvas, svg) { opacity: 0; }
 .avatar-editor-controls { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.avatar-storybook-options { flex: none; min-width: 0; padding: 0; margin: 0 0 6px; border: 0; }
+.avatar-storybook-options legend { padding: 0; margin-bottom: 5px; color: #263a55; font-size: 13px; font-weight: 750; }
+.avatar-storybook-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.avatar-storybook-choices button {
+  min-height: 44px; padding: 4px 6px; border: 1px solid #ded2c1; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  background: #fffdf7; color: #3f4e60; font-size: 12px; font-weight: 700; line-height: 1.25; word-break: keep-all;
+}
+.avatar-storybook-choices button[aria-pressed="true"] { background: #eaf4ff; border-color: #6694c9; color: #1c467c; }
+.avatar-storybook-thumb {
+  flex: none; width: 27px; height: 29px; border-radius: 5px;
+  background-color: #f6ebdb; background-position: center; background-repeat: no-repeat; background-size: contain;
+}
 .avatar-category-list {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 10px;
   flex: none; border-bottom: 1px solid #e2d9ca;

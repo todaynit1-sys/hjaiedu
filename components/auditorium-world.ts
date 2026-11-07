@@ -95,18 +95,18 @@ function paintLinen(context: CanvasRenderingContext2D, width: number, height: nu
 
 function paintDesktop(context: CanvasRenderingContext2D, width: number, height: number) {
   paintWood(context, width, height);
-  const finish = context.createLinearGradient(0, 0, width * .28, height);
-  finish.addColorStop(0, '#fff7e2c9');
-  finish.addColorStop(.17, '#fff4ce14');
-  finish.addColorStop(.72, '#b0804e15');
-  finish.addColorStop(1, '#99623753');
+  const finish = context.createLinearGradient(width * .18, 0, width * .78, height);
+  finish.addColorStop(0, '#fff8dfc9');
+  finish.addColorStop(.40, '#ffe6af33');
+  finish.addColorStop(.74, '#c38a4b18');
+  finish.addColorStop(1, '#9e5d3260');
   context.fillStyle = finish;
   context.fillRect(0, 0, width, height);
-  context.lineWidth = 2;
-  context.strokeStyle = '#fff8e4b8';
-  context.strokeRect(6, 5, width - 12, height - 10);
-  context.strokeStyle = '#8e603b35';
-  context.strokeRect(11, 9, width - 22, height - 18);
+  context.beginPath();
+  context.roundRect(4, 4, width - 8, height - 8, 10);
+  context.lineWidth = 3.5;
+  context.strokeStyle = '#fff2cbbd';
+  context.stroke();
   for (let streak = 0; streak < 13; streak++) {
     const y = 14 + streak * (height - 28) / 12;
     context.beginPath();
@@ -119,25 +119,25 @@ function paintDesktop(context: CanvasRenderingContext2D, width: number, height: 
 }
 
 function paintSeatTextile(context: CanvasRenderingContext2D, width: number, height: number) {
-  const shading = context.createRadialGradient(width * .24, height * .2, 3, width * .44, height * .41, width * .81);
-  shading.addColorStop(0, '#fcfcfc');
-  shading.addColorStop(.62, '#e3e6eb');
-  shading.addColorStop(1, '#a4adbf');
+  const shading = context.createLinearGradient(width * .22, 0, width * .7, height);
+  shading.addColorStop(0, '#f4f9ff');
+  shading.addColorStop(.14, '#e1e9f4');
+  shading.addColorStop(.67, '#bdc8d8');
+  shading.addColorStop(1, '#a8b5c7');
   context.fillStyle = shading;
   context.fillRect(0, 0, width, height);
   for (let y = 0; y < height; y += 2) {
     for (let x = (y / 2 % 2) * 2; x < width; x += 4) {
       const grain = (Math.imul(x + 7, 11939) ^ Math.imul(y + 13, 48121)) & 255;
-      context.fillStyle = grain % 3 ? `rgba(245, 248, 253, ${grain / 1600})` : `rgba(41, 55, 80, ${grain / 1900})`;
+      context.fillStyle = grain % 3 ? `rgba(245, 248, 253, ${grain / 2000})` : `rgba(27, 46, 72, ${grain / 1200})`;
       context.fillRect(x, y, 2.5, 1);
     }
   }
-  context.strokeStyle = '#ffffff73';
-  context.lineWidth = 1.3;
-  context.strokeRect(6, 6, width - 12, height - 12);
-  context.strokeStyle = '#45536e50';
-  context.setLineDash([2, 2]);
-  context.strokeRect(10, 10, width - 20, height - 20);
+  context.beginPath();
+  context.roundRect(5, 5, width - 10, height - 10, 11);
+  context.strokeStyle = '#f4f9ff8f';
+  context.lineWidth = 2;
+  context.stroke();
 }
 
 function paintGarden(context: CanvasRenderingContext2D, width: number, height: number) {
@@ -308,14 +308,13 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   const mapleEdge = matte('#be8356', { map: woodGrain });
   const frameWood = matte('#915e43', { map: woodGrain });
   const stageMaple = matte('#c48b64', { map: woodGrain });
-  const desktop = matte('#efab73', { map: desktopGrain, roughness: .68 });
-  const desktopLip = matte('#c98753', { map: woodGrain, roughness: .74 });
-  const deskFrame = matte('#7e7a77');
-  const blueFabric = matte('#4b70a7', { map: seatTextile, roughness: .94 });
-  const blueEdge = matte('#335a87');
-  const blueHighlight = matte('#6e96c4', { map: seatTextile, roughness: .93 });
-  const steel = matte('#616b79');
-  const footCaps = matte('#4e5260');
+  const desktop = matte('#f3ae6a', { map: desktopGrain, roughness: .64 });
+  const desktopLip = matte('#ab693d', { map: woodGrain, roughness: .79 });
+  const deskFrame = matte('#8a705e', { map: woodGrain });
+  const blueFabric = matte('#3f6591', { map: seatTextile, roughness: .94 });
+  const blueEdge = matte('#2d4667');
+  const steel = matte('#777677');
+  const footCaps = matte('#514a4b');
   const chalkGreen = matte('#234e43', { emissive: '#172f2a', emissiveIntensity: .22 });
   const terraCotta = matte('#eee0cb');
   const oak = matte('#ffffff', { map: woodGrain });
@@ -590,7 +589,7 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   }
   function renderActors(frames: AuditoriumActorFrame[]) {
     if (disposed) return;
-    actors.update(frames);
+    actors.update(frames.map(frame => frame.instructor ? frame : { ...frame, scale: frame.scale * 1.10 }));
     render();
   }
   function setBackdrop(enabled: boolean) {
@@ -610,6 +609,7 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     if (capacity === anchors.length) return anchors;
     clearSeating();
     const columns = capacity / 5;
+    const bankSize = columns / 2;
     const points = Array.from({ length: capacity }, (_, index) => auditoriumSeat(index, capacity));
     anchors = points;
     const locations = points.map(({ x, y }) => fromScreen(x, y, floorAnchorPlane));
@@ -621,43 +621,50 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     const feet: BoxPlacement[] = [];
     const chairPads: BoxPlacement[] = [];
     const chairEdges: BoxPlacement[] = [];
-    const chairTopSeams: BoxPlacement[] = [];
     const shadows: BoxPlacement[] = [];
 
     locations.forEach(({ x, z }, index) => {
-      const column = index % columns;
-      const sideEnd = column === columns / 2 - 1 || column === columns - 1;
+      const bankColumn = index % bankSize;
+      const sideEnd = bankColumn === bankSize - 1;
       const neighbor = locations[index + (sideEnd ? -1 : 1)];
-      const width = Math.min(2.12, Math.abs(x - neighbor.x) * .92);
-      const deskZ = z - .65;
-      const deskDepth = .93;
-      const windowLight = points[index].x < .24 ? '#fff5e4' : points[index].x > .77 ? '#fff1e6' : '#f8e7db';
-      shadows.push({ width: width * 1.54, height: 1, depth: 2.33, x: x + .16, y: .016, z: z - .35 });
-      desks.push({ width, height: .16, depth: deskDepth, x, y: 1.155, z: deskZ, color: windowLight });
-      deskLips.push({ width: width * .99, height: .068, depth: deskDepth * .975, x, y: 1.076, z: deskZ });
-      deskAprons.push({ width: width - .24, height: .135, depth: .153, x, y: .974, z: deskZ + .342 });
-      deskAprons.push({ width: width - .28, height: .061, depth: .624, x, y: .81, z: deskZ - .041 });
+      const pitch = Math.abs(x - neighbor.x);
+      const width = Math.min(2.45, pitch - .026);
+      const joined = pitch <= 2.48;
+      const deskZ = z - .68;
+      const deskDepth = 1.025;
+      const windowLight = points[index].x < .24 || points[index].x > .76 ? '#fff6e7' : '#f9e8d9';
+      shadows.push({ width: width * 1.41, height: 1, depth: 2.34, x: x + .16, y: .016, z: z - .35 });
+      desks.push({ width, height: .218, depth: deskDepth, x, y: 1.153, z: deskZ, color: windowLight });
+      if (!joined || bankColumn === 0) {
+        // A shared timber edge reads as one table, with narrow seams between the maple tops.
+        const span = joined ? width + pitch * (bankSize - 1) : width;
+        const center = joined ? x + pitch * (bankSize - 1) / 2 : x;
+        deskLips.push({ width: span - .035, height: .096, depth: deskDepth - .038, x: center, y: 1.028, z: deskZ });
+        deskAprons.push({ width: span - .25, height: .12, depth: .12, x: center, y: .946, z: deskZ + .365 });
+      }
       for (const legX of [-1, 1]) for (const legZ of [-1, 1]) {
-        const tableLegX = x + legX * (width / 2 - .131);
-        const tableLegZ = deskZ + legZ * .34;
-        const seatLegX = x + legX * .355;
+        if (!joined || bankColumn === 0 || legX === 1) {
+          const inset = joined && legX === 1 && !sideEnd ? .028 : .127;
+          const tableLegX = x + legX * (width / 2 - inset);
+          const tableLegZ = deskZ + legZ * .36;
+          deskLegs.push({ width: .148, height: 1.038, depth: .156, x: tableLegX, y: .532, z: tableLegZ });
+          feet.push({ width: .155, height: .065, depth: .164, x: tableLegX, y: .042, z: tableLegZ });
+          shadows.push({ width: .39, height: 1, depth: .43, x: tableLegX + .03, y: .017, z: tableLegZ });
+        }
+        const seatLegX = x + legX * .391;
         const seatLegZ = z + legZ * .288;
-        deskLegs.push({ width: .157, height: 1.038, depth: .157, x: tableLegX, y: .531, z: tableLegZ });
-        chairLegs.push({ width: .116, height: .584, depth: .116, x: seatLegX, y: .303, z: seatLegZ, pitch: -.044 * legZ });
-        feet.push({ width: .169, height: .073, depth: .167, x: tableLegX, y: .045, z: tableLegZ });
+        chairLegs.push({ width: .116, height: .612, depth: .116, x: seatLegX, y: .317, z: seatLegZ, pitch: -.044 * legZ });
         feet.push({ width: .131, height: .064, depth: .128, x: seatLegX, y: .043, z: seatLegZ + legZ * .013 });
-        shadows.push({ width: .39, height: 1, depth: .43, x: tableLegX + .03, y: .017, z: tableLegZ });
         shadows.push({ width: .33, height: 1, depth: .37, x: seatLegX + .027, y: .017, z: seatLegZ });
       }
       for (const side of [-1, 1]) {
-        chairLegs.push({ width: .118, height: .764, depth: .108, x: x + side * .37, y: .865, z: z + .291, pitch: .078 });
+        chairLegs.push({ width: .112, height: .805, depth: .108, x: x + side * .391, y: .916, z: z + .30, pitch: .060 });
       }
-      chairLegs.push({ width: .794, height: .06, depth: .067, x, y: .485, z: z + .29 });
-      chairEdges.push({ width: .977, height: .123, depth: .755, x, y: .585, z: z + .016 });
-      chairPads.push({ width: .933, height: .135, depth: .725, x, y: .684, z: z + .019 });
-      chairEdges.push({ width: .990, height: .686, depth: .208, x, y: 1.058, z: z + .311, pitch: .076 });
-      chairPads.push({ width: .928, height: .624, depth: .155, x, y: 1.067, z: z + .403, pitch: .076 });
-      chairTopSeams.push({ width: .857, height: .033, depth: .087, x, y: 1.375, z: z + .399, pitch: .076 });
+      chairLegs.push({ width: .834, height: .059, depth: .068, x, y: .486, z: z + .29 });
+      chairEdges.push({ width: 1.038, height: .112, depth: .755, x, y: .609, z: z + .016 });
+      chairPads.push({ width: 1.005, height: .124, depth: .732, x, y: .709, z: z + .015 });
+      chairEdges.push({ width: 1.048, height: .755, depth: .190, x, y: 1.101, z: z + .332, pitch: .062 });
+      chairPads.push({ width: 1.023, height: .732, depth: .147, x, y: 1.112, z: z + .405, pitch: .062 });
     });
     instances(shadows, furnitureShadow, seating, shadowPlane).renderOrder = 2;
     instances(desks, desktop, seating, desktopBox);
@@ -666,9 +673,8 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
     instances(deskLegs, deskFrame, seating, roundedBox);
     instances(chairLegs, steel, seating, roundedBox);
     instances(feet, footCaps, seating, roundedBox);
-    instances(chairEdges, blueEdge, seating, roundedBox);
-    instances(chairPads, blueFabric, seating, roundedBox);
-    instances(chairTopSeams, blueHighlight, seating, roundedBox);
+    instances(chairEdges, blueEdge, seating, desktopBox);
+    instances(chairPads, blueFabric, seating, desktopBox);
     render();
     return anchors;
   }

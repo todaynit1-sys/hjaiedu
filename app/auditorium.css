@@ -11,7 +11,7 @@
   color: #243b57;
 }
 .auditorium-viewport {
-  --overview-min-height: clamp(340px, 33vw, 454px);
+  --overview-min-height: clamp(340px, 34vw, 480px);
   position: relative; display: grid; place-items: center; width: 100%;
   height: clamp(var(--overview-min-height), calc(100dvh - 285px), 880px);
   min-height: var(--overview-min-height); flex: 1 0 auto; overflow: auto; overscroll-behavior: auto;
@@ -30,6 +30,13 @@
   object-fit: fill; pointer-events: none; visibility: hidden;
 }
 .classroom-floor[data-backdrop] .auditorium-backdrop { visibility: visible; }
+/* Lift the illustrated lectern in front of the instructor without moving either anchor. */
+.classroom-floor[data-backdrop]::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: url('/classroom/storybook-classroom.jpg') center / 100% 100%;
+  clip-path: polygon(23.1% 28.2%, 26.2% 27.1%, 27% 25%, 30.1% 24.1%,
+    29.8% 26.8%, 30.6% 27.6%, 30.3% 35.3%, 25.1% 37.1%, 23.3% 35.8%);
+}
 .auditorium-world, .auditorium-art { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
 .auditorium-world { opacity: 0; }
 .auditorium-world[data-ready="true"] { opacity: 1; }
@@ -50,6 +57,11 @@
 .classroom-floor[data-backdrop] .world-screen .classroom-board { background: none; box-shadow: none; }
 .classroom-floor[data-backdrop] .world-screen .chalkboard-tray { display: none; }
 .world-screen .classroom-board-content p { font-size: clamp(18px, 2.7vw, 40px); line-height: 1.38; }
+.classroom-floor[data-backdrop] .world-screen [data-welcome] .classroom-board-welcome {
+  font-size: clamp(16px, 3.15cqw, 54px);
+  font-weight: 850; line-height: 1.23; letter-spacing: -.045em;
+  text-shadow: 0 2px 0 #204a43, .03em 0 #fff5d94d;
+}
 .world-screen .classroom-board-content a { font-size: 13px; }
 .chalkboard-emphasis { color: #ffe8a0; }
 .chalkboard-drawing { display: none; position: absolute; color: #c1e4da; pointer-events: none; opacity: .7; }
@@ -115,11 +127,45 @@
   animation: none; overflow: visible; transform-origin: 50% 94%;
   scale: var(--actor-depth); transition: scale 180ms ease-out;
 }
-.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor-sprite { visibility: hidden; }
-.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor.is-mine::before {
+.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor-sprite,
+.classroom-actor[data-illustrated] > .classroom-actor-sprite { visibility: hidden; }
+.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor.is-mine::before,
+.classroom-actor.is-mine[data-illustrated]::before {
   content: ""; position: absolute; inset: auto 14% 0; height: 9%;
   border: 1.5px solid #e8fbff; border-radius: 50%;
   box-shadow: 0 0 0 1px #4fcbef, 0 0 8px #71dcf9a0; background: #71dcf925;
+}
+.storybook-actor-art {
+  position: absolute; inset: auto -11% 6%; height: 117%; pointer-events: none;
+  visibility: hidden; transform-origin: 50% 100%; scale: var(--actor-depth);
+}
+.classroom-actor[data-illustrated] .storybook-actor-art { visibility: visible; }
+.storybook-actor-art img {
+  display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: center bottom; opacity: 0;
+}
+.classroom-actor[data-pose="standing"] .storybook-actor-art [data-frame="idle"],
+.classroom-actor[data-pose="seated"] .storybook-actor-art [data-frame="seated"] { opacity: 1; }
+.classroom-actor[data-pose="standing"][data-facing="left"] .storybook-actor-art,
+.classroom-actor[data-pose="seated"][data-seat-side="left"] .storybook-actor-art { transform: scaleX(-1); }
+.classroom-actor[data-pose="seated"] .storybook-actor-art {
+  height: 88%; bottom: 12%; clip-path: inset(0 0 30%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="idle"] {
+    animation: storybook-idle 300ms steps(1, end) infinite;
+  }
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="step"] {
+    animation: storybook-step 300ms steps(1, end) infinite;
+  }
+}
+@keyframes storybook-idle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes storybook-step {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 .classroom-actor[data-facing="left"][data-pose="standing"] .classroom-actor-sprite { transform: scaleX(-1); }
 .classroom-actor .classroom-actor-body { transform-origin: 45px 50px; transition: transform 145ms ease-out; }
@@ -162,6 +208,7 @@
   .auditorium-viewport[data-view="near"] { height: clamp(240px, calc(100dvh - 345px), 520px); }
   .auditorium-viewport[data-view="near"] > .classroom-floor { width: 1280px; min-width: 1280px; min-height: 800px; }
   .auditorium-scene .classroom-seat-bubble { font-size: 10px; min-width: 54px; max-width: 90px; }
+  .auditorium-viewport[data-view="overview"] .classroom-seat:not(.is-mine) .auditorium-seat-caption { display: none; }
   .world-screen .classroom-board { padding: 3px 6px; }
   .world-screen .classroom-board-content p { font-size: 18px; }
 }

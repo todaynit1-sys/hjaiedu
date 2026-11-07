@@ -6,7 +6,7 @@ const bounded = (x: number, y: number): ClassroomPosition => ({
   y: Math.min(.92, Math.max(.365, y))
 });
 
-export const INSTRUCTOR_HOME = { x: .285, y: .425 };
+export const INSTRUCTOR_HOME = { x: .249, y: .329 };
 
 export function seatExit(home: ClassroomPosition) {
   return bounded(home.x + (home.x < .5 ? .022 : -.022), home.y + (home.y > .89 ? -.036 : .038));

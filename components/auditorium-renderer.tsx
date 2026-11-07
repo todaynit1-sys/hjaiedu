@@ -63,6 +63,7 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
       const positions = new Map<string, {x: number; z: number; heading: number}>();
       let travelling = false;
       for (const actor of floor.querySelectorAll<HTMLElement>('.classroom-actor')) {
+        if (actor.hasAttribute('data-illustrated')) continue;
         const id = actor.dataset.seat ?? 'instructor';
         const profile = profiles.current.get(id);
         if (!profile) continue;
@@ -82,7 +83,7 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
         const old = previous.get(id);
         let heading = old?.heading ?? .14;
         if (seated) heading = left < .5 ? 2.84 : -2.84;
-        else if (moving && old && Math.hypot(point.x - old.x, point.z - old.z) > .003) {
+        else if (old && Math.hypot(point.x - old.x, point.z - old.z) > (moving ? .003 : .03)) {
           heading = Math.atan2(point.x - old.x, point.z - old.z);
         } else if (moving && !old) heading = actor.dataset.facing === 'left' ? -.7 : .7;
         positions.set(id, { ...point, heading });
@@ -106,7 +107,7 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
       queueActors();
     });
     mutations.observe(floor, { subtree: true, childList: true, attributes: true,
-      attributeFilter: ['style', 'data-travelling', 'data-walking', 'data-pose'] });
+      attributeFilter: ['style', 'data-travelling', 'data-walking', 'data-pose', 'data-illustrated'] });
     document.addEventListener('visibilitychange', queueActors);
     function resize() {
       frame = 0;

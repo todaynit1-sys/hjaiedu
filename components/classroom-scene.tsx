@@ -8,7 +8,7 @@ import { WalkingAvatar } from './walking-avatar';
 import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
 import { AuditoriumRenderer, type AuditoriumActorProfile, type AuditoriumProjection } from './auditorium-renderer';
-import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
+import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, STORYBOOK_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
 import { defaultCharacter, type AvatarCustomization, type Character, type ClassroomMove, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 import '../app/auditorium.css';
@@ -177,14 +177,14 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
   const teacher = data.messages.reduce<PublicMessage | undefined>(
     (latest, message) => message.author === 'student' ? latest : message, undefined);
   const currentQuestion = data.questionRound?.open ? data.questionRound : undefined;
-  const messageKey = `${currentQuestion?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}`;
+  const messageKey = `${currentQuestion?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}/${backdrop}`;
   const boardExpanded = expandedMessage === messageKey;
   const recordExpansion = useCallback((expanded: boolean) => {
     if (expanded) setExpandedMessage(messageKey);
   }, [messageKey]);
   const latest = data.messages.at(-1);
   const turnPage = (offset: number) => setSelectedPage({ roomDay, page: pages[pageIndex + offset] });
-  const screenBounds = world?.screen ?? AUDITORIUM_SCREEN;
+  const screenBounds = backdrop ? STORYBOOK_SCREEN : world?.screen ?? AUDITORIUM_SCREEN;
   const screenStyle = {
     left:`${screenBounds.left*100}%`, top:`${screenBounds.top*100}%`, width:`${screenBounds.width*100}%`,
     '--screen-height': `${screenBounds.height*100}cqh`
@@ -203,7 +203,7 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
     <div ref={movement.floor} className="classroom-floor" data-backdrop={backdrop || undefined} data-moving={canMoveHere && (movement.moving || movement.autonomous) || undefined}
       role="group" aria-label="캐릭터 이동 영역" aria-describedby={onMove ? 'classroom-move-hint' : undefined}
       tabIndex={canMoveHere ? 0 : undefined} onClick={canMoveHere ? movement.click : undefined} onKeyDown={canMoveHere ? movement.keyDown : undefined}>
-    <img className="auditorium-backdrop" src="/classroom/sunlit-classroom.jpg" width="1672" height="941" alt="" aria-hidden="true"
+    <img className="auditorium-backdrop" src="/classroom/storybook-classroom.jpg" width="1774" height="887" alt="" aria-hidden="true"
       decoding="async" fetchPriority="high" onLoad={() => setBackdrop(true)} onError={() => setBackdrop(false)}/>
     <AuditoriumRenderer capacity={capacity} backdrop={backdrop} visible={visible} actors={actorProfiles} onLayout={setProjection}/>
     {!world && !backdrop && <AuditoriumArt/>}

@@ -1,12 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AvatarCustomization } from '../lib/avatar-customization';
+import { storybookAvatar, storybookSprite, type StorybookAvatarId } from '../lib/storybook-avatar';
 import type { Character } from '../lib/types';
 import { AvatarArt } from './classroom-avatar';
+
+function StorybookPortrait({ variant }: { variant: StorybookAvatarId }) {
+  const [loaded, setLoaded] = useState(false);
+  return <img className="avatar-preview-illustration" data-loaded={loaded} alt="" decoding="async"
+    src={storybookSprite(variant, 'idle')} onLoad={() => setLoaded(true)} onError={() => setLoaded(false)} />;
+}
 
 export function AvatarPreview({ character, avatar }: { character: Character; avatar?: AvatarCustomization }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const appearance = useRef({ character, avatar });
   const redraw = useRef<(() => void) | undefined>(undefined);
+  const storybook = storybookAvatar(character, avatar);
   useEffect(() => {
     appearance.current = { character, avatar };
     redraw.current?.();
@@ -52,5 +60,6 @@ export function AvatarPreview({ character, avatar }: { character: Character; ava
   return <div className="avatar-preview-art" aria-hidden="true">
     <canvas ref={canvas} data-ready="false" />
     <svg viewBox="15 -2 60 66"><AvatarArt character={character} avatar={avatar} pose="walking" /></svg>
+    {storybook && <StorybookPortrait key={storybook} variant={storybook} />}
   </div>;
 }
