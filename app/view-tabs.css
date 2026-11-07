@@ -1,20 +1,19 @@
 .classroom-workspace.room-view-workspace {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 0;
-  width: min(100%, 1680px);
-  padding: 0 clamp(12px, 2vw, 28px) max(8px, env(safe-area-inset-bottom));
+  width: min(100%, var(--room-width));
+  padding: 8px var(--room-gutter) max(8px, env(safe-area-inset-bottom));
 }
-.room-view-workspace > .classroom-view-tools {
-  grid-column: 1;
-  grid-row: 1;
+.live-header > .classroom-view-tools {
+  grid-area: views;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 52px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: clamp(8px, 1vw, 15px);
+  min-width: 0;
+  min-height: 48px;
 }
 .classroom-view-actions,
 .classroom-camera-tools { display: flex; flex: none; align-items: center; gap: 6px; }
@@ -43,7 +42,7 @@
   color: var(--forest);
   background: var(--mint);
 }
-.room-view-workspace .classroom-switch {
+.classroom-view-tools .classroom-switch {
   display: flex;
   flex: none;
   align-self: stretch;
@@ -53,26 +52,26 @@
   border: 0;
   background: transparent;
 }
-.room-view-workspace .classroom-switch button {
+.classroom-view-tools .classroom-switch button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   position: relative;
-  min-width: 116px;
+  min-width: 88px;
   min-height: 44px;
-  padding: 7px 22px;
+  padding: 7px 12px;
   border-radius: 8px 8px 0 0;
   color: var(--muted);
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
-.room-view-workspace .classroom-switch button[aria-pressed="true"] {
+.classroom-view-tools .classroom-switch button[aria-pressed="true"] {
   color: var(--forest);
   background: var(--mint);
 }
-.room-view-workspace .classroom-switch button[aria-pressed="true"]::after {
+.classroom-view-tools .classroom-switch button[aria-pressed="true"]::after {
   position: absolute;
   right: 10px;
   bottom: 0;
@@ -81,15 +80,15 @@
   border-radius: 3px 3px 0 0;
   content: "";
 }
-.room-view-workspace .classroom-switch button:hover:not([aria-pressed="true"]) {
+.classroom-view-tools .classroom-switch button:hover:not([aria-pressed="true"]) {
   color: var(--forest-dark);
   background: #fff8;
 }
-.room-view-workspace .classroom-switch button:focus-visible {
+.classroom-view-tools .classroom-switch button:focus-visible {
   outline: 2px solid var(--forest);
   outline-offset: -3px;
 }
-.room-view-workspace .view-chat-badge {
+.classroom-view-tools .view-chat-badge {
   padding: 2px 5px;
   border-radius: 5px;
   background: var(--mint);
@@ -98,28 +97,35 @@
   line-height: 1.4;
   white-space: nowrap;
 }
-.room-view-workspace > .classroom-pane {
+.classroom-workspace.room-view-workspace > .classroom-pane {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   width: 100%;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: #fffaf1;
 }
 .classroom-workspace.room-view-workspace > .live-chat {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   width: min(100%, 1120px);
   margin-inline: auto;
   border-radius: 16px 16px 0 0;
 }
 .classroom-workspace.room-view-workspace > .chat-composer {
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 2;
   width: min(100%, 1120px);
   margin-inline: auto;
   border-radius: 0 0 16px 16px;
 }
 .classroom-workspace.room-view-workspace[data-view="classroom"] > .chat-composer {
-  margin-top: 6px;
-  border-radius: 16px;
+  width: 100%;
+  border-radius: 0 0 14px 14px;
+}
+.classroom-workspace.room-view-workspace > .classroom-alerts {
+  grid-area: 1 / 1 / 2 / 2;
 }
 .room-view-workspace > [hidden] { display: none; }
 .classroom-view-actions > .materials-button {
@@ -133,13 +139,40 @@
   .room-view-workspace .chat-meta { font-size: 12px; }
   .room-view-workspace .chat-meta b { font-size: 14px; }
 }
+@media (1180px < width <= 1380px) {
+  .live-header > .classroom-view-tools { gap: 8px; }
+  .classroom-view-tools .classroom-switch button {
+    min-width: 74px;
+    padding-inline: 7px;
+    gap: 5px;
+    font-size: 14px;
+  }
+  .classroom-view-tools .view-chat-badge {
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    color: transparent;
+    background: var(--forest);
+  }
+  .classroom-camera-tools > button { width: 44px; padding: 0; }
+  .classroom-camera-tools > button > span { display: none; }
+  .classroom-view-actions > :is(.classroom-question-trigger, .materials-button) { padding-inline: 8px; }
+}
+@media (max-width: 1180px) {
+  .live-header > .classroom-view-tools {
+    justify-content: space-between;
+    border-top: 1px solid var(--line);
+  }
+}
 @media (max-width: 760px) {
   .classroom-workspace.room-view-workspace {
-    padding: 0 8px max(4px, env(safe-area-inset-bottom));
+    padding: 4px var(--room-gutter) max(4px, env(safe-area-inset-bottom));
   }
-  .room-view-workspace > .classroom-view-tools { min-height: 48px; gap: 6px; margin-bottom: 5px; }
-  .room-view-workspace .classroom-switch { flex: 1; gap: 2px; }
-  .room-view-workspace .classroom-switch button {
+  .live-header > .classroom-view-tools { min-height: 46px; gap: 6px; }
+  .classroom-view-tools .classroom-switch { flex: 1; gap: 2px; }
+  .classroom-view-tools .classroom-switch button {
     flex: 1;
     min-width: 0;
     min-height: 44px;
@@ -151,8 +184,8 @@
   .classroom-camera-tools { gap: 4px; }
   .classroom-camera-tools { padding-inline-end: 4px; }
   .classroom-view-actions > .materials-button { padding: 5px 8px; font-size: 12px; }
-  .room-view-workspace .classroom-switch button > svg { width: 15px; height: 15px; }
-  .room-view-workspace .view-chat-badge {
+  .classroom-view-tools .classroom-switch button > svg { width: 15px; height: 15px; }
+  .classroom-view-tools .view-chat-badge {
     width: 6px;
     height: 6px;
     padding: 0;
@@ -163,7 +196,7 @@
   }
 }
 @media (max-width: 580px) {
-  .room-view-workspace .classroom-switch button > svg,
+  .classroom-view-tools .classroom-switch button > svg,
   .classroom-camera-tools > button > span,
   .classroom-view-actions > :is(.materials-button, .classroom-question-trigger) > span { display: none; }
   .classroom-view-actions > :is(.materials-button, .classroom-question-trigger),

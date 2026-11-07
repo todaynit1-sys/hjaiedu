@@ -91,7 +91,10 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
     const viewport = window.visualViewport;
     if (!viewport) return;
     function fitKeyboard() {
-      if (viewport?.scale === 1) roomRef.current?.style.setProperty('--visible-room-height', `${viewport.height}px`);
+      const room = roomRef.current;
+      if (!room || viewport?.scale !== 1) return;
+      room.style.setProperty('--visible-room-height', `${viewport.height}px`);
+      room.toggleAttribute('data-compact-viewport', viewport.height <= 500);
     }
     fitKeyboard();
     viewport.addEventListener('resize', fitKeyboard);
@@ -248,9 +251,27 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       </div>
     </details>
   </div>;
+  const viewTools = data && <div className="classroom-view-tools">
+    <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
+      <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강의실</button>
+      <button aria-label="채팅" aria-pressed={view === 'chat'} aria-controls="chat-pane" aria-describedby={hasNewChat ? 'new-chat-hint' : undefined} onClick={() => setView('chat')}><MessageCircle size={18} aria-hidden="true" />채팅{hasNewChat && <span className="view-chat-badge" aria-hidden="true">새 메시지</span>}</button>
+    </div>
+    <div className="classroom-view-actions">
+      {view === 'classroom' && <div className="classroom-camera-tools" role="group" aria-label="교실 보기">
+        <button type="button" aria-label="전체 보기" title="전체 보기" aria-pressed={sceneView === 'overview'}
+          onClick={() => setSceneView('overview')}><Maximize size={16} aria-hidden="true" /><span>전체 보기</span></button>
+        <button type="button" aria-label="내 주변" title="내 주변" aria-pressed={sceneView === 'near'}
+          onClick={() => { setSceneView('near'); setNearRequest(request => request + 1); }}><LocateFixed size={16} aria-hidden="true" /><span>내 주변</span></button>
+      </div>}
+      <ClassroomQuestion data={data} host={host} open={questionOpen} onOpenChange={toggleQuestion}
+        onAction={active ? classroomActivity : undefined} />
+      {materialsButton}
+    </div>
+  </div>;
   return <div className={`live-room classroom-themed${host ? ' is-host' : ''}`} ref={roomRef}>
     <a className="skip-link" href="#main">본문으로 건너뛰기</a>
     <header className="live-header"><Brand roomCode={code} hostAccess={!host} />
+      {viewTools}
       <div className="live-header-actions"><AboutLink />
         {data && !data.demo && <a className="survey-link" href={SURVEY_URL} target="_blank" rel="noopener noreferrer" aria-label="수업 설문 참여 (새 탭)"><ClipboardList size={15} /><span>수업 설문</span></a>}
         {host && <span className="live-role">강사</span>}
@@ -265,23 +286,6 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       {error && <div className="live-error" role="alert"><WifiOff size={17} /><span>{error}</span><button aria-label="오류 메시지 닫기" onClick={() => setError('')}><X size={16} /></button></div>}
       <main id="main" className="classroom-workspace room-view-workspace" data-view={view}>
         <h1 className="room-accessible-title">{data.title}</h1>
-        <div className="classroom-view-tools">
-          <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
-            <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강의실</button>
-            <button aria-label="채팅" aria-pressed={view === 'chat'} aria-controls="chat-pane" aria-describedby={hasNewChat ? 'new-chat-hint' : undefined} onClick={() => setView('chat')}><MessageCircle size={18} aria-hidden="true" />채팅{hasNewChat && <span className="view-chat-badge" aria-hidden="true">새 메시지</span>}</button>
-          </div>
-          <div className="classroom-view-actions">
-            {view === 'classroom' && <div className="classroom-camera-tools" role="group" aria-label="교실 보기">
-              <button type="button" aria-label="전체 보기" title="전체 보기" aria-pressed={sceneView === 'overview'}
-                onClick={() => setSceneView('overview')}><Maximize size={16} aria-hidden="true" /><span>전체 보기</span></button>
-              <button type="button" aria-label="내 주변" title="내 주변" aria-pressed={sceneView === 'near'}
-                onClick={() => { setSceneView('near'); setNearRequest(request => request + 1); }}><LocateFixed size={16} aria-hidden="true" /><span>내 주변</span></button>
-            </div>}
-            <ClassroomQuestion data={data} host={host} open={questionOpen} onOpenChange={toggleQuestion}
-              onAction={active ? classroomActivity : undefined} />
-            {materialsButton}
-          </div>
-        </div>
         <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
         <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
           <ClassroomScene data={data} host={host} visible={view === 'classroom'} view={sceneView} nearRequest={nearRequest} onActivity={active ? classroomActivity : undefined} onAvatarChange={!host && active ? avatar => action({ type: 'avatar-customize', avatar }, '꾸민 캐릭터를 저장했어요.') : undefined}

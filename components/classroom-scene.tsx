@@ -124,13 +124,6 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
   const [backdrop, setBackdrop] = useState(false);
   const [projection, setProjection] = useState<AuditoriumProjection | null>(null);
   const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
-  useEffect(() => {
-    const element = viewport.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() => element.style.setProperty('--available-height', element.clientHeight+'px'));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
   const page = selectedPage?.roomDay === roomDay && pages.includes(selectedPage.page)
     ? selectedPage.page : mySeat ? seatPage(mySeat.number) : 0;
   const pageIndex = pages.indexOf(page);

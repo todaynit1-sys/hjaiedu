@@ -2,7 +2,8 @@ import type { AvatarCustomization } from './avatar-customization';
 import type { Character } from './types';
 
 export type StorybookAvatarId = 'cardigan' | 'beanie';
-export type StorybookPose = 'idle' | 'step' | 'seated';
+export const verticalStorybookPoses = ['step-up', 'step-up-back', 'step-down', 'step-down-back'] as const;
+export type StorybookPose = 'idle' | 'step' | 'step-back' | 'seated' | typeof verticalStorybookPoses[number];
 export type StorybookBounds = [number, number, number, number];
 export type StorybookLandmarks = {
   head: StorybookBounds;
@@ -34,7 +35,7 @@ export function storybookSprite(id: StorybookAvatarId, pose: StorybookPose) {
   return `/classroom/avatar-${id}-${pose}.webp`;
 }
 
-export function rosterSprite(hair: AvatarCustomization['hair'], pose: StorybookPose) {
-  const base = `/classroom/roster/${hair}-${pose}`;
+export function storybookLayer(name: string) {
+  const base = `/classroom/avatars/${name}`;
   return { art: `${base}.webp`, mask: `${base}-mask.png` };
 }

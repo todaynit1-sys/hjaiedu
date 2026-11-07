@@ -1,9 +1,9 @@
 import { memo, useId } from 'react';
-import type { AvatarCustomization } from '../lib/avatar-customization';
+import { isHumanHair, type AvatarCustomization, type HumanHair } from '../lib/avatar-customization';
 import type { Character } from '../lib/types';
 
 type Outfit = {
-  hair: AvatarCustomization['hair'];
+  hair: HumanHair;
   hairLight: string;
   hairDark: string;
   skin: string;
@@ -119,7 +119,7 @@ function customOutfit(avatar: AvatarCustomization): Outfit {
   const [skin, skinShade] = avatarPalettes.skin[avatar.skin];
   const [shirt, shirtShade] = avatarPalettes.clothingColor[avatar.clothingColor];
   return {
-    hair: avatar.hair, hairLight, hairDark, skin, skinShade, shirt, shirtShade,
+    hair: isHumanHair(avatar.hair) ? avatar.hair : 'crop', hairLight, hairDark, skin, skinShade, shirt, shirtShade,
     accessory: avatar.accessory, detail: avatar.clothing,
   };
 }
@@ -130,7 +130,7 @@ export function avatarAppearance(character: Character, avatar?: AvatarCustomizat
   return { ...outfit, expression, pants: '#444856', pantsLight: '#626578', shoes: '#79523e' };
 }
 
-const hairPaths: Record<AvatarCustomization['hair'], string> = {
+const hairPaths: Record<HumanHair, string> = {
   waves: 'M27 33c-4.9-1.6-6-6.5-2.8-9.4-2.8-3-1.1-8.5 2.6-10.6 1.5-5 6.7-8.7 12.7-8.1 2.9-2.4 7.9-2.4 11.7-.6 5.8-.1 10.6 3.4 12 8.8 4.7 2.9 5.5 9.3 2 13.1l-4.1 4.2-.8-9.9c-3.8 1.6-6.2-1.5-7.8-4.4-3.3 5.6-8.4 8.1-13.2 7.4.9-1.3 1.5-2.6 1.6-3.9-3.7 4.8-7.6 6.3-10.8 5.5Z',
   crop: 'M29 30q-4-5-2-12 0-7 8-11 6-3 12-2 13 0 17 8 3 6-1 15l-3-2-1-9q-9 5-18 1-3 4-9 6l-1 6Z',
   spiky: 'M29 30q-3-4-3-9l-3-5 7-2-1-5 8 .4L41 4l7 3 6-4 3 5 8-1-1 6 5 4-4 4 1 5-5 4-2-11-5 3-5-5-7 6-1-5-7 5-2 7Z',
@@ -138,10 +138,14 @@ const hairPaths: Record<AvatarCustomization['hair'], string> = {
   bun: 'M29 30q-3-2-4-7-2-9 5-14 5-5 14-5 14-1 19 8 4 8-1 17l-3-2-.7-9q-9 2-15-7-4 10-12 12l-.5 6Z',
   curls: 'M29 32q-5-1-4-6-5-3-2-7-2-5 3-7 0-5 6-6 2-4 8-3 5-2 8 1 5-2 9 2 5-1 7 5 5 2 3 7 3 5-1 8l-4 5-2-11q-4 1-6-2-4 4-8 1-4 4-9 2-2 4-6 4l-1 7Z',
   part: 'M29 29q-3-2-4-6-1-10 7-15 4-3 12-4 9-1 15 4 7 4 6 13-.4 4-4 8l-2-9q-9 1-15-9-2 8-12 11l-1 7Z',
-  long: 'M28 39q-5 1-5-6 2-5 1-12-1-12 11-16 12-4 21 2 10 4 9 15 0 7 2 11 1 6-6 7l-3-6 1-14q-9 0-15-8-4 8-13 10l1 12Z'
+  long: 'M28 39q-5 1-5-6 2-5 1-12-1-12 11-16 12-4 21 2 10 4 9 15 0 7 2 11 1 6-6 7l-3-6 1-14q-9 0-15-8-4 8-13 10l1 12Z',
+  ponytail: 'M29 30q-4-2-5-7-1-10 8-15 7-4 16-4 12 .1 16 9 4 9-3 16l-2-8q-8-.3-14-9-3.5 8.7-12.5 11.1L31 30Z',
+  pigtails: 'M29 30q-5-2-5-8.4C24.8 10 32.6 3.4 44.6 4q14.6-1.5 19.6 9.3c2.7 6.4 1.3 11.8-3.6 15.1l-1.4-6.6Q51 21 44.4 13q-3.3 7.6-12.9 10.5Z',
+  braid: 'M29 32q-5-2-5-9.5-1-9.2 7.9-14.7 6.6-5.8 14.6-4.2 14.8 0 18.6 10.9 2.8 8.9-3.2 15.3l-3.1-8.4q-9.9.4-14.7-8.9-3.2 9.1-11.9 11.2Z',
+  undercut: 'M27 26.4q-3.9-7.8.9-14.9 3.9-6.8 11.9-7.9 12.6-2.8 22.3 3.6 5.4 4.6 2.7 11.4l-4.4 3.3-1.6-7.2q-9.1 2.5-17.6-.9-3.2 5.9-12.2 6.3L29 27Z',
 };
 
-const locks: Record<AvatarCustomization['hair'], readonly string[]> = {
+const locks: Record<HumanHair, readonly string[]> = {
   waves: [
     'M24 21C25 13 32 8 42 8c-3.6 6-8.8 12-18 13Z',
     'M26 27c8.3-3 13.7-10.7 17.2-20 5.1-.6 7.6 1.4 7.1 5.3C48 22 37.2 28.7 26 27Z',
@@ -178,7 +182,43 @@ const locks: Record<AvatarCustomization['hair'], readonly string[]> = {
     'M23.3 39c2.3-10.5-4.9-21.1 8.9-30 4-2.7 8.4-3.4 13-3.2-4.2 7.1-16.1 10.4-13.7 32.7-2 2.5-5 3.4-8.2.5Z',
     'M44 6.5c12.9-5.4 22.3 5.8 20 20.3-.2 4.7 5.6 9.1 1.4 12.6-3.4 2.1-7.9-1.4-7.9-7.7C62.3 17 50 13.5 44 6.5Z',
   ],
+  ponytail: [
+    'M24.8 24.7C27 15.7 33 8.5 45.5 6.4c-3.5 8.3-10.6 16-20.7 18.3Z',
+    'M43 7.1c11.3-3.9 20.3 5 20.4 14-10.5-3.1-15.8-6.8-20.4-14Z',
+  ],
+  pigtails: [
+    'M24.2 24.1C24.5 15 33.4 6.9 44.8 6c-2.9 9.9-9.8 17-20.6 18.1Z',
+    'M44.5 5.6c13.2-2.1 19.1 6.7 20.4 16.1-9.3-1.7-15.1-6.8-20.4-16.1Z',
+  ],
+  braid: [
+    'M25.6 25.2C25.6 13.1 32 8 45.8 5.4c-1.8 7.9-8.7 17.2-20.2 19.8Z',
+    'M44.9 6.2c10.4-3.5 18 6.5 19.3 13.8-10.9-3.3-15.3-6.2-19.3-13.8Z',
+  ],
+  undercut: [
+    'M26.4 18.2c1.8-8 9.8-13.4 21.1-13.9-4.8 6.2-11.7 11.9-21.1 13.9Z',
+    'M42 8.6c8.9-4.4 18.7-2.8 23.7 4.3-8.6 1.5-16.5 1.2-23.7-4.3Z',
+  ],
 };
+
+function HairTail({ style, fill, shade }: { style: HumanHair; fill: string; shade: string }) {
+  if (style === 'ponytail') return <g>
+    <path d="M32 11c-6-6.5-13.1-2.7-14.7 3.3-2.1 8.8 6.2 16.6 2.4 27.1 11.4-1.4 14.1-12.9 10.8-20.8Z" fill={fill} />
+    <path d="M24.5 11.8c-5.6 5.9-.9 15 1.8 20.1" fill="none" stroke={shade} strokeWidth=".8" />
+    <ellipse cx="30" cy="13.4" rx="3.5" ry="2.4" fill="#e6a590" />
+  </g>;
+  if (style === 'pigtails') return <g fill={fill}>
+    <path d="M29 18c-7.5-4.1-11.4.7-11.1 7.4 0 5.1 2.8 9.9 1.9 15.1 9.8-3.5 11-13.1 7.6-18.3Z" />
+    <path d="M61 18c7.1-3.6 12.2 1 11.6 7.4-.4 5.6-3.6 10.1-2.5 15.1-9.7-3-11.9-12.3-8.9-18.3Z" />
+    <path d="M22 23q-1.6 6.7 1.4 12m44.5-12q1.9 6.1-1.1 12" fill="none" stroke={shade} strokeWidth=".8" />
+    <ellipse cx="27" cy="20" rx="3.5" ry="2.2" fill="#d393aa" /><ellipse cx="63" cy="20" rx="3.5" ry="2.2" fill="#d393aa" />
+  </g>;
+  if (style === 'braid') return <g>
+    <path d="M30 20c-6.9 1-8.3 5.2-7.7 8.9-3.9 1.5-4.4 6.2-2.7 8.8-2.1 3-1 6.9 2.9 9.9 3.4-1.6 4.9-3.9 3.1-7.1 3.5-2.1 4.2-5.8 2-8.3 3.7-2.6 5.1-6.9 2.4-12.2Z" fill={fill} />
+    <path d="m23.3 28.2 4.8 3.7m-7.2 4.9 5 3.1m-5.2 3.8 3.5 1.4" fill="none" stroke={shade} strokeWidth=".9" />
+    <path d="m19.6 43.3 5 1.5" fill="none" stroke="#dda27b" strokeWidth="1.6" />
+  </g>;
+  return null;
+}
 
 function HairAccessory({ accessory }: { accessory: Outfit['accessory'] }) {
   switch (accessory) {
@@ -258,6 +298,8 @@ export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, inst
   const shoes = `url(#${id}-shoes)`;
   const trousers = `url(#${id}-pants)`;
   const knit = `url(#${id}-knit)`;
+  const layer = outfit.detail === 'vest' || outfit.detail === 'overalls';
+  const sleeveColor = layer ? '#e8d8bf' : sleeve;
   const jersey = 'M29.6 45.6c.1-4 3.2-7 7.8-7.7l7.3-1.8 8.9 2.3c4.8 1.2 6.3 4.3 6.5 7.7l-1.7 4.2c-5.7 3.5-20.1 4.2-25.8.5Z';
   return <g fill="none" stroke="none" strokeLinecap="round" strokeLinejoin="round">
     <defs>
@@ -296,8 +338,8 @@ export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, inst
         <path d="M.27.08l.5.66-.47.6m1.12-1.26-.48.66.48.6" stroke="#fff6d8" strokeWidth=".17" opacity=".28" />
       </pattern>
       <linearGradient id={`${id}-pants`} x2="1" y2=".73">
-        <stop stopColor={outfit.pantsLight} />
-        <stop offset=".8" stopColor={outfit.pants} />
+        <stop stopColor={outfit.detail === 'overalls' ? outfit.shirt : outfit.pantsLight} />
+        <stop offset=".8" stopColor={outfit.detail === 'overalls' ? outfit.shirtShade : outfit.pants} />
         <stop offset="1" stopColor="#353543" />
       </linearGradient>
       <linearGradient id={`${id}-shoes`} x2=".47" y2="1">
@@ -330,7 +372,8 @@ export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, inst
       </g>
     </>}
     <g className="classroom-actor-body">
-      <path d={jersey} fill={sleeve} />
+      {outfit.detail === 'hoodie' && <path d="M36 40.9q-4-2.7.4-7.3 8.1-5 15.3-.1 5.2 3.9.7 7.7Z" fill={sleeve} stroke={outfit.shirtShade} strokeWidth=".75" />}
+      <path d={jersey} fill={outfit.detail === 'overalls' ? '#e8d8bf' : sleeve} />
       {(outfit.detail === 'knit' || outfit.detail === 'cardigan') && <path d={jersey} fill={knit} />}
       <path d="M32.3 49.4q10.9 3 26.4-.4l-.5 1.7q-11.5 3.9-25.4.4Z" fill={outfit.shirtShade} opacity=".62" />
       {outfit.detail === 'cardigan' ? <g>
@@ -342,9 +385,22 @@ export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, inst
         <path d="M46.6 46.1h.3m-.1 3.1h.3" stroke="#e8bb76" strokeWidth=".43" />
       </g> : <path d="M37.4 39.8q6.9 4.2 14.8-.3" fill="none" stroke="#fff5e4" strokeWidth="1.35" opacity=".7" />}
       {outfit.detail === 'puffer' && <path d="M33.5 44.4q10 2.4 21.9-.7M34 47.7q9 2.4 21.3-.7" fill="none" stroke="#fff5e2" strokeWidth=".68" opacity=".47" />}
+      {outfit.detail === 'hoodie' && <g fill="none" stroke={outfit.shirtShade} strokeWidth=".8">
+        <path d="M39 44.4q6.8 1.5 12 0l2 4.3q-7.2 2.1-15 0Z" fill={sleeve} />
+        <path d="M41.4 40.4l-.7 3.9m8.6-4 .8 3.9" stroke="#ffebcb" />
+      </g>}
+      {outfit.detail === 'vest' && <g fill="none" stroke={outfit.shirtShade}>
+        <path d="m36.3 39.8 8.9 5 8.2-5.7m-8.2 5.7.4 7.3" strokeWidth="1.1" />
+        <path d="M35.7 48.3q2.5.4 5-.2m10.1.1q2.2-.1 4.7-.7" strokeWidth=".85" />
+      </g>}
+      {outfit.detail === 'overalls' && <g>
+        <path d="M35 38.8l4.4-.3 2.6 6.6h6.8l2.7-6.8 4 .6-2.7 8 2.3 5.4q-9 2.3-18.4.2l1.7-5.7Z" fill={sleeve} stroke={outfit.shirtShade} strokeWidth=".65" />
+        <path d="M41 47.3h9v2.1q-4.4 2.2-9 0Z" fill="none" stroke={outfit.shirtShade} strokeWidth=".65" />
+        <circle cx="40.2" cy="45.6" r=".85" fill="#e6b777" /><circle cx="51" cy="45.4" r=".85" fill="#e6b777" />
+      </g>}
       {standingArms && <g className="classroom-actor-standing-arms">
-        <path d="M30.9 42.4c-2.8.7-3.5 5.4-2.6 7.6.9 1.5 3.4 2 4.9.2l2-6.3Z" fill={sleeve} />
-        <path d="M54.9 41.6c3.3-.4 5.9 1.4 7.6 3.7l-2.5 4.2c-2.6.6-4.3-2.2-5.9-4.3Z" fill={sleeve} />
+        <path d="M30.9 42.4c-2.8.7-3.5 5.4-2.6 7.6.9 1.5 3.4 2 4.9.2l2-6.3Z" fill={sleeveColor} />
+        <path d="M54.9 41.6c3.3-.4 5.9 1.4 7.6 3.7l-2.5 4.2c-2.6.6-4.3-2.2-5.9-4.3Z" fill={sleeveColor} />
         <path d="M28.8 48q2.6 1.2 4.9.6l-.5 1.9q-2.2.9-4.7-.8Zm30.6-4.1q2 1.1 3 2l-1.8 2.7-2.4-1.6Z" fill={outfit.shirtShade} opacity=".59" />
         <path d="M29 48.9q1.3.7 2.8.8m27-3.4 1.6 1.3" stroke="#fff5dc" strokeWidth=".44" opacity=".4" />
         <path d="M28.5 49.6q2.3 1.2 4.2.7l-.5 1.4q-1.1 1.1-2.5.5-1.6-.6-1.2-2.6Zm32.3-3.8c1.1-1.7 3.5-1.7 4.3-.3.6 1.6-.8 3.9-2.6 3.9-1.2.1-2.7-1.2-1.7-3.6Z" fill={skin} />
@@ -359,12 +415,14 @@ export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, inst
         <rect x="48.5" y="44.2" width="4.4" height="3.2" rx=".6" fill="#ebcc8d" />
       </g>}
       <g className="classroom-actor-face" transform={pose === 'seated' ? 'rotate(-3 45 28)' : undefined}>
+        <HairTail style={outfit.hair} fill={hair} shade={outfit.hairDark} />
         {outfit.hair === 'bun' && <circle cx="37.7" cy="7.1" r="6.5" fill={hair} />}
         <path d="M27 23q0-12 10.3-16.1C51 1.8 61.5 8.4 63.9 19l-1.5 11.9-4.1 4.1H29.4Z" fill={hair} />
         <path d="M30.5 28.5c-3.6-3.6-7.5-2.1-7 1.4.4 2.9 3.3 4.7 7.3 3.8m29.4-7.1c2.6-3.3 6.3-2.3 6 1.1-.1 3-2.6 4.9-5.8 4.9" fill={skin} />
         <path d="M26 29.1q1.1-1.2 2.6.3m35-1.9q1.2-1.1 1.6.1" fill="none" stroke={outfit.skinShade} strokeWidth=".7" />
         <path d="M28.9 24.2C28.4 15 34.4 10.6 43 10.3c11.6-.5 18.6 6.5 18.6 16.9.1 8.9-5.4 14.1-14.7 14.2-11.3.4-17.7-4.8-18-17.2Z" fill={skin} />
         <path d={hairPaths[outfit.hair]} fill={hair} />
+        {outfit.hair === 'undercut' && <path d="M28.7 22.8q2.6-.4 4.4-2m-4.2 4.1q2.8-.5 4.9-2.1" fill="none" stroke={outfit.hairDark} strokeWidth=".45" opacity=".67" />}
         <g clipPath={`url(#${id}-fringe)`} fill={`url(#${id}-lock)`}>
           {locks[outfit.hair].map(shape => <path key={shape} d={shape} />)}
         </g>

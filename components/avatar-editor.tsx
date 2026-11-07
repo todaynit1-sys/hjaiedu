@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Palette, Shirt, Smile, Sparkles, X } from 'lucide-react';
-import { AVATAR_OPTIONS, type AvatarCustomization } from '../lib/avatar-customization';
-import { STORYBOOK_AVATARS, storybookSprite } from '../lib/storybook-avatar';
+import { AVATAR_HEADS_BY_KIND, AVATAR_KINDS, AVATAR_OPTIONS, avatarKind, isHumanHair, type AvatarCustomization, type AvatarKind, type AvatarOption } from '../lib/avatar-customization';
 import type { Character } from '../lib/types';
 import { avatarPalettes, starterAvatar } from './classroom-avatar';
 import { AvatarPreview } from './avatar-preview';
@@ -14,12 +13,18 @@ const categories = [
   { id: 'accessories', label: '소품', Icon: Sparkles },
 ] as const;
 
-const optionLabels: { [Key in keyof AvatarCustomization]: Record<AvatarCustomization[Key], string> } = {
-  hair: { waves: '웨이브', crop: '짧은 머리', spiky: '삐죽 머리', bob: '단발', bun: '올림머리', curls: '곱슬', part: '가르마', long: '긴 머리' },
+const kindLabels: Record<AvatarKind, string> = { male: '남', female: '여', alien: '외계인', animal: '동물' };
+
+const optionLabels: { [Key in AvatarOption]: Record<AvatarCustomization[Key], string> } = {
+  hair: {
+    waves: '웨이브', crop: '짧은 머리', spiky: '삐죽 머리', bob: '단발', bun: '올림머리', curls: '곱슬', part: '가르마', long: '긴 머리',
+    ponytail: '포니테일', pigtails: '양갈래', braid: '땋은 머리', undercut: '언더컷',
+    'alien-sprout': '새싹 외계인', 'alien-moon': '달빛 외계인', cat: '고양이', rabbit: '토끼', bear: '곰',
+  },
   hairColor: { black: '검정', brown: '갈색', blond: '금발', pink: '분홍', silver: '은빛', navy: '남색' },
   skin: { porcelain: '아이보리', peach: '복숭아빛', honey: '꿀빛', bronze: '구릿빛', deep: '짙은 갈색' },
   expression: { smile: '잔잔한 미소', grin: '활짝 웃기', sleepy: '꾸벅꾸벅' },
-  clothing: { plain: '기본 티셔츠', knit: '니트', puffer: '패딩', cardigan: '가디건' },
+  clothing: { plain: '기본 티셔츠', knit: '니트', puffer: '패딩', cardigan: '가디건', hoodie: '후드티', vest: '조끼', overalls: '멜빵바지' },
   clothingColor: { cream: '크림', sage: '연두', sky: '하늘색', lavender: '라벤더', rose: '장밋빛', amber: '호박색', navy: '남색' },
   accessory: { none: '없음', glasses: '안경', cat: '고양이 귀', ribbon: '리본', beanie: '비니', sprout: '새싹', headphones: '헤드폰',
     star: '별', scarf: '목도리', clip: '머리핀', earmuffs: '귀마개', frog: '개구리 모자', mushroom: '버섯 모자', axolotl: '우파 머리띠' },
@@ -31,12 +36,12 @@ const categoryOptions = {
   clothes: [['clothing', '옷 종류'], ['clothingColor', '옷 색']],
   accessories: [['accessory', '소품']],
 } as const;
-const optionValues: { [Key in keyof AvatarCustomization]: readonly AvatarCustomization[Key][] } = AVATAR_OPTIONS;
-const swatches: Partial<Record<keyof AvatarCustomization, Record<string, readonly [string, string]>>> = avatarPalettes;
-const customizationFields = Object.keys(AVATAR_OPTIONS) as Array<keyof AvatarCustomization>;
+const optionValues: { [Key in AvatarOption]: readonly AvatarCustomization[Key][] } = AVATAR_OPTIONS;
+const swatches: Partial<Record<AvatarOption, Record<string, readonly [string, string]>>> = avatarPalettes;
+const customizationFields = Object.keys(AVATAR_OPTIONS) as AvatarOption[];
 
 function sameAvatar(left: AvatarCustomization, right: AvatarCustomization) {
-  return customizationFields.every(key => left[key] === right[key]);
+  return avatarKind(left) === avatarKind(right) && customizationFields.every(key => left[key] === right[key]);
 }
 
 export function AvatarEditor({ character, current, onSave, onClose }: {
@@ -52,12 +57,14 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
   const [error, setError] = useState('');
   const changed = !sameAvatar(draft, initial);
   const previewAvatar = changed ? draft : current;
+  const kind = avatarKind(draft);
+  const creature = !isHumanHair(draft.hair);
 
   useEffect(() => {
     const previous = document.activeElement;
     const element = dialog.current;
     element?.showModal();
-    element?.querySelector<HTMLButtonElement>('.avatar-category[aria-pressed="true"]')?.focus();
+    element?.querySelector<HTMLButtonElement>('.avatar-kind-list [aria-pressed="true"]')?.focus();
     return () => {
       element?.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
@@ -70,7 +77,7 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
     setSaving(true);
     setError('');
     try {
-      await onSave(draft);
+      await onSave({ ...draft, kind });
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '캐릭터를 저장하지 못했어요. 다시 시도해주세요.');
@@ -79,8 +86,19 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
     }
   }
 
-  function optionsFor<Key extends keyof AvatarCustomization>(key: Key, label: string) {
-    const options = optionValues[key];
+  function selectKind(selected: AvatarKind) {
+    if (selected === kind) return;
+    const heads = AVATAR_HEADS_BY_KIND[selected];
+    setDraft(previous => ({
+      ...previous,
+      kind: selected,
+      hair: heads.includes(previous.hair) ? previous.hair : heads[0],
+    }));
+    setCategory('hair');
+    setError('');
+  }
+
+  function optionsFor<Key extends AvatarOption>(key: Key, label: string, options = optionValues[key]) {
     const palette = swatches[key];
     return <fieldset className="avatar-options" key={key}>
       <legend>{label}</legend>
@@ -110,29 +128,29 @@ export function AvatarEditor({ character, current, onSave, onClose }: {
         <figcaption>미리 보기</figcaption>
       </figure>
       <div className="avatar-editor-controls">
-        <fieldset className="avatar-storybook-options">
-          <legend>추천 조합</legend>
-          <div className="avatar-storybook-choices">
-            {STORYBOOK_AVATARS.map(({ id, label, avatar }) => <button type="button" key={id}
-              aria-pressed={sameAvatar(draft, avatar)} disabled={saving}
-              onClick={() => { setDraft({ ...avatar }); setError(''); }}>
-              <span className="avatar-storybook-thumb" aria-hidden="true"
-                style={{ backgroundImage: `url('${storybookSprite(id, 'idle')}')` }} />
-              <span>{label}</span>
-            </button>)}
-          </div>
-        </fieldset>
-        <div className="avatar-category-list" role="group" aria-label="꾸미기 종류">
-          {categories.map(({ id, label, Icon }) => <button className="avatar-category" key={id} type="button"
-            aria-pressed={category === id} disabled={saving} onClick={() => setCategory(id)}><Icon size={16} aria-hidden="true" />{label}</button>)}
+        <div className="avatar-kind-list" role="group" aria-label="캐릭터 유형">
+          {AVATAR_KINDS.map(value => <button key={value} type="button" aria-pressed={kind === value} disabled={saving}
+            onClick={() => selectKind(value)}>{kindLabels[value]}</button>)}
         </div>
-        <div className="avatar-editor-options">{categoryOptions[category].map(([key, label]) => optionsFor(key, label))}</div>
+        <div className="avatar-category-list" role="group" aria-label="꾸미기 종류" data-creature={creature || undefined}>
+          {categories.filter(({ id }) => !creature || id === 'hair' || id === 'clothes').map(({ id, label, Icon }) =>
+            <button className="avatar-category" key={id} type="button" aria-pressed={category === id}
+              disabled={saving} onClick={() => setCategory(id)}>
+              <Icon size={16} aria-hidden="true" />{creature && id === 'hair' ? '종류' : label}
+            </button>)}
+        </div>
+        <div className="avatar-editor-options" key={kind}>{categoryOptions[category].map(([key, label]) => {
+          if (key === 'hair') return optionsFor(key, creature ? `${kindLabels[kind]} 종류` : label, AVATAR_HEADS_BY_KIND[kind]);
+          if (key === 'hairColor' && creature) return null;
+          return optionsFor(key, label);
+        })}</div>
       </div>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {!onSave && <p role="status">지금은 캐릭터를 저장할 수 없어요.</p>}
     <div className="avatar-editor-footer">
-      <button type="button" className="avatar-reset" disabled={!changed || saving} onClick={() => { setDraft(initial); setError(''); }}>되돌리기</button>
+      <button type="button" className="avatar-reset" disabled={!changed || saving}
+        onClick={() => { setDraft(initial); setCategory('hair'); setError(''); }}>되돌리기</button>
       <button type="button" className="primary" disabled={!changed || saving || !onSave} onClick={() => void save()}>{saving ? '저장 중' : '꾸민 모습 저장'}</button>
     </div>
   </dialog>;

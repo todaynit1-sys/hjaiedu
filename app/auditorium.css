@@ -19,7 +19,7 @@
 }
 .auditorium-scene .classroom-floor {
   position: relative; display: block; flex: none; container-type: size;
-  width: min(100%, calc(var(--available-height, 500px) * 2.35));
+  width: 100%;
   height: 100%; min-height: 0; isolation: isolate;
   background: #e6d4bd;
 }
@@ -161,28 +161,38 @@
 .classroom-actor[data-at-lectern] .storybook-actor-art { clip-path: inset(0 0 29%); }
 @media (prefers-reduced-motion: no-preference) {
   .classroom-actor[data-pose="standing"][data-walking] .storybook-gait {
-    animation: storybook-weight 480ms ease-in-out infinite;
+    animation: storybook-weight var(--storybook-cycle, 600ms) ease-in-out infinite;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="idle"] {
-    animation: storybook-idle 480ms linear infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) [data-frame="idle"] [data-art-layer="body"] {
+    animation: storybook-idle var(--storybook-cycle, 600ms) linear infinite;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-actor-art [data-frame="step"][data-art-ready] {
-    animation: storybook-step 480ms linear infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) :is([data-frame="step"], [data-frame="step-back"]) {
+    opacity: 1;
+    transition: none;
+  }
+  .storybook-gait [data-frame="step"] [data-art-layer="body"] { opacity: 0; }
+  .storybook-gait [data-frame="step-back"] [data-art-layer="body"] { opacity: 0; }
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait [data-frame="step"] [data-art-layer="body"] {
+    animation: storybook-step var(--storybook-cycle, 600ms) linear infinite;
+  }
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait [data-frame="step-back"] [data-art-layer="body"] {
+    animation: storybook-step var(--storybook-cycle, 600ms) linear infinite;
+    animation-delay: calc(var(--storybook-cycle, 600ms) / -2);
   }
 }
 @keyframes storybook-idle {
-  0%, 22%, 76%, 100% { opacity: 1; }
-  33%, 65% { opacity: 0; }
+  0%, 47%, 50%, 97%, 100% { opacity: 1; }
+  7%, 40%, 57%, 90% { opacity: 0; }
 }
 @keyframes storybook-step {
-  0%, 22%, 76%, 100% { opacity: 0; }
-  33%, 65% { opacity: 1; }
+  0%, 47%, 100% { opacity: 0; }
+  7%, 40% { opacity: 1; }
 }
 @keyframes storybook-weight {
   0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-3%) rotate(-2.5deg); }
-  52% { transform: translateY(0) rotate(2deg); }
-  76% { transform: translateY(-2.6%) rotate(-1.5deg); }
+  24% { transform: translateY(-2%) rotate(-1.6deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  74% { transform: translateY(-2%) rotate(1.6deg); }
 }
 .classroom-actor[data-facing="left"][data-pose="standing"] .classroom-actor-sprite { transform: scaleX(-1); }
 .classroom-actor .classroom-actor-body { transform-origin: 45px 50px; transition: transform 145ms ease-out; }
@@ -220,6 +230,10 @@
 }
 .classroom-move-mode:disabled { opacity: .65; }
 .auditorium-viewport:focus-visible, .classroom-move-mode:focus-visible { outline: 2px solid #3157a0; outline-offset: -2px; }
+@media (min-width: 761px) {
+  .classroom-workspace .classroom-pane > .auditorium-scene { min-height: 100%; }
+  .auditorium-viewport { height: 0; min-height: 300px; flex: 1 1 0; }
+}
 @media (max-width: 760px) {
   .auditorium-viewport { height: auto; min-height: 0; display: block; flex: none; }
   .auditorium-scene .classroom-floor { width: 100%; height: auto; min-height: 0; aspect-ratio: 4 / 3; }

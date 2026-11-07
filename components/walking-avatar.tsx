@@ -4,6 +4,8 @@ import type { Character, ClassroomPosition } from '../lib/types';
 import { AvatarArt } from './classroom-avatar';
 import { StorybookAvatarArt } from './storybook-avatar-art';
 
+type Facing = 'left' | 'right' | 'up' | 'down';
+
 export function WalkingAvatar({ position, origin, dockExit, floor, mine, number, instructor, name, character, avatar, scale, children }: {
   position?: ClassroomPosition | null;
   origin: ClassroomPosition;
@@ -24,8 +26,10 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
   const element = useRef<HTMLDivElement>(null);
   const previous = useRef({ x, y, shouldSit });
   const animation = useRef<Animation | null>(null);
+  const turnFrame = useRef<number | undefined>(undefined);
   const stepTimer = useRef<number | undefined>(undefined);
   const [seated, setSeated] = useState(shouldSit);
+  const [facing, setFacing] = useState<Facing>('right');
   const appearanceKey = JSON.stringify([character, avatar, Boolean(instructor)]);
   const [readyAppearance, setReadyAppearance] = useState<string>();
   const illustrated = readyAppearance === appearanceKey;
@@ -35,6 +39,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     return () => {
       animation.current?.cancel();
       animation.current = null;
+      if (turnFrame.current !== undefined) cancelAnimationFrame(turnFrame.current);
       window.clearTimeout(stepTimer.current);
       if (node) {
         delete node.dataset.travelling;
@@ -57,6 +62,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     const offset = interrupted ? getComputedStyle(node).translate.split(' ').map(parseFloat) : [];
     animation.current?.cancel();
     animation.current = null;
+    if (turnFrame.current !== undefined) cancelAnimationFrame(turnFrame.current);
     window.clearTimeout(stepTimer.current);
     delete node.dataset.travelling;
     delete node.dataset.walking;
@@ -101,9 +107,15 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     setSeated(false);
     node.dataset.travelling = '';
     if (shouldSit) node.dataset.returning = '';
-    const facing = points.find(point => Math.abs(point.x - from.x) > .008);
-    if (facing) node.dataset.facing = facing.x < from.x ? 'left' : 'right';
+    function faceSegment(index: number) {
+      const a = points[index], b = points[index + 1];
+      const dx = (b.x - a.x) * width, dy = (b.y - a.y) * height;
+      setFacing(Math.abs(dy) > Math.abs(dx) ? (dy < 0 ? 'up' : 'down') : (dx < 0 ? 'left' : 'right'));
+    }
+    faceSegment(0);
     const riseDuration = rising ? 145 : 0;
+    const walkDuration = Math.min(1650, Math.max(210, distance * 2.2));
+    node.style.setProperty('--storybook-cycle', `${Math.min(600, Math.max(300, walkDuration))}ms`);
     if (riseDuration) {
       stepTimer.current = window.setTimeout(() => { node.dataset.walking = ''; }, riseDuration);
     } else {
@@ -115,19 +127,31 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
       zIndex: String(Math.round(point.y * 100) + 1),
       offset: distances[index] / distance,
     })), {
-      duration: Math.min(1650, Math.max(210, distance * 2.2)),
+      duration: walkDuration,
       delay: riseDuration,
       easing: 'cubic-bezier(.29, .10, .70, .96)',
       fill: 'backwards',
     });
     animation.current = walk;
+    let segment = 0;
+    function followTurns() {
+      if (animation.current !== walk) return;
+      const progress = walk.effect?.getComputedTiming().progress ?? 0;
+      while (segment + 2 < points.length && progress * distance >= distances[segment + 1]) {
+        faceSegment(++segment);
+      }
+      turnFrame.current = requestAnimationFrame(followTurns);
+    }
+    if (points.length > 2) turnFrame.current = requestAnimationFrame(followTurns);
     const settle = () => {
       if (animation.current !== walk) return;
       animation.current = null;
+      if (turnFrame.current !== undefined) cancelAnimationFrame(turnFrame.current);
       window.clearTimeout(stepTimer.current);
       delete node.dataset.travelling;
       delete node.dataset.walking;
       delete node.dataset.returning;
+      setFacing(direction => direction === 'up' || direction === 'down' ? 'right' : direction);
       setSeated(shouldSit);
     };
     walk.onfinish = settle;
@@ -143,7 +167,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
   return <div ref={element} className={className} data-seat={number} data-customized={avatar ? 'true' : undefined}
     data-illustrated={illustrated || undefined} data-seat-side={origin.x < .5 ? 'left' : 'right'}
     data-at-lectern={Boolean(instructor && !position) || undefined}
-    data-pose={seated ? 'seated' : 'standing'} data-facing="right" title={name} style={style}>
+    data-pose={seated ? 'seated' : 'standing'} data-facing={facing} title={name} style={style}>
     <svg className="classroom-actor-sprite" viewBox="15 -2 60 66" aria-hidden="true">
       {mine && <ellipse className="classroom-actor-ring" cx="45" cy="60.1" rx="20" ry="3.1" fill="#72cff442" stroke="#ecfcff" strokeWidth="1.6" />}
       <AvatarArt character={character} avatar={avatar} pose="actor" instructor={instructor} />
@@ -151,8 +175,12 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     <div className="storybook-actor-art" aria-hidden="true">
       <div className="storybook-gait">
         <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor} pose="idle"
+          lookingUp={!seated && facing === 'up'} preloadDirections={mine}
           onReady={seated ? undefined : () => setReadyAppearance(appearanceKey)} />
-        <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor} pose="step" />
+        <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor}
+          pose={facing === 'up' ? 'step-up' : facing === 'down' ? 'step-down' : 'step'} frame="step" bodyOnly />
+        <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor}
+          pose={facing === 'up' ? 'step-up-back' : facing === 'down' ? 'step-down-back' : 'step-back'} frame="step-back" bodyOnly />
         {!instructor && <StorybookAvatarArt character={character} avatar={avatar} pose="seated"
           onReady={seated ? () => setReadyAppearance(appearanceKey) : undefined} />}
       </div>

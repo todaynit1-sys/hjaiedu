@@ -86,6 +86,7 @@ async function readyStage(page) {
   await preview.waitFor();
   assert.equal(await editor.locator('.avatar-preview-art canvas').count(), 0, 'All editor previews use the classroom illustration');
   const defaultPreview = await preview.screenshot();
+  await editor.getByRole('button',{name:'여',exact:true}).click();
   const avatarChoices = [
     ['머리', ['단발','분홍']], ['얼굴', ['꿀빛','꾸벅꾸벅']],
     ['옷', ['니트','하늘색']], ['소품', ['고양이 귀']],
@@ -109,7 +110,7 @@ async function readyStage(page) {
   }
   assert(!(await preview.screenshot()).equals(defaultPreview),'The classroom illustration must react to the avatar draft');
   await student.screenshot({path:'.local/screenshots/avatar-editor-mobile.png'});
-  const expectedAvatar = {hair:'bob',hairColor:'pink',skin:'honey',expression:'sleepy',clothing:'knit',clothingColor:'sky',accessory:'cat'};
+  const expectedAvatar = {hair:'bob',hairColor:'pink',skin:'honey',expression:'sleepy',clothing:'knit',clothingColor:'sky',accessory:'cat',kind:'female'};
   const pendingSnapshot = await (await studentB.request.get(roomURL)).json();
   assert.equal(pendingSnapshot.seats.find(seat=>seat.number===1).avatar,undefined,'The editor must keep an unsubmitted draft private');
   await editor.getByRole('button',{name:'꾸민 모습 저장',exact:true}).click();
@@ -235,8 +236,7 @@ async function readyStage(page) {
         const viewport = await student.locator('.auditorium-viewport').boundingBox();
         const floor = await student.locator('.classroom-floor').boundingBox();
         const screen = await student.locator('.classroom-board').boundingBox();
-        return floor.width >= viewport.width*.76 && screen.width >= viewport.width*.42
-          && floor.width / floor.height <= 2.36;
+        return floor.width >= viewport.width - 2 && screen.width >= viewport.width*.42;
       }, 'The stage and screen should use the available width in a short desktop window');
     }
     const classroomComposer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();

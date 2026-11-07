@@ -7,18 +7,25 @@
   --line: #cbd9e7;
   --mint: #e8f1fd;
   --paper: #f3f6fa;
+  --room-width: 1680px;
+  --room-gutter: clamp(12px, 2vw, 28px);
   color: var(--ink);
   background: linear-gradient(180deg, #fffaf1, #f2f6fc 230px);
 }
 
 .classroom-themed > .live-header {
-  height: 62px;
-  padding-inline: max(clamp(12px, 2vw, 28px), calc((100vw - 1624px) / 2));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "brand views actions";
+  height: auto;
+  min-height: 60px;
+  gap: 0 clamp(10px, 1.3vw, 24px);
+  padding-inline: max(var(--room-gutter), calc((100% - var(--room-width)) / 2 + var(--room-gutter)));
   border-bottom: 1px solid var(--line);
   background: #fffdf7;
   box-shadow: 0 2px 10px #243d5b0c;
 }
-.classroom-themed .live-header .brand { gap: 8px; }
+.classroom-themed .live-header .brand { grid-area: brand; gap: 8px; }
 .classroom-themed .live-header .brand-access { min-width: 44px; }
 .classroom-themed .live-header .brand-mark {
   width: 36px;
@@ -38,7 +45,7 @@
   color: var(--muted);
   font-size: 10px;
 }
-.classroom-themed .live-header-actions { gap: 8px; }
+.classroom-themed .live-header-actions { grid-area: actions; justify-self: end; gap: 8px; }
 .classroom-themed .live-header :is(.about-link, .survey-link, .live-share, .room-settings summary, .icon-button) {
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -103,7 +110,7 @@
 .classroom-themed .room-view-workspace > .toast {
   position: relative;
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   inset: auto;
   align-self: end;
   justify-self: center;
@@ -117,8 +124,18 @@
 .classroom-themed .classroom-question-dialog { border-color: var(--line); background: #fffdf7; }
 .classroom-themed .classroom-question-dialog .question-answer-list li { background: #fff; }
 
+@media (max-width: 1180px) {
+  .classroom-themed > .live-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(54px, auto) auto;
+    grid-template-areas: "brand actions" "views views";
+    min-height: 54px;
+    column-gap: 8px;
+  }
+}
 @media (max-width: 760px) {
-  .classroom-themed > .live-header { height: 56px; padding-inline: 9px; gap: 4px; }
+  .live-room.classroom-themed { --room-gutter: 8px; }
+  .classroom-themed > .live-header { grid-template-rows: minmax(52px, auto) auto; min-height: 52px; column-gap: 4px; }
   .classroom-themed .live-header .brand { gap: 4px; }
   .classroom-themed .live-header .brand-mark { width: 30px; height: 30px; border-radius: 8px; }
   .classroom-themed .live-header .brand-title { font-size: 15px; }
