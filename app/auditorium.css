@@ -172,20 +172,19 @@
   .classroom-actor[data-pose="standing"][data-walking] .storybook-gait {
     animation: storybook-weight var(--storybook-cycle, 600ms) ease-in-out infinite;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) [data-frame="idle"] [data-art-layer="body"] {
-    animation: storybook-idle var(--storybook-cycle, 600ms) linear infinite;
+  .classroom-actor:not(.is-instructor, [data-creature]) .storybook-gait {
+    --storybook-frame-ease: step-end;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) :is([data-frame="step"], [data-frame="step-back"]) {
-    opacity: 1;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) [data-frame] {
     transition: none;
   }
-  .storybook-gait [data-frame="step"] [data-art-layer="body"] { opacity: 0; }
-  .storybook-gait [data-frame="step-back"] [data-art-layer="body"] { opacity: 0; }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait [data-frame="step"] [data-art-layer="body"] {
-    animation: storybook-step var(--storybook-cycle, 600ms) linear infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) [data-frame="idle"] {
+    animation: storybook-idle var(--storybook-cycle, 600ms) var(--storybook-frame-ease, linear) infinite;
   }
-  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait [data-frame="step-back"] [data-art-layer="body"] {
-    animation: storybook-step var(--storybook-cycle, 600ms) linear infinite;
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) :is([data-frame="step"], [data-frame="step-back"]) {
+    animation: storybook-step var(--storybook-cycle, 600ms) var(--storybook-frame-ease, linear) infinite;
+  }
+  .classroom-actor[data-pose="standing"][data-walking] .storybook-gait:has([data-frame="step"][data-art-ready]):has([data-frame="step-back"][data-art-ready]) [data-frame="step-back"] {
     animation-delay: calc(var(--storybook-cycle, 600ms) / -2);
   }
 }

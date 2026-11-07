@@ -179,9 +179,9 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
           direction={!seated && (facing === 'up' || facing === 'down') ? facing : undefined} preloadDirections={mine}
           onReady={seated ? undefined : () => setReadyAppearance(appearanceKey)} />
         <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor}
-          pose={facing === 'up' ? 'step-up' : facing === 'down' ? 'step-down' : 'step'} frame="step" bodyOnly />
+          pose={facing === 'up' ? 'step-up' : facing === 'down' ? 'step-down' : 'step'} frame="step" />
         <StorybookAvatarArt character={character} avatar={avatar} instructor={instructor}
-          pose={facing === 'up' ? 'step-up-back' : facing === 'down' ? 'step-down-back' : 'step-back'} frame="step-back" bodyOnly />
+          pose={facing === 'up' ? 'step-up-back' : facing === 'down' ? 'step-down-back' : 'step-back'} frame="step-back" />
         {!instructor && <StorybookAvatarArt character={character} avatar={avatar} pose="seated"
           onReady={seated ? () => setReadyAppearance(appearanceKey) : undefined} />}
       </div>

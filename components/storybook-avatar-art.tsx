@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { isHumanHair, type AvatarCustomization } from '../lib/avatar-customization';
+import { storybookBodyAttachments, storybookHeadAttachments } from '../lib/storybook-attachments';
 import { storybookAvatar, storybookLayer, verticalStorybookPoses, type StorybookPose } from '../lib/storybook-avatar';
 import { STORYBOOK_HEIGHT, STORYBOOK_WIDTH, storybookFrame, type StorybookPalette } from '../lib/storybook-frame';
 import { storybookHeads } from '../lib/storybook-heads';
@@ -37,7 +38,7 @@ function creaturePose(creature: string, pose: StorybookPose, direction?: 'up' | 
 
 export const StorybookAvatarArt = memo(function StorybookAvatarArt({
   character, avatar, instructor = false, pose, frame = pose, className, onReady,
-  bodyOnly = false, direction, preloadDirections = false
+  direction, preloadDirections = false
 }: {
   character: Character;
   avatar?: AvatarCustomization;
@@ -46,7 +47,6 @@ export const StorybookAvatarArt = memo(function StorybookAvatarArt({
   frame?: StorybookPose;
   className?: string;
   onReady?: () => void;
-  bodyOnly?: boolean;
   direction?: 'up' | 'down';
   preloadDirections?: boolean;
 }) {
@@ -55,19 +55,25 @@ export const StorybookAvatarArt = memo(function StorybookAvatarArt({
   const { hair, hairLight, hairDark, shirt, shirtShade, detail = 'plain', expression, accessory = 'none' } = appearance;
   const creature = avatar && !isHumanHair(avatar.hair) ? avatar.hair : undefined;
   const { skin, skinShade } = appearance;
-  const lookingUp = direction === 'up';
+  const gaitFrame = frame === 'step' || frame === 'step-back';
+  const lookingUp = direction === 'up' || pose === 'step-up' || pose === 'step-up-back';
   const side = pose === 'seated' || lookingUp ? 'side' : 'front';
   const portrait = exact ?? hair;
-  const headName = instructor || creature || bodyOnly ? undefined : `head-${portrait}-${side}`;
+  const headName = instructor || creature ? undefined : `head-${portrait}-${side}`;
   const bodyName = instructor ? `smart-robot-${pose === 'seated' ? 'idle' : directedPose(pose, direction)}`
-    : creature ? `creature-${creature}-${creaturePose(creature, pose, direction)}` : `body-${detail}-${pose}`;
+    : creature ? `creature-${creature}-${creaturePose(creature, pose, direction)}` : `body-${detail}-${directedPose(pose, direction)}`;
   const body = useStorybookLayer(bodyName, instructor || creature ? undefined : { skin: [skin, skinShade], clothing: [shirt, shirtShade] },
     instructor ? 'robot' : creature ?? `human/${skin}/${skinShade}`);
   const head = useStorybookLayer(headName, exact || !headName ? undefined : { hair: [hairLight, hairDark], skin: [skin, skinShade] },
     headName ? JSON.stringify([portrait, hairLight, hairDark, skin, skinShade]) : undefined);
   const ready = Boolean(body && (!headName || head));
   const landmarks = head && !exact ? storybookHeads[head.name] : undefined;
-  const raisedSide = lookingUp && head?.name.endsWith('-side');
+  const headAttachment = head && storybookHeadAttachments[head.name];
+  const bodyAttachment = body && storybookBodyAttachments[body.name];
+  // Overlap the neckline slightly so the painted edges stay joined at small scales.
+  const headTransform = headAttachment && bodyAttachment
+    ? `translate(${bodyAttachment[0] - headAttachment[0]} ${bodyAttachment[1] - headAttachment[1] + 8})`
+    : undefined;
 
   useEffect(() => {
     if (!preloadDirections) return;
@@ -82,17 +88,18 @@ export const StorybookAvatarArt = memo(function StorybookAvatarArt({
   useEffect(() => { if (ready) onReady?.(); }, [ready, onReady]);
 
   return <svg className={className} data-frame={frame} data-art-ready={ready ? 'true' : undefined} data-creature={creature}
-    data-art-source={storybookLayer(head?.name ?? headName ?? body?.name ?? bodyName).art}
+    data-art-source={storybookLayer(gaitFrame ? body?.name ?? bodyName : head?.name ?? headName ?? body?.name ?? bodyName).art}
     data-outfit-source={storybookLayer(body?.name ?? bodyName).art}
     viewBox={ready ? `0 0 ${STORYBOOK_WIDTH} ${STORYBOOK_HEIGHT}` : '15 -2 60 66'} width="100%" height="100%"
+    overflow={headName ? 'visible' : undefined}
     aria-hidden="true" focusable="false">
     {ready ? <>
       <image data-art-layer="body" href={body?.href} width={STORYBOOK_WIDTH} height={STORYBOOK_HEIGHT} />
-      {head && <g transform={raisedSide ? 'translate(-5 -23)' : undefined}>
+      {head && <g transform={headTransform}>
         <image data-art-layer="head" href={head.href} width={STORYBOOK_WIDTH} height={STORYBOOK_HEIGHT} />
         {landmarks && <StorybookAvatarDetails appearance={{ accessory, expression, skin, skinShade }}
-          pose={raisedSide ? 'seated' : pose} landmarks={landmarks} />}
+          pose={head.name.endsWith('-side') ? 'seated' : pose} landmarks={landmarks} />}
       </g>}
-    </> : !bodyOnly && <AvatarArt character={character} avatar={avatar} pose={pose === 'seated' ? 'seated' : 'walking'} instructor={instructor} />}
+    </> : !gaitFrame && <AvatarArt character={character} avatar={avatar} pose={pose === 'seated' ? 'seated' : 'walking'} instructor={instructor} />}
   </svg>;
 });
