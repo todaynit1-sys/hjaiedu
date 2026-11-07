@@ -1,0 +1,115 @@
+.classroom-workspace.room-view-workspace {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+  width: min(100%, 1680px);
+  padding: 12px clamp(12px, 2vw, 28px) max(12px, env(safe-area-inset-bottom));
+}
+.room-view-workspace > .classroom-view-tools {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.room-view-workspace .classroom-switch {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d8dfee;
+  border-radius: 12px;
+  background: #edf0f8;
+}
+.room-view-workspace .classroom-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 148px;
+  min-height: 44px;
+  padding: 7px 22px;
+  border-radius: 8px;
+  color: var(--forest-dark);
+  font-size: 15px;
+  font-weight: 700;
+}
+.room-view-workspace .classroom-switch button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--forest);
+  box-shadow: 0 2px 5px #0f1b4c16;
+}
+.room-view-workspace .classroom-switch button:focus-visible {
+  outline: 2px solid var(--forest-dark);
+  outline-offset: 2px;
+}
+.room-view-workspace .view-chat-badge {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #fff;
+  color: #354684;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.room-view-workspace > .classroom-pane {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+}
+.classroom-workspace.room-view-workspace > .live-chat {
+  grid-column: 1;
+  grid-row: 2;
+  width: min(100%, 1120px);
+  margin-inline: auto;
+  border-radius: 16px 16px 0 0;
+}
+.classroom-workspace.room-view-workspace > .chat-composer {
+  grid-column: 1;
+  grid-row: 3;
+  width: min(100%, 1120px);
+  margin-inline: auto;
+  border-radius: 0 0 16px 16px;
+}
+.room-view-workspace > [hidden] { display: none; }
+.room-view-workspace .classroom-view-tools > .materials-button {
+  min-height: 44px;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+.room-view-workspace .chat-header-tools .materials-button { display: none; }
+@media (min-width: 761px) {
+  .room-view-workspace[data-view="classroom"] > .chat-composer { display: none; }
+  .room-view-workspace .chat-scroll { padding: 24px clamp(16px, 4vw, 54px) 12px; }
+  .room-view-workspace .chat-message-body { max-width: min(82%, 720px); }
+  .room-view-workspace .chat-meta { font-size: 12px; }
+  .room-view-workspace .chat-meta b { font-size: 14px; }
+}
+@media (max-width: 760px) {
+  .classroom-workspace.room-view-workspace {
+    padding: 6px 8px max(4px, env(safe-area-inset-bottom));
+  }
+  .room-view-workspace > .classroom-view-tools { gap: 8px; padding-bottom: 6px; }
+  .room-view-workspace .classroom-switch { flex: 1; padding: 2px; gap: 3px; border-radius: 10px; }
+  .room-view-workspace .classroom-switch button {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 4px 6px;
+    gap: 5px;
+    font-size: 14px;
+  }
+  .room-view-workspace .classroom-view-tools > .materials-button { padding: 5px 10px; font-size: 12px; }
+  .room-view-workspace .view-chat-badge {
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    color: transparent;
+    background: #5b6bb4;
+  }
+  .room-view-workspace .classroom-switch button[aria-pressed="true"] .view-chat-badge { background: #fff; }
+}

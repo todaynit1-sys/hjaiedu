@@ -3,9 +3,14 @@ const { mkdirSync, writeFileSync } = require('node:fs');
 const assert = require('node:assert/strict');
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:3010';
 async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) return; await new Promise(r=>setTimeout(r,200)); } throw new Error(message); }
+async function readyStage(page) {
+  await page.locator('canvas.auditorium-world[data-ready="true"]').waitFor();
+  await page.locator('.auditorium-scene[data-world="ready"]').waitFor();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+}
 (async () => {
   mkdirSync('.local/screenshots', { recursive: true });
-  const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
+  const browser = await chromium.launch({ headless: true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'], ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
   const teacher = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const studentA = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const studentB = await browser.newContext();
@@ -14,17 +19,20 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   const mainJoins = await Promise.all([studentA.request.post(base+'/api/rooms/MAMOAI',{data:{type:'join'}}),studentB.request.post(base+'/api/rooms/MAMOAI',{data:{type:'join'}})]);
   assert(mainJoins.every(response=>response.status()===200),'Main room initialization failed');
   assert((await Promise.all(mainJoins.map(response=>response.json()))).every(room=>room.code==='MAMOAI'));
-  await page.goto(base); await page.getByRole('heading',{name:'실시간 채팅',exact:true}).waitFor();
-  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isEnabled(),true);
+  await page.goto(base); await readyStage(page);
+  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isVisible(),false);
   assert.equal(await page.getByLabel('강의실 참여 코드',{exact:true}).count(),0);
   await page.screenshot({ path: '.local/screenshots/home-desktop.png', fullPage: true });
   await page.keyboard.press('Tab'); assert.equal(await page.locator('.skip-link').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('Tab');
+  await page.getByRole('button',{name:'채팅',exact:true}).click();
+  await page.getByRole('heading',{name:'실시간 채팅',exact:true}).waitFor();
+  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isEnabled(),true);
   for (let tap = 0; tap < 5; tap++) await page.getByRole('button',{name:'AI환경연구소 로고',exact:true}).click();
   await page.getByLabel('강사 접속 코드').fill(process.env.TEST_HOST_PASSWORD || '0423');
   await page.getByRole('button', { name: '강사로 들어가기' }).click();
   await page.waitForURL(/host\?room=MAMOAI/);
-  await page.getByRole('heading', { name: '실시간 채팅',exact:true }).waitFor();
+  await readyStage(page);
   assert.match(page.url(),/host\?room=MAMOAI/);
   const create = await teacher.request.post(base+'/api/rooms', { data: { title: '실시간 기능 검증 수업' } }); assert.equal(create.status(), 200);
   const { code } = await create.json();
@@ -59,6 +67,9 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.goto(base+'/room/'+code); await student.getByRole('heading',{name:'실시간 기능 검증 수업'}).waitFor();
   const second = await studentB.newPage();
   await second.goto(base+'/room/'+code);
+  await readyStage(student);
+  await readyStage(page);
+  await readyStage(second);
   const occupied = page.locator('.classroom-seat.is-occupied');
   await waitUntil(async () => (await occupied.count()) === 2, 'Expected one desk for each connected student');
   assert.equal(await page.locator('.classroom-seats > li').count(), 20);
@@ -81,8 +92,13 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
     'The other student must see the selected axolotl on the correct desk');
   await student.setViewportSize({width:390,height:844});
   assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
+  await page.getByRole('button',{name:'채팅',exact:true}).click();
   await page.getByLabel('채팅 메시지',{exact:true}).fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+  await page.getByRole('button',{name:'강당',exact:true}).click();
+  await readyStage(page);
   await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
+  await waitUntil(async()=>await student.getByRole('button',{name:'채팅',exact:true}).getAttribute('aria-describedby')==='new-chat-hint',
+    'The auditorium view must notify students of incoming chat');
   await student.getByLabel('채팅 메시지',{exact:true}).fill('한글 조합 중');
   await student.getByLabel('채팅 메시지',{exact:true}).evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,isComposing:true})));
   assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).inputValue(),'한글 조합 중');
@@ -90,18 +106,24 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByLabel('채팅 메시지',{exact:true}).fill('수강생 질문이 강사에게 보이나요?'); await student.getByLabel('채팅 메시지',{exact:true}).press('Enter');
   const firstBubble = occupied.filter({hasText:'수강생 01'}).locator('.classroom-seat-bubble');
   await firstBubble.getByText('수강생 질문이 강사에게 보이나요?',{exact:true}).waitFor({timeout:10000});
+  await second.getByRole('button',{name:'채팅',exact:true}).click();
   await second.getByLabel('채팅 메시지',{exact:true}).fill('저도 잘 보여요!');
   await second.getByLabel('채팅 메시지',{exact:true}).press('Enter');
+  await second.getByRole('button',{name:'강당',exact:true}).click();
+  await readyStage(second);
   await occupied.filter({hasText:'수강생 02'}).locator('.classroom-seat-bubble').getByText('저도 잘 보여요!',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'채팅',exact:true}).click();
   await page.getByRole('button',{name:'링크 첨부',exact:true}).click(); await page.getByLabel('채팅 메시지',{exact:true}).fill('실습 자료'); await page.getByLabel('링크 주소').fill('https://chatgpt.com/'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
   await student.locator('.classroom-board-content').getByText('실습 자료',{exact:true}).waitFor({timeout:10000});
   await page.locator('.chat-message').filter({hasText:'실습 자료'}).locator('.message-menu summary').click();
   await page.getByRole('button',{name:'상단 고정',exact:true}).click();
-  const classroomButton = student.getByRole('button',{name:'교실',exact:true});
+  await page.getByRole('button',{name:'강당',exact:true}).click();
+  const classroomButton = student.getByRole('button',{name:'강당',exact:true});
   const chatButton = student.getByRole('button',{name:'채팅',exact:true});
   await student.getByLabel('채팅 메시지',{exact:true}).fill('작성 중인 질문');
   await chatButton.click();
   assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).inputValue(), '작성 중인 질문');
+  await waitUntil(async()=>await chatButton.getAttribute('aria-describedby')===null,'Opening chat clears its unread indicator');
   await student.locator('.chat-pinned').waitFor({timeout:10000});
   await student.getByRole('button',{name:'참고자료 다운로드'}).click();
   assert((await student.locator('dialog a[href*="/materials/"]').count()) > 0);
@@ -133,14 +155,31 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await page.screenshot({path:'.local/screenshots/share-qr.png',fullPage:true}); await page.keyboard.press('Escape'); assert.equal(await page.locator('dialog').count(),0);
   for (const [width,height] of [[1440,900],[810,535],[390,844],[320,568]]) {
     await student.setViewportSize({width,height});
+    await readyStage(student);
     await student.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
     assert.equal(await student.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true, 'Overflow at '+width);
     assert.equal(await student.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true,'Page scroll at '+width);
-    const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox(); assert(composer.y>=0 && composer.y+composer.height<=height,'Composer outside first viewport at '+width);
+    if (width >= 761) {
+      assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).isVisible(),false,'Desktop auditorium reserves its full view for the stage');
+      await chatButton.click();
+      const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();
+      assert(composer.y>=0 && composer.y+composer.height<=height,'Chat composer outside first viewport at '+width);
+      const desktopDraft = await student.getByLabel('채팅 메시지',{exact:true}).inputValue();
+      await student.screenshot({path:'.local/screenshots/chat-'+width+'.png',fullPage:true});
+      await classroomButton.click();
+      await readyStage(student);
+      await chatButton.click();
+      assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).inputValue(),desktopDraft,'Desktop view changes preserve the chat draft');
+      await classroomButton.click();
+      await readyStage(student);
+    } else {
+      const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();
+      assert(composer.y>=0 && composer.y+composer.height<=height,'Mobile composer outside first viewport at '+width);
+    }
     const points = await student.locator('.classroom-seat').evaluateAll(items=>items.map(el=>({x:parseFloat(el.style.left), y:parseFloat(el.style.top)})));
     assert.equal(new Set(points.map(point=>point.x+'/'+point.y)).size,20,'Unique auditorium positions at '+width);
     assert(points.every(point=>point.x>0 && point.x<100 && point.y>0 && point.y<100),'All seats inside auditorium at '+width);
-    assert(points[0].y<points[1].y && points[3].y<points[2].y,'First row curves around stage at '+width);
+    assert(points[0].y<points[1].y && points[3].y<points[2].y,'Projected first row curves around stage at '+width);
     assert.equal(await student.locator('.classroom-seat').count(), 20);
     const deskBottom = await student.locator('.classroom-seat').evaluateAll(items=>Math.max(...items.map(el=>el.getBoundingClientRect().bottom)));
     const footer = await student.locator('.classroom-seating-footer').boundingBox();
@@ -159,6 +198,8 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
     await student.screenshot({path:'.local/screenshots/student-'+width+'.png',fullPage:true});
   }
   await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
+  await page.getByRole('button',{name:'강당',exact:true}).click();
+  await readyStage(page);
   await page.screenshot({path:'.local/screenshots/teacher-desktop.png',fullPage:true});
   await page.setViewportSize({width:320,height:1000}); assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,'Teacher overflow at 320');
   await page.evaluate(()=>window.scrollTo({top:0,left:0,behavior:'instant'}));
@@ -186,7 +227,7 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
       const p = body.querySelector('p');
       const frame = el.getBoundingClientRect();
       const textAndLinks = Array.from(body.querySelectorAll('p,a')).map(item => item.getBoundingClientRect());
-      return { size: parseFloat(getComputedStyle(p).fontSize), height: frame.height,
+      return { size: parseFloat(getComputedStyle(p).fontSize), height: frame.height, expanded: el.hasAttribute('data-expanded'),
         fits: body.scrollHeight <= body.clientHeight+1 && body.scrollWidth <= body.clientWidth+1 &&
           textAndLinks.every(box => box.top >= frame.top && box.bottom <= frame.bottom && box.left >= frame.left && box.right <= frame.right) };
     });
@@ -194,7 +235,11 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await postNote(shortNote);
   const compact = await boardMetrics();
   await postNote(mediumNote);
-  await waitUntil(async () => { const m = await boardMetrics(); return m.fits && m.size < compact.size; }, 'Medium post must shrink and fit the mobile board');
+  await waitUntil(async () => {
+    const m = await boardMetrics();
+    const expanded = await board.getAttribute('data-expanded') !== null;
+    return m.fits && (m.size <= compact.size || expanded);
+  }, 'Medium post must fit the screen or expand into a readable board');
   const file = Buffer.from('local QA');
   const uploaded = await teacher.request.post(roomURL+'/files', { data: file, headers: {
     'content-type': 'application/octet-stream', 'x-upload-id': crypto.randomUUID(), 'x-class-date': value.date,
@@ -213,7 +258,14 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   }
   await student.setViewportSize({ width: 320, height: 568 });
   await postNote(shortNote);
-  await waitUntil(async () => { const m = await boardMetrics(); return m.fits && Math.abs(m.height-compact.height)<2 && Math.abs(m.size-compact.size)<1; }, 'Short posts restore original board size');
+  await waitUntil(async () => {
+    const m = await boardMetrics();
+    return m.fits && Math.abs(m.height-compact.height)<2 && m.size>=compact.size-1 && m.expanded===compact.expanded;
+  }, 'Short posts restore compact board height and readable text').catch(async error=>{
+    await student.screenshot({path:'.local/screenshots/chalkboard-restore-error.png'});
+    error.message+=' '+JSON.stringify({compact,current:await boardMetrics(),stage:await board.evaluate(el=>({expanded:el.hasAttribute('data-expanded'),parent:el.parentElement.className,style:el.parentElement.getAttribute('style')}))});
+    throw error;
+  });
   await student.getByRole('button', {name:'닉네임 설정', exact:true}).click();
   const nicknameDialog = student.getByRole('dialog', {name:'닉네임 설정', exact:true});
   await nicknameDialog.getByLabel('수업에서 사용할 이름').fill('몽실구름');
@@ -302,11 +354,12 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
     checks: ['instructor login', '20 visible desks', 'two students with distinct seat bubbles', 'teacher chalkboard',
       'student avatar visible to peers', 'visible live mood counts and vote replacement',
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
-      'mobile tab draft', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
+      'full-width auditorium and separate desktop chat', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
-      'OX quiz, answer regions and correct-answer reveal', 'group-photo PNG download', 'browser errors']
+      'OX quiz, answer regions and correct-answer reveal', 'group-photo PNG download',
+      '20 to 50 live WebGL seats', 'WebGL context loss, fallback and rendered restoration', 'browser errors']
   }, null, 2));
-  console.log('PASS: 20-seat classroom, two students, teacher chalkboard, mobile tabs, materials, voting, moderation and 1440/390/320 layouts.');
+  console.log('PASS: full-width WebGL auditorium, separate desktop and mobile chat, preserved drafts, teacher chalkboard, materials, voting and moderation.');
   await browser.close();
 })().catch(e=>{ console.error(e);process.exit(1); });
 
@@ -315,6 +368,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
   const contexts = [];
   const sockets = [];
   const pages = [];
+  const pageErrors = [];
   const created = await teacher.request.post(base+'/api/rooms', {data:{title:'강당 50명 확인'}});
   assert.equal(created.status(),200);
   const {code} = await created.json();
@@ -343,21 +397,34 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
   }
 
   try {
-    for (let index=0;index<50;index++) await joinStudent();
     const instructor = await teacher.newPage();
     pages.push(instructor);
+    instructor.on('pageerror',error=>pageErrors.push(error.message));
     await instructor.setViewportSize({width:1440,height:900});
+    for (let index=0;index<20;index++) await joinStudent();
     await instructor.goto(base+'/host?room='+code);
     await instructor.getByRole('heading',{name:'강당 50명 확인',exact:true}).waitFor();
+    await readyStage(instructor);
+    assert.equal(await instructor.locator('.classroom-seat').count(),20);
+    for (let index=20;index<50;index++) {
+      await joinStudent();
+      if ([20,30,40].includes(index)) {
+        const expandedCapacity = Math.ceil((index+1)/10)*10;
+        await waitUntil(async()=>await instructor.locator('.classroom-seat').count()===expandedCapacity,
+          'Live auditorium capacity did not expand to '+expandedCapacity);
+        await readyStage(instructor);
+      }
+    }
     await waitUntil(async()=>await instructor.locator('.classroom-seat.is-occupied').count()===50,
       'The auditorium must render all fifty real connected students');
+    await readyStage(instructor);
     assert.equal(await instructor.locator('.classroom-seat').count(),50);
     await instructor.getByText('반원 강당 · 50석',{exact:true}).waitFor();
     const positions = await instructor.locator('.classroom-seat').evaluateAll(seats=>seats.map(seat=>({
       x:parseFloat(seat.style.left),y:parseFloat(seat.style.top)
     })));
     assert.equal(new Set(positions.map(point=>point.x+','+point.y)).size,50);
-    assert(positions.every(point=>point.x>=6&&point.x<=94&&point.y>=8&&point.y<=92),
+    assert(positions.every(point=>point.x>0&&point.x<100&&point.y>0&&point.y<100),
       'Every auditorium seat must be within the interactive floor');
     const lowestSeat = await instructor.locator('.classroom-seat').evaluateAll(seats=>Math.max(...seats.map(seat=>seat.getBoundingClientRect().bottom)));
     const footer = await instructor.locator('.classroom-seating-footer').boundingBox();
@@ -365,8 +432,10 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
 
     const student = await contexts[49].newPage();
     pages.push(student);
+    student.on('pageerror',error=>pageErrors.push(error.message));
     await student.goto(base+'/room/'+code);
     await student.locator('.classroom-seat.is-mine').waitFor();
+    await readyStage(student);
     await student.getByRole('button',{name:'닉네임 설정',exact:true}).click();
     const nickname = student.getByRole('dialog',{name:'닉네임 설정',exact:true});
     await nickname.getByLabel('수업에서 사용할 이름').fill('강당 오십번');
@@ -385,6 +454,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     assert.equal(await student.locator('.classroom-greet-hit').count(),0,
       'Overview must not expose overlapping tiny avatar hit targets');
     await student.getByRole('button',{name:'내 주변',exact:true}).click();
+    await readyStage(student);
     const floor = student.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
     const visibleFloor = student.getByRole('region',{name:'강당 객석',exact:true});
     const ownTarget = student.locator('.classroom-seat.is-mine .classroom-desk-hit');
@@ -407,7 +477,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
       for (const yRatio of [.2,.4,.6,.8]) for (const xRatio of [.2,.4,.6,.8]) {
         const x=bounds.x+bounds.width*xRatio,y=bounds.y+bounds.height*yRatio;
         const hit=document.elementFromPoint(x,y);
-        if (hit?.closest('.classroom-floor')&&!hit.closest('button')) return {x,y};
+        if (hit?.closest('.classroom-floor')&&!hit.closest('button,.world-screen')) return {x,y};
       }
       return null;
     });
@@ -431,19 +501,47 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await student.getByRole('button',{name:'내 자리로',exact:true}).click();
     await waitUntil(async()=>await walker.count()===0,'The fiftieth student must be able to return to their original seat');
 
+    const canvas = instructor.locator('canvas.auditorium-world');
+    const lossControl = await canvas.evaluateHandle(element=>element.getContext('webgl2')?.getExtension('WEBGL_lose_context'));
+    assert(await lossControl.evaluate(extension=>Boolean(extension)),'The WebGL fixture needs the genuine context-loss extension');
+    const widthBeforeLoss = (await canvas.boundingBox()).width;
+    await lossControl.evaluate(extension=>extension.loseContext());
+    await instructor.locator('.auditorium-scene[data-world="fallback"] .auditorium-art').waitFor();
+    await instructor.setViewportSize({width:1280,height:810});
+    await instructor.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.notEqual((await canvas.boundingBox()).width,widthBeforeLoss,'The lost canvas must be resized during this check');
+    assert.equal(await canvas.getAttribute('data-ready'),'false','Resize during context loss must keep the fallback visible');
+    assert.equal(await instructor.locator('.classroom-seat.is-occupied').count(),50,'Context loss must retain the live participants');
+    await lossControl.evaluate(extension=>extension.restoreContext());
+    await readyStage(instructor);
+    assert.equal(await canvas.evaluate(element=>element.getContext('webgl2').isContextLost()),false);
+    const frame = require('pngjs').PNG.sync.read(await canvas.screenshot({
+      style:'.world-screen,.classroom-seats,.classroom-walker{visibility:hidden!important}'
+    }));
+    const sceneColors = new Set();
+    for (let y=8;y<frame.height;y+=16) for (let x=8;x<frame.width;x+=16) {
+      const pixel = (y*frame.width+x)*4;
+      sceneColors.add(`${frame.data[pixel]},${frame.data[pixel+1]},${frame.data[pixel+2]}`);
+    }
+    assert(sceneColors.size>12,'Restored WebGL canvas must draw the auditorium rather than a blank frame');
+    await lossControl.dispose();
+
     sockets[0].close(1000);
     await waitUntil(async()=>sockets[0].readyState===WebSocket.CLOSED,'First student did not disconnect');
     await contexts[0].close();
     const laterContext = await joinStudent();
     const laterStudent = await laterContext.newPage();
     pages.push(laterStudent);
+    laterStudent.on('pageerror',error=>pageErrors.push(error.message));
     await laterStudent.goto(base+'/room/'+code);
+    await readyStage(laterStudent);
     await waitUntil(async()=>await laterStudent.locator('.classroom-own-seat b').innerText()==='51',
       'A later daily student must keep seat fifty-one instead of being renumbered');
     await laterStudent.getByText('반원 강당 · 20석',{exact:true}).waitFor();
     assert.equal(await laterStudent.locator('.classroom-seat').count(),20);
     assert.equal(await laterStudent.getByRole('button',{name:'앞 좌석 보기',exact:true}).isEnabled(),true);
-    console.log('PASS: fifty real students, expanded auditorium, peer reactions, mobile nearby movement and daily seat overflow.');
+    assert.deepEqual(pageErrors,[],'Live capacity transitions must not throw browser errors');
+    console.log('PASS: fifty real students, live auditorium expansion, peer reactions, mobile movement, rendered WebGL recovery and seat overflow.');
   } finally {
     await Promise.allSettled(pages.map(page=>page.close()));
     await Promise.allSettled(sockets.map(socket=>new Promise(resolve=>{

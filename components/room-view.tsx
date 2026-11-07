@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
 import { ClassroomMood } from './classroom-mood';
 import { ClassroomPolls } from './classroom-polls';
@@ -16,6 +16,7 @@ import { api, dateLabel, timeLabel, uploadFile } from '../lib/client';
 import { fileSize, MAX_FILE_BYTES } from '../lib/files';
 import { SURVEY_RESPONSES_URL, SURVEY_URL } from '../lib/survey';
 import type { PublicMessage, ResetTarget, Snapshot } from '../lib/types';
+import '../app/view-tabs.css';
 
 function MessageText({ text }: { text: string }) {
   return <>{text.split(/(https?:\/\/[^\s<>]+)/g).map((part, i) => /^https?:\/\//.test(part) ? <a key={i} href={part} target="_blank" rel="noopener noreferrer">{part}</a> : part)}</>;
@@ -69,7 +70,9 @@ function QuestionDialog({ busy, onAction, onClose }: { busy: boolean; onAction: 
 export function RoomView({ code, host, onBack, onLogout }: { code: string; host: boolean; onBack?: () => void; onLogout?: () => Promise<void> }) {
   const [data, setData] = useState<Snapshot | null>(null); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [connected, setConnected] = useState(true); const [busy, setBusy] = useState(false);
   const [share, setShare] = useState(false); const [questions, setQuestions] = useState(false); const [tab, setTab] = useState<'all' | 'links'>('all'); const [notice, setNotice] = useState(''); const [unread, setUnread] = useState(false);
-  const [mobileView, setMobileView] = useState<'classroom' | 'chat'>('classroom');
+  const [view, setView] = useState<'classroom' | 'chat'>('classroom');
+  const [hasNewChat, setHasNewChat] = useState(false);
+  const observedChat = useRef<{ date: string; id?: string } | null>(null);
   const [pollView, setPollView] = useState<'custom' | 'history' | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [managedPollId, setManagedPollId] = useState<string | null>(null);
@@ -151,7 +154,16 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const messages = data?.messages.filter(m => tab === 'all' || m.url || /https?:\/\//.test(m.text)) ?? []; const lastId = messages.at(-1)?.id;
   function scrollLatest() { const element = scroller.current; if (element) element.scrollTop = element.scrollHeight; nearBottom.current = true; setUnread(false); }
   useEffect(() => { nearBottom.current = true; setUnread(false); }, [date, tab]);
-  useEffect(() => { if (nearBottom.current || forceBottom.current) { scrollLatest(); forceBottom.current = false; } else setUnread(true); }, [lastId, date, tab, mobileView]);
+  useEffect(() => { if (nearBottom.current || forceBottom.current) { scrollLatest(); forceBottom.current = false; } else setUnread(true); }, [lastId, date, tab, view]);
+  useEffect(() => {
+    if (!data) return;
+    const latest = data.messages.at(-1);
+    const previous = observedChat.current;
+    if (view === 'chat' || !latest || previous?.date !== data.date) setHasNewChat(false);
+    else if (previous && previous.id !== latest.id && (!previous.id || data.messages.some(message => message.id === previous.id))
+      && !latest.mine && !(host && latest.author !== 'student')) setHasNewChat(true);
+    observedChat.current = { date: data.date, id: latest?.id };
+  }, [data, view, host]);
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
   const moodPoll = data?.polls.find(poll => poll.kind === 'mood' && !poll.archived);
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
@@ -197,16 +209,17 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       {error ? <><p role="alert">{error}</p><button className="primary" onClick={() => window.location.reload()}>다시 연결</button><a href="/join">다른 강의실 참여</a></> : <p role="status">좌석과 채팅을 준비하고 있어요.</p>}
     </main> : <>
       {error && <div className="live-error" role="alert"><WifiOff size={17} /><span>{error}</span><button aria-label="오류 메시지 닫기" onClick={() => setError('')}><X size={16} /></button></div>}
-      <main id="main" className="classroom-workspace" data-view={mobileView}>
+      <main id="main" className="classroom-workspace room-view-workspace" data-view={view}>
         <h1 className="room-accessible-title">{data.title}</h1>
-        <div className="classroom-mobile-tools">
+        <div className="classroom-mobile-tools classroom-view-tools">
           <div className="classroom-switch" role="group" aria-label="강의실 화면 전환">
-            <button aria-pressed={mobileView === 'classroom'} aria-controls="classroom-pane" onClick={() => setMobileView('classroom')}>교실</button>
-            <button aria-pressed={mobileView === 'chat'} aria-controls="chat-pane" onClick={() => setMobileView('chat')}>채팅</button>
+            <button aria-pressed={view === 'classroom'} aria-controls="classroom-pane" onClick={() => setView('classroom')}><Presentation size={18} aria-hidden="true" />강당</button>
+            <button aria-label="채팅" aria-pressed={view === 'chat'} aria-controls="chat-pane" aria-describedby={hasNewChat ? 'new-chat-hint' : undefined} onClick={() => setView('chat')}><MessageCircle size={18} aria-hidden="true" />채팅{hasNewChat && <span className="view-chat-badge" aria-hidden="true">새 메시지</span>}</button>
           </div>
           {materialsButton}
         </div>
-        <div id="classroom-pane" className="classroom-pane">
+        <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
+        <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
           <ClassroomScene data={data} host={host} onActivity={active ? classroomActivity : undefined} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
             onMove={!host && active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
@@ -215,7 +228,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
             {host && active && <button onClick={() => setQuestions(true)} aria-label="새 투표 만들기" aria-haspopup="dialog"><Plus size={16} />새 투표</button>}
           </div>}
         </div>
-        <section className="live-chat" id="chat-pane" aria-labelledby="chat-title">
+        <section className="live-chat" id="chat-pane" aria-labelledby="chat-title" hidden={view !== 'chat'}>
           <div className="live-chat-heading"><h2 id="chat-title"><MessageCircle size={20} />실시간 채팅</h2>
             <div className="chat-header-tools">
               <button className="classroom-link-filter" aria-label="링크만 보기" aria-pressed={tab === 'links'} onClick={() => setTab(tab === 'links' ? 'all' : 'links')}><Link2 size={14} />링크만</button>

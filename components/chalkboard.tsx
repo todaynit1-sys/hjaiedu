@@ -29,7 +29,7 @@ function fitBoard(board: HTMLDivElement, content: HTMLDivElement, caption: HTMLP
   caption.style.fontSize = `${lower}px`;
 }
 
-export function Chalkboard({ message, code, active }: { message?: PublicMessage; code: string; active: boolean }) {
+export function Chalkboard({ message, code, active, onExpanded }: { message?: PublicMessage; code: string; active: boolean; onExpanded?: (expanded: boolean) => void }) {
   const caption = message?.text || (active ? '질문은 편하게 남겨주세요!' : '오늘 강의가 끝났어요.');
   const boardRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -37,7 +37,11 @@ export function Chalkboard({ message, code, active }: { message?: PublicMessage;
   useLayoutEffect(() => {
     const board = boardRef.current, content = contentRef.current, paragraph = captionRef.current;
     if (!board || !content || !paragraph) return;
-    const measure = () => fitBoard(board, content, paragraph);
+    const measure = () => {
+      if (!board.clientWidth) return;
+      fitBoard(board, content, paragraph);
+      onExpanded?.(board.hasAttribute('data-expanded'));
+    };
     let frame = 0;
     let disposed = false;
     function schedule() {
@@ -68,7 +72,7 @@ export function Chalkboard({ message, code, active }: { message?: PublicMessage;
       window.visualViewport?.removeEventListener('resize', schedule);
       document.fonts?.removeEventListener?.('loadingdone', schedule);
     };
-  }, [caption, message?.id, message?.url, message?.attachment?.name]);
+  }, [caption, message?.id, message?.url, message?.attachment?.name, onExpanded]);
 
   return <div ref={boardRef} className="classroom-board fitted-chalkboard" role="region" aria-label="강의실 칠판">
     <div ref={contentRef} className="classroom-board-content">

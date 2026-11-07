@@ -56,6 +56,7 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
   }
   function click(event: MouseEvent<HTMLDivElement>) {
     if (!current || !onMove) return;
+    if (event.target instanceof Element && event.target.closest('a, button, input, textarea, select, .world-screen')) return;
     const field = event.currentTarget.getBoundingClientRect();
     move(bounded((event.clientX - field.x) / field.width, (event.clientY - field.y) / field.height));
     floor.current?.focus({ preventScroll: true });
