@@ -1,0 +1,97 @@
+.room-view-workspace { position: relative; }
+
+.room-view-workspace > .classroom-alerts {
+  position: absolute;
+  grid-area: 2 / 1 / 3 / 2;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: 4px;
+  pointer-events: none;
+}
+.classroom-alerts-stack {
+  display: grid;
+  gap: 7px;
+  width: min(100%, 370px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 4px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.classroom-alert {
+  --alert-border: #b5cbea;
+  --alert-title: #214f9c;
+  --alert-paper: #f7fbff;
+  --alert-action: #e7f0ff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 8px;
+  padding: 4px 5px 6px 11px;
+  border: 1px solid var(--alert-border);
+  border-radius: 12px;
+  color: #233a56;
+  background: var(--alert-paper);
+  box-shadow: 0 3px 8px #243d5b27;
+  animation: classroom-alert-appear 160ms ease-out both;
+  pointer-events: auto;
+}
+.classroom-alert[data-kind="question"] {
+  --alert-border: #e8c988;
+  --alert-title: #714709;
+  --alert-paper: #fffbef;
+  --alert-action: #ffedc7;
+}
+.classroom-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--alert-title);
+  font-size: 14px;
+  font-weight: 770;
+  line-height: 1.35;
+}
+.classroom-alert-text {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.classroom-alert-close, .classroom-alert-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  color: var(--alert-title);
+}
+.classroom-alert-close:hover, .classroom-alert-action { background: var(--alert-action); }
+.classroom-alert-action {
+  gap: 4px;
+  padding-inline: 8px;
+  border: 1px solid var(--alert-border);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.classroom-alert-action:hover { border-color: currentColor; }
+.classroom-alert :is(.classroom-alert-action, .classroom-alert-close):focus-visible {
+  outline: 2px solid var(--alert-title);
+  outline-offset: -3px;
+}
+@keyframes classroom-alert-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .classroom-alert { animation: none; }
+}

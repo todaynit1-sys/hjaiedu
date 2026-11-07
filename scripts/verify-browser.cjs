@@ -134,8 +134,9 @@ async function readyStage(page) {
   await editor.getByRole('button',{name:'캐릭터 꾸미기 닫기',exact:true}).click();
   await student.setViewportSize({width:390,height:844});
   assert.equal(await page.getByRole('button',{name:'캐릭터 꾸미기',exact:true}).count(), 0);
+  const instructorMessage = '강사와 수강생이 함께 나누는 실시간 채팅입니다.';
   const teacherChatInput = page.getByLabel('채팅 메시지',{exact:true});
-  await teacherChatInput.fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.');
+  await teacherChatInput.fill(instructorMessage);
   await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'강의실',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal(await page.getByRole('heading',{name:'실시간 채팅',exact:true}).count(),0);
@@ -146,9 +147,25 @@ async function readyStage(page) {
     const composer = await page.locator('.chat-composer').boundingBox();
     return toast && composer && toast.y+toast.height <= composer.y;
   },'The send confirmation must stay above the persistent composer');
-  await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
+  await student.locator('.classroom-board-content').getByText(instructorMessage,{exact:true}).waitFor({timeout:10000});
   await waitUntil(async()=>await student.getByRole('button',{name:'채팅',exact:true}).getAttribute('aria-describedby')==='new-chat-hint',
     'The auditorium view must notify students of incoming chat');
+  const instructorAlert = student.locator('.classroom-alert[data-kind="message"]');
+  await instructorAlert.getByText(instructorMessage,{exact:true}).waitFor();
+  assert.equal(await page.locator('.classroom-alert[data-kind="message"]').count(),0,'The instructor should not be alerted to their own chat');
+  await instructorAlert.getByRole('button',{name:'채팅 보기',exact:true}).click();
+  await student.getByRole('heading',{name:'실시간 채팅',exact:true}).waitFor();
+  const chatTarget = student.locator('.chat-message').filter({hasText:instructorMessage});
+  await waitUntil(async()=>await chatTarget.evaluate(message=>message===document.activeElement),
+    'The alert should focus the linked instructor message');
+  assert.equal(await instructorAlert.count(),0);
+  await student.getByRole('button',{name:'강의실',exact:true}).click();
+  await readyStage(student);
+  await second.reload();
+  await readyStage(second);
+  await second.locator('.classroom-board-content').getByText(instructorMessage,{exact:true}).waitFor();
+  const peerInstructorAlerts = second.locator('.classroom-alert[data-kind="message"]');
+  assert.equal(await peerInstructorAlerts.count(),0,'Reloaded chat history should not show instructor alerts');
   await student.getByLabel('채팅 메시지',{exact:true}).fill('한글 조합 중');
   await student.getByLabel('채팅 메시지',{exact:true}).evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,isComposing:true})));
   assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).inputValue(),'한글 조합 중');
@@ -156,6 +173,10 @@ async function readyStage(page) {
   await student.getByLabel('채팅 메시지',{exact:true}).fill('수강생 질문이 강사에게 보이나요?'); await student.getByLabel('채팅 메시지',{exact:true}).press('Enter');
   const firstBubble = page.locator('.classroom-actor[data-seat="1"] .classroom-seat-bubble');
   await firstBubble.getByText('수강생 질문이 강사에게 보이나요?',{exact:true}).waitFor({timeout:10000});
+  await second.locator('.classroom-actor[data-seat="1"] .classroom-seat-bubble')
+    .getByText('수강생 질문이 강사에게 보이나요?',{exact:true}).waitFor();
+  await second.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await peerInstructorAlerts.count(),0,'A student message must not create an instructor alert');
   await second.getByRole('button',{name:'채팅',exact:true}).click();
   await second.getByLabel('채팅 메시지',{exact:true}).fill('저도 잘 보여요!');
   await second.getByLabel('채팅 메시지',{exact:true}).press('Enter');
@@ -435,6 +456,9 @@ async function readyStage(page) {
   await activities.getByRole('button',{name:'박수',exact:true}).click();
   await peerActor.locator('[data-kind="clap"]').waitFor();
   await activities.getByRole('button',{name:'단체사진 미리보기',exact:true}).click();
+  const reflection = '환경 데이터와 AI 활용을 연결해 본 수업이었어요.';
+  await activities.getByLabel('짧은 소감 (선택)',{exact:true}).fill(reflection);
+  await activities.locator('.classroom-photo-caption').getByText(reflection,{exact:true}).waitFor();
   const photoDownload = student.waitForEvent('download');
   await activities.getByRole('button',{name:'단체사진 PNG 저장',exact:true}).click();
   const photo = await photoDownload;
@@ -443,7 +467,30 @@ async function readyStage(page) {
   const photoBytes = require('node:fs').readFileSync(await photo.path());
   assert.equal(photoBytes.subarray(1,4).toString(),'PNG');
   require('node:fs').copyFileSync(await photo.path(),'.local/screenshots/classroom-group-photo.png');
+  await activities.getByRole('button',{name:'내 수강 기록에 저장',exact:true}).click();
+  await activities.getByText('내 수강 기록에 저장했어요.',{exact:true}).waitFor();
   await activities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
+  await student.reload();
+  await readyStage(student);
+  await student.getByRole('button',{name:'활동',exact:true}).click();
+  await activities.getByRole('button',{name:'내 수강 기록 보기',exact:true}).click();
+  const archive = student.getByRole('dialog',{name:'내 수강 기록',exact:true});
+  await archive.getByRole('heading',{name:'내 수강 기록 · 1개',exact:true}).waitFor();
+  const memory = archive.getByRole('article');
+  await memory.getByRole('heading',{name:'실시간 기능 검증 수업',exact:true}).waitFor();
+  await memory.getByText(reflection,{exact:true}).waitFor();
+  await memory.getByText('사진 보기',{exact:true}).click();
+  const savedPhoto = memory.getByRole('img',{name:'실시간 기능 검증 수업 단체사진, 소감 포함',exact:true});
+  await savedPhoto.waitFor();
+  await waitUntil(async()=>await savedPhoto.evaluate(image=>image.complete&&image.naturalWidth===900),
+    'Reloaded portfolio should restore the original photo Blob');
+  await archive.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
+  await second.getByRole('button',{name:'활동',exact:true}).click();
+  await second.getByRole('dialog',{name:'교실 활동',exact:true}).getByRole('button',{name:'내 수강 기록 보기',exact:true}).click();
+  const peerArchive = second.getByRole('dialog',{name:'내 수강 기록',exact:true});
+  await peerArchive.getByRole('heading',{name:'내 수강 기록 · 0개',exact:true}).waitFor();
+  assert.equal(await peerArchive.getByRole('article').count(),0,'Other browser contexts must not see local portfolio records');
+  await peerArchive.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
   const greetingRequest = target => target.waitForResponse(response => response.request().method()==='POST' && response.url().endsWith('/api/rooms/'+code) && response.request().postDataJSON()?.type==='greet');
   await second.getByRole('button',{name:'내 주변',exact:true}).click();
   await student.getByRole('button',{name:'내 주변',exact:true}).click();
@@ -471,7 +518,9 @@ async function readyStage(page) {
   const hostQuestion = page.getByRole('dialog',{name:/^질문 (출제|관리)$/});
   await hostQuestion.getByLabel('질문',{exact:true}).fill(prompt);
   await hostQuestion.getByRole('button',{name:'질문 열기',exact:true}).click();
-  await student.getByRole('button',{name:'질문 답하기',exact:true}).waitFor();
+  const questionAlert = student.locator('.classroom-alert[data-kind="question"]');
+  await questionAlert.getByText(prompt,{exact:true}).waitFor();
+  assert.equal(await page.locator('.classroom-alert[data-kind="question"]').count(),0);
   const mobileToolbar = student.locator('.classroom-view-tools');
   const mobileToolbarButtons = mobileToolbar.getByRole('button');
   assert.equal(await mobileToolbarButtons.count(),6,'The compact classroom bar should expose all six controls');
@@ -484,18 +533,24 @@ async function readyStage(page) {
       (index===0 || box.left>=boxes[index-1].right));
   }), 'Question, camera, tabs and materials must fit on one 320px toolbar with distinct touch targets');
   await student.screenshot({path:'.local/screenshots/classroom-toolbar-320.png'});
-  await student.getByRole('button',{name:'질문 답하기',exact:true}).click();
+  await questionAlert.getByRole('button',{name:'질문 답하기',exact:true}).click();
   const studentQuestion = student.getByRole('dialog',{name:'질문 답하기',exact:true});
   await studentQuestion.getByText(prompt,{exact:true}).waitFor();
+  assert.equal(await questionAlert.count(),0);
   await studentQuestion.getByLabel('내 답변',{exact:true}).fill(answer);
   await studentQuestion.getByRole('button',{name:'답변 보내기',exact:true}).click();
   await studentQuestion.getByRole('button',{name:'답변 수정',exact:true}).waitFor();
   await student.screenshot({path:'.local/screenshots/classroom-question-mobile.png'});
   await studentQuestion.getByRole('button',{name:'질문 창 닫기',exact:true}).click();
 
+  await second.reload();
+  await readyStage(second);
+  const peerQuestionButton = second.locator('.classroom-view-tools').getByRole('button',{name:'질문 답하기',exact:true});
+  await peerQuestionButton.waitFor();
+  assert.equal(await second.locator('.classroom-alert[data-kind="question"]').count(),0,'Reload must not alert for an already active question');
   await second.getByRole('button',{name:'채팅',exact:true}).click();
   assert.equal(await second.getByRole('group',{name:'교실 보기',exact:true}).count(),0);
-  await second.getByRole('button',{name:'질문 답하기',exact:true}).click();
+  await peerQuestionButton.click();
   const peerQuestion = second.getByRole('dialog',{name:'질문 답하기',exact:true});
   await peerQuestion.getByText(prompt,{exact:true}).waitFor();
   assert.equal(await peerQuestion.getByText(answer,{exact:true}).count(),0);
@@ -528,7 +583,9 @@ async function readyStage(page) {
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'single-line 320px classroom toolbar', 'full-width auditorium and persistent composer', 'desktop classroom chat send', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
-      'short-answer questions in classroom and chat, private submission, close and publication', 'group-photo PNG download', 'instructor movement and return visible to students',
+      'short-answer questions in classroom and chat, private submission, close and publication',
+      'teacher and question alert destinations, student-message filtering and reload suppression',
+      'group-photo PNG download and local portfolio with reflection, reload persistence and context isolation', 'instructor movement and return visible to students',
       'student autonomous movement, manual takeover and continuous animated return to seat',
       '20 to 50 live WebGL seats', 'WebGL context loss, fallback and rendered restoration', 'browser errors']
   }, null, 2));

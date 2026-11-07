@@ -1,0 +1,30 @@
+.classroom-photo-reflection { margin-top: 14px; }
+.classroom-photo-reflection label { margin-bottom: 6px; color: var(--forest-dark); font-size: 14px; }
+.classroom-photo-reflection textarea { min-height: 76px; padding: 10px; border-color: var(--line); font-size: 16px; }
+.classroom-photo-reflection > p { display: flex; justify-content: space-between; gap: 8px; }
+.classroom-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.classroom-photo-actions button { flex: 1 1 160px; justify-content: center; }
+.classroom-activities-content .classroom-photo-notice { color: var(--forest); font-weight: 650; }
+.classroom-activities-content > .classroom-portfolio-open,
+.classroom-activities-content > .classroom-portfolio-back { width: 100%; margin-bottom: 12px; font-weight: 650; }
+.classroom-portfolio { min-width: 0; }
+.classroom-portfolio h3 { color: var(--forest-dark); }
+.classroom-portfolio .classroom-storage-note { line-height: 1.6; }
+.classroom-memory-empty { padding: 15px 0; }
+.classroom-memory-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px; }
+.classroom-memory-list article { padding: 14px; background: #f8faff; border: 1px solid var(--line); border-radius: 10px; }
+.classroom-memory-list time { color: var(--muted); font-size: 12px; }
+.classroom-memory-list h4 { margin: 5px 0 8px; color: var(--forest-dark); font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+.classroom-memory-list .classroom-memory-reflection { margin: 10px 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.classroom-memory-photo { min-width: 0; margin-top: 10px; }
+.classroom-memory-photo summary { display: flex; gap: 6px; align-items: center; min-height: 44px; width: fit-content; padding: 6px 8px; color: var(--forest-dark); font-size: 14px; font-weight: 650; border-radius: 6px; cursor: pointer; }
+.classroom-memory-photo summary:hover { background: var(--mint); }
+.classroom-memory-photo summary::marker { content: ''; }
+.classroom-memory-photo summary::-webkit-details-marker { display: none; }
+.classroom-memory-photo summary:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.classroom-memory-photo img { display: block; width: 100%; height: auto; margin: 6px 0 12px; border-radius: 6px; }
+.classroom-activities-content .classroom-memory-download { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+@media (max-width: 380px) {
+  .classroom-photo-actions button { flex-basis: 100%; }
+  .classroom-memory-list article { padding: 10px; }
+}

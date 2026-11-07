@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LocateFixed, LogOut, Maximize, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
 import { ClassroomQuestion } from './classroom-activities';
+import { ClassroomAlerts } from './classroom-alerts';
 import { ClassroomPolls } from './classroom-polls';
 import { Brand } from './brand';
 import { AboutLink } from './about-link';
@@ -26,7 +27,7 @@ function ChatMessage({ code, message, host, editable, busy, onAction, onNotice }
   const [confirming, setConfirming] = useState(false);
   const teacher = message.author !== 'student'; const mine = message.mine || (host && teacher);
   async function copy() { try { await navigator.clipboard.writeText(message.url ?? message.text); onNotice('복사했어요.'); } catch { onNotice('내용을 선택해서 복사해주세요.'); } }
-  return <article className={`chat-message ${mine ? 'my-message' : ''} ${teacher ? 'teacher-message' : ''}`}>
+  return <article className={`chat-message ${mine ? 'my-message' : ''} ${teacher ? 'teacher-message' : ''}`} data-message-id={message.id} tabIndex={-1}>
     <div className="chat-message-body"><div className="chat-meta"><b>{message.authorName ?? '강사'}</b>{mine && <span>나</span>}<time dateTime={message.createdAt}>{timeLabel(message.createdAt)}</time></div>
       <div className="chat-bubble"><p><MessageText text={message.text} /></p>{message.url && <a className="chat-link" href={message.url} target="_blank" rel="noopener noreferrer"><Link2 size={16} /><span>{new URL(message.url).hostname.replace('www.', '')}</span><ExternalLink size={14} /></a>}{message.attachment && <a className="chat-file" href={`/api/rooms/${code}/files/${message.attachment.id}`} download={message.attachment.name} aria-label={`${message.attachment.name} 다운로드`}><FileText size={22} aria-hidden="true" /><span><b>{message.attachment.name}</b><small>{fileSize(message.attachment.size)} · 오늘만 다운로드</small></span><Download size={18} aria-hidden="true" /></a>}</div>
       <details className="message-menu"><summary aria-label={`${message.text.slice(0, 20)} 메시지 메뉴`}><MoreHorizontal size={17} /></summary><div><button onClick={copy}><Copy size={14} />복사</button>{host && editable && <><button disabled={busy} onClick={() => onAction({ type: 'pin', id: message.id }, message.pinned ? '고정을 해제했어요.' : '메시지를 고정했어요.')}><Pin size={14} />{message.pinned ? '고정 해제' : '상단 고정'}</button><button disabled={busy} onClick={() => setConfirming(true)}><Trash2 size={14} />삭제</button></>}</div></details>
@@ -76,6 +77,11 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const [nearRequest, setNearRequest] = useState(0);
   const [hasNewChat, setHasNewChat] = useState(false);
   const observedChat = useRef<{ date: string; id?: string } | null>(null);
+  const observedAlerts = useRef<{ day: string; messages: Set<string>; questions: Set<string> } | null>(null);
+  const [messageAlert, setMessageAlert] = useState<string>();
+  const [questionAlert, setQuestionAlert] = useState<string>();
+  const [questionOpen, setQuestionOpen] = useState(false);
+  const [chatTarget, setChatTarget] = useState<string>();
   const [pollView, setPollView] = useState<'custom' | 'history' | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [managedPollId, setManagedPollId] = useState<string | null>(null);
@@ -169,6 +175,53 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       && !latest.mine && !(host && latest.author !== 'student')) setHasNewChat(true);
     observedChat.current = { date: data.date, id: latest?.id };
   }, [data, view, host]);
+  useEffect(() => {
+    if (!data || host) return;
+    const day = `${data.code}/${data.date}`;
+    const round = data.questionRound;
+    const seen = observedAlerts.current;
+    if (seen?.day !== day) {
+      observedAlerts.current = {
+        day,
+        messages: new Set(data.messages.map(message => message.id)),
+        questions: new Set(round ? [round.id] : [])
+      };
+      setMessageAlert(undefined);
+      setQuestionAlert(undefined);
+      return;
+    }
+    let latest: PublicMessage | undefined;
+    for (const message of data.messages) {
+      if (!seen.messages.has(message.id) && message.author !== 'student') latest = message;
+      seen.messages.add(message.id);
+    }
+    if (latest) setMessageAlert(latest.id);
+    if (round && !seen.questions.has(round.id)) {
+      seen.questions.add(round.id);
+      if (round.open && round.myAnswer === null && !questionOpen) setQuestionAlert(round.id);
+    }
+  }, [data, host, questionOpen]);
+  useEffect(() => {
+    if (!messageAlert) return;
+    const timer = window.setTimeout(() => {
+      if (!document.activeElement?.closest('.classroom-alert[data-kind="message"]')) setMessageAlert(undefined);
+    }, 12000);
+    return () => window.clearTimeout(timer);
+  }, [messageAlert]);
+  useEffect(() => {
+    if (!chatTarget || view !== 'chat') return;
+    const element = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(chatTarget)}"]`);
+    element?.focus({ preventScroll: true });
+    element?.scrollIntoView({ block: 'nearest' });
+    setChatTarget(undefined);
+  }, [chatTarget, view]);
+  const alertMessage = data?.messages.find(message => message.id === messageAlert);
+  const round = data?.questionRound;
+  const alertQuestion = round?.id === questionAlert && round?.open && round.myAnswer === null ? round : undefined;
+  function toggleQuestion(open: boolean) {
+    setQuestionOpen(open);
+    if (open) setQuestionAlert(undefined);
+  }
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
   const previousPolls = data?.polls.filter(poll => poll.kind === 'custom' && poll.archived) ?? [];
@@ -224,7 +277,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
               <button type="button" aria-label="내 주변" title="내 주변" aria-pressed={sceneView === 'near'}
                 onClick={() => { setSceneView('near'); setNearRequest(request => request + 1); }}><LocateFixed size={16} aria-hidden="true" /><span>내 주변</span></button>
             </div>}
-            <ClassroomQuestion data={data} host={host} onAction={active ? classroomActivity : undefined} />
+            <ClassroomQuestion data={data} host={host} open={questionOpen} onOpenChange={toggleQuestion}
+              onAction={active ? classroomActivity : undefined} />
             {materialsButton}
           </div>
         </div>
@@ -261,6 +315,11 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {unread && <button className="new-messages" onClick={scrollLatest}><ArrowDown size={15} />새 메시지 보기</button>}
         </section>
         <Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
+        {!host && <ClassroomAlerts message={alertMessage} question={alertQuestion}
+          onOpenChat={() => { setChatTarget(messageAlert); setMessageAlert(undefined); setTab('all'); setView('chat'); }}
+          onOpenQuestion={() => toggleQuestion(true)}
+          onDismissMessage={() => setMessageAlert(undefined)}
+          onDismissQuestion={() => setQuestionAlert(undefined)} />}
         <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>
       </main>
     </>}

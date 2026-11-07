@@ -2,6 +2,9 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { CircleHelp, Hand, Heart, MessageSquare, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
 import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type ClassroomSeat, type ReactionKind, type Snapshot } from '../lib/types';
 import '../app/classroom-activities.css';
+import { saveClassroomMemory } from '../lib/classroom-portfolio';
+import { ClassroomPortfolio, photoReflectionLines, renderGroupPhoto, useDownloadPhoto } from './classroom-portfolio';
+import { AvatarArt } from './classroom-avatar';
 
 export type ClassroomAction = (input: Record<string, unknown>) => Promise<void>;
 const reactions = {
@@ -34,21 +37,24 @@ export function ActivityBadge({ seat, updatedAt }: { seat: ClassroomSeat; update
   </span>;
 }
 
-export function ClassroomQuestion({ data, onAction, host }: {
-  data: Snapshot; onAction?: ClassroomAction; host: boolean;
+export function ClassroomQuestion({ data, onAction, host, open, onOpenChange }: {
+  data: Snapshot; onAction?: ClassroomAction; host: boolean; open: boolean; onOpenChange: (open: boolean) => void;
 }) {
   const round = data.questionRound;
-  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   if (!host && !round) return null;
 
   const label = host ? (round ? '질문 관리' : '질문 출제') : (round?.open ? '질문 답하기' : '답변 보기');
   return <>
     <button className="classroom-question-trigger" type="button" aria-haspopup="dialog" aria-label={label} title={label}
-      onClick={() => setOpen(true)}>
+      ref={trigger} onClick={() => onOpenChange(true)}>
       <MessageSquare size={16} aria-hidden="true" /><span>{label}</span>
     </button>
     {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host}
-      onAction={onAction} onClose={() => setOpen(false)} />}
+      onAction={onAction} onClose={() => {
+        onOpenChange(false);
+        requestAnimationFrame(() => trigger.current?.focus());
+      }} />}
   </>;
 }
 
@@ -185,57 +191,68 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const photo = useRef<SVGSVGElement>(null);
+  const pending = useRef(false);
+  const reflectionId = useId();
   const [takingPhoto, setTakingPhoto] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [reflection, setReflection] = useState('');
+  const [savedSignature, setSavedSignature] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const downloadPhoto = useDownloadPhoto();
   const mySeat = data.seats.find(seat => seat.mine);
   const photoSeats = data.seats;
-  const rows = Math.max(1, Math.ceil(photoSeats.length / 6));
-  const photoHeight = 230 + rows * 110;
+  const includeInstructor = host || Boolean(data.instructor);
+  const photoMembers = [
+    ...(includeInstructor ? [{ id: 'instructor', name: '강사', head: <AvatarArt character="glasses" pose="portrait" /> }] : []),
+    ...photoSeats.map(seat => ({ id: String(seat.number), name: seat.name, head: renderHead(seat) }))
+  ];
+  const rows = Math.max(1, Math.ceil(photoMembers.length / 6));
+  const reflectionLines = useMemo(() => photoReflectionLines(reflection), [reflection]);
+  const reflectionY = 205 + rows * 110;
+  const photoHeight = 230 + rows * 110 + (reflectionLines.length ? 65 + reflectionLines.length * 29 : 0);
+  const photoSignature = JSON.stringify({ date: data.date, title: data.title, reflection: reflection.trim(), includeInstructor,
+    seats: photoSeats.map(({ number, name, character, avatar }) => ({ number, name, character, avatar })) });
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current;
     element?.showModal();
     return () => { element?.close(); previous?.focus(); };
   }, []);
+  useEffect(() => {
+    dialog.current?.querySelector<HTMLButtonElement>(showPortfolio ? '.classroom-portfolio-back' : '.classroom-portfolio-open')?.focus();
+  }, [showPortfolio]);
   async function run(input: Record<string, unknown>) {
-    if (!onAction || busy) return;
+    if (!onAction || pending.current) return;
+    pending.current = true;
     setBusy(true); setError('');
     try { await onAction(input); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '다시 시도해주세요.'); }
-    finally { setBusy(false); }
+    finally { pending.current = false; setBusy(false); }
   }
-  async function savePhoto() {
-    if (!photo.current || busy) return;
-    setBusy(true); setError('');
-    let source = '';
-    let download = '';
+  async function savePhoto(destination: 'download' | 'portfolio') {
+    if (!photo.current || pending.current) return;
+    pending.current = true;
+    setBusy(true); setError(''); setNotice('');
     try {
-      await document.fonts.ready;
-      source = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(photo.current)], {type:'image/svg+xml;charset=utf-8'}));
-      const image = new Image();
-      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('단체사진을 만들지 못했어요.')); image.src = source; });
-      const canvas = document.createElement('canvas');
-      canvas.width = 900; canvas.height = photoHeight;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('이 브라우저에서는 사진 저장을 지원하지 않아요.');
-      context.drawImage(image, 0, 0);
-      const blob = await new Promise<Blob>((resolve,reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('사진 저장을 다시 시도해주세요.')), 'image/png'));
-      download = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = download; anchor.download = `AI강의실-단체사진-${data.date}.png`;
-      document.body.append(anchor); anchor.click(); anchor.remove();
+      const image = await renderGroupPhoto(photo.current, 900, photoHeight);
+      if (destination === 'portfolio') {
+        await saveClassroomMemory({ id: crypto.randomUUID(), title: data.title, date: data.date, reflection: reflection.trim(), image, savedAt: Date.now() });
+        setSavedSignature(photoSignature);
+        setNotice('내 수강 기록에 저장했어요.');
+      } else downloadPhoto(image, data.date);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '사진 저장을 다시 시도해주세요.'); }
     finally {
-      if (source) URL.revokeObjectURL(source);
-      if (download) window.setTimeout(() => URL.revokeObjectURL(download), 30_000);
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   }
   return <dialog ref={dialog} className="classroom-character-dialog classroom-activities-dialog" aria-labelledby="classroom-activities-title"
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <div className="classroom-picker-heading"><h2 id="classroom-activities-title">교실 활동</h2><button className="icon-button" aria-label="교실 활동 닫기" type="button" disabled={busy} onClick={onClose}><X size={20}/></button></div>
+    <div className="classroom-picker-heading"><h2 id="classroom-activities-title">{showPortfolio ? '내 수강 기록' : '교실 활동'}</h2><button className="icon-button" aria-label="교실 활동 닫기" type="button" disabled={busy} onClick={onClose}><X size={20}/></button></div>
     <div className="classroom-activities-content">
+      {showPortfolio ? <><button type="button" className="classroom-portfolio-back" onClick={() => setShowPortfolio(false)}>교실 활동으로 돌아가기</button><ClassroomPortfolio /></> : <>
+      <button type="button" className="classroom-portfolio-open" disabled={busy} onClick={() => setShowPortfolio(true)}>내 수강 기록 보기</button>
       {!host && mySeat && <section aria-label="손들기와 리액션">
         <button className="activity-hand" type="button" disabled={busy || !onAction} aria-pressed={Boolean(mySeat.activity?.handAt)}
           onClick={() => run({type:'hand', raised:!mySeat.activity?.handAt})}><Hand size={20}/>{mySeat.activity?.handAt ? '손 내리기' : '질문 있어요'}</button>
@@ -249,24 +266,41 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
         {hands.length ? <ol className="activity-hand-queue">{hands.map(seat => <li key={seat.number}><span>{String(seat.number).padStart(2,'0')} · {seat.name}</span>
           <button type="button" disabled={busy || !onAction} onClick={() => run({type:'hand-lower',seatNumber:seat.number})}>응답 완료</button></li>)}</ol> : <p>손을 든 수강생이 여기에 표시돼요.</p>}
       </section>}
-      <section aria-label="수업 단체사진"><h3>오늘의 단체사진</h3><p>지금 접속한 {photoSeats.length}명의 캐릭터와 닉네임을 사진에 담아요.</p>
+      <section aria-label="수업 단체사진"><h3>오늘의 단체사진</h3><p>지금 접속한 수강생 {photoSeats.length}명{includeInstructor ? '과 강사' : ''}의 캐릭터와 닉네임을 사진에 담아요.</p>
         <button type="button" disabled={busy} onClick={()=>setTakingPhoto(value=>!value)}>{takingPhoto ? '사진 접기' : '단체사진 미리보기'}</button>
         {takingPhoto && <>
+          <div className="classroom-photo-reflection">
+            <label htmlFor={reflectionId}>짧은 소감 (선택)</label>
+            <textarea id={reflectionId} rows={2} maxLength={240} disabled={busy} value={reflection}
+              onChange={event => { setReflection(event.target.value); setNotice(''); }} placeholder="오늘 배운 내용이나 느낀 점을 남겨주세요." />
+            <p>사진에도 함께 담겨요. <span>{reflection.length}/240</span></p>
+          </div>
           <svg ref={photo} className="classroom-group-photo" xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 900 ${photoHeight}`} role="img" aria-label="AI 강의실 단체사진" style={{color:'#283452',fontFamily:'sans-serif'}}>
             <rect width="900" height={photoHeight} rx="24" fill="#f3f5fc"/>
             <rect x="35" y="25" width="830" height="130" rx="12" fill="#325447" stroke="#d8bd89" strokeWidth="9"/>
             <text x="450" y="75" textAnchor="middle" fill="#fffef7" fontSize="30" fontWeight="700">오늘도 수고했어요!</text>
-            <text x="450" y="110" textAnchor="middle" fill="#fffef7" fontSize="20">{data.title.slice(0,36)}</text>
+            <text x="450" y="110" textAnchor="middle" fill="#fffef7" fontSize="20">{Array.from(data.title).slice(0,36).join('')}</text>
             <text x="450" y="138" textAnchor="middle" fill="#dce9df" fontSize="16">{data.date} · AI환경연구소</text>
-            {photoSeats.map((seat,index)=><g key={seat.number} transform={`translate(${45+index%6*140},${185+Math.floor(index/6)*110})`}>
-              <svg x="17" y="0" width="88" height="68" viewBox="0 0 90 68" fill="none" stroke="#283452" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{renderHead(seat)}</svg>
-              <text x="60" y="83" fill="#283452" fontSize="15" textAnchor="middle">{Array.from(seat.name).slice(0,9).join('')}</text>
+            {photoMembers.map((member,index)=><g key={member.id} transform={`translate(${45+index%6*140},${185+Math.floor(index/6)*110})`}>
+              <svg x="17" y="0" width="88" height="68" viewBox="0 0 90 68" fill="none" stroke="#283452" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{member.head}</svg>
+              <text x="60" y="83" fill="#283452" fontSize="15" textAnchor="middle">{Array.from(member.name).slice(0,9).join('')}</text>
             </g>)}
+            {reflectionLines.length > 0 && <g className="classroom-photo-caption">
+              <rect x="45" y={reflectionY-12} width="810" height={48+reflectionLines.length*29} rx="12" fill="#fff" />
+              <text x="65" y={reflectionY+15} fontSize="16" fontWeight="700" fill="#4656a5">수업 소감</text>
+              {reflectionLines.map((line,index) => <text key={index} x="65" y={reflectionY+46+index*29} fontSize="20" fill="#283452">{line}</text>)}
+            </g>}
             <text x="450" y={photoHeight-20} textAnchor="middle" fontSize="16" fill="#4656a5">신현준 연구사 실시간 강의실 · 함께 배우는 우리</text>
           </svg>
-          <button className="primary" type="button" disabled={busy} onClick={savePhoto}>{busy ? '사진 만드는 중' : '단체사진 PNG 저장'}</button>
+          <div className="classroom-photo-actions">
+            <button className="primary" type="button" disabled={busy || savedSignature === photoSignature} onClick={() => savePhoto('portfolio')}>내 수강 기록에 저장</button>
+            <button type="button" disabled={busy} onClick={() => savePhoto('download')}>단체사진 PNG 저장</button>
+          </div>
         </>}
       </section>
+      {busy && <p role="status">처리하고 있어요.</p>}
+      {notice && <p role="status" className="classroom-photo-notice">{notice}</p>}
+      </>}
       {error && <p className="error" role="alert">{error}</p>}
     </div>
   </dialog>;
