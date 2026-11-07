@@ -122,6 +122,12 @@
   aspect-ratio: 60 / 66; color: var(--desk-ink); pointer-events: none;
   transform: translate(-50%, -94%);
 }
+.auditorium-scene .classroom-actor.is-instructor {
+  --actor-scale: clamp(25px, 4.8cqw, 65px);
+}
+.classroom-actor.is-instructor > .classroom-walker-greet {
+  left: 50%; right: auto; width: max(100%, 44px); transform: translateX(-50%);
+}
 .classroom-actor > .classroom-actor-sprite {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%;
   animation: none; overflow: visible; transform-origin: 50% 94%;
@@ -129,8 +135,8 @@
 }
 .classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor-sprite,
 .classroom-actor[data-illustrated] > .classroom-actor-sprite { visibility: hidden; }
-.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor.is-mine::before,
-.classroom-actor.is-mine[data-illustrated]::before {
+.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor.is-mine:not([data-at-lectern])::before,
+.classroom-actor.is-mine[data-illustrated]:not([data-at-lectern])::before {
   content: ""; position: absolute; inset: auto 14% 0; height: 9%;
   border: 1.5px solid #e8fbff; border-radius: 50%;
   box-shadow: 0 0 0 1px #4fcbef, 0 0 8px #71dcf9a0; background: #71dcf925;
@@ -161,7 +167,7 @@
 .storybook-actor-art [data-frame="seated"][data-creature] {
   inset: auto 0 18%; height: 100%; clip-path: none;
 }
-.classroom-actor[data-at-lectern] .storybook-actor-art { clip-path: inset(0 0 29%); }
+.classroom-actor[data-at-lectern]:not([data-travelling]) .storybook-actor-art { clip-path: inset(0 0 29%); }
 @media (prefers-reduced-motion: no-preference) {
   .classroom-actor[data-pose="standing"][data-walking] .storybook-gait {
     animation: storybook-weight var(--storybook-cycle, 600ms) ease-in-out infinite;

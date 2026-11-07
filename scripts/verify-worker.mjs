@@ -79,6 +79,28 @@ try {
   assert.equal(hostTicket.response.status, 200);
   const code = (await request('/api/rooms', { title: '50명 동시 검증' }, host)).data.code;
   const path = `/api/rooms/${code}`;
+  const dockRequest = { type: 'start-day', dockInstructor: true };
+  const instructorMove = { type: 'instructor-move', position: { x: .5, y: .56 } };
+  const disconnectTeacher = async peer => {
+    peer.ws.close();
+    await until(async () => !(await request(path, undefined, host)).data.instructor, 'Instructor socket did not close');
+  };
+  assert.equal((await request(path, dockRequest)).response.status, 401);
+  for (const move of [instructorMove, { type: 'instructor-move', wander: true }]) {
+    const moved = await request(path, move, host);
+    assert.equal(moved.response.status, 200);
+    assert.equal((await request(path, { type: 'start-day' }, host)).response.status, 200);
+    const resumed = await connect(path, host);
+    await until(() => resumed.latest?.instructor, 'Instructor did not reconnect');
+    if (move.position) assert.deepEqual(resumed.latest.instructor.position, move.position);
+    else assert(resumed.latest.instructor.wanderSince);
+    await disconnectTeacher(resumed);
+    assert.equal((await request(path, dockRequest, host)).response.status, 200);
+    const docked = await connect(path, host);
+    await until(() => docked.latest?.instructor, 'Instructor did not reenter');
+    assert.deepEqual(docked.latest.instructor, {}, 'A fresh instructor entry clears earlier motion');
+    await disconnectTeacher(docked);
+  }
   const teacher = await connect(path, host);
   const students = [];
   for (let i = 0; i < 50; i++) {
@@ -89,11 +111,13 @@ try {
   assert.deepEqual(teacher.latest.seats.map(s => s.number), Array.from({ length: 50 }, (_, i) => i + 1));
   assert(teacher.latest.seats.every(s => !s.mine));
   assert.deepEqual(teacher.latest.polls.map(p => p.kind), ['mood']);
-  const instructorMove = { type: 'instructor-move', position: { x: .5, y: .56 } };
+  assert.deepEqual(teacher.latest.instructor, {});
   assert.equal((await request(path, instructorMove, students[0].cookie)).response.status, 403);
   assert.equal((await request(path, { ...instructorMove, position: { x: 2, y: .56 } }, host)).response.status, 400);
   assert.equal((await request(path, instructorMove, host)).response.status, 200);
   await until(() => students[0].peer.latest?.instructor?.position?.y === .56, 'Instructor movement did not broadcast');
+  assert.deepEqual((await request(path, dockRequest, host)).data.instructor.position, instructorMove.position,
+    'Another host tab keeps the live instructor in place');
   assert.equal(students[0].peer.latest.online, 50);
   assert.equal(students[0].peer.latest.seats.length, 50);
   const studentWander = { type: 'move', wander: true };

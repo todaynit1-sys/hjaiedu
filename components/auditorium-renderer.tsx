@@ -87,7 +87,7 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
           heading = Math.atan2(point.x - old.x, point.z - old.z);
         } else if (moving && !old) heading = actor.dataset.facing === 'left' ? -.7 : .7;
         positions.set(id, { ...point, heading });
-        frames.push({ ...profile, ...point, heading, scale: profile.instructor ? 1.07 : 1,
+        frames.push({ ...profile, ...point, heading, scale: profile.instructor ? .74 : 1,
           seated, stride: actor.hasAttribute('data-walking') ? now / 115 : 0 });
       }
       previous = positions;

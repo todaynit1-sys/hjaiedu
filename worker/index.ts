@@ -276,6 +276,12 @@ export class ClassBoard extends DurableObject<Env> {
           setCookie = cookie(request, 'guest', await this.token({ purpose: 'guest', id: guest, exp: Date.now() + 2_592_000_000 }), 2_592_000);
         } else if (input.type === 'start-day') {
           if (!host) throw new AppError('강사 로그인이 필요합니다.', 401);
+          const day = room.days[today()];
+          // An already connected instructor keeps control when another host tab opens.
+          if (input.dockInstructor === true && day?.instructor && !this.attendance(code).instructor) {
+            delete day.instructor;
+            this.files.saveRoom(room);
+          }
         } else if (input.type === 'heartbeat') {
           if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
         } else {

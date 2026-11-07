@@ -103,7 +103,14 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const scroller = useRef<HTMLDivElement>(null); const nearBottom = useRef(true); const forceBottom = useRef(false);
   function notify(message: string) { setNotice(message); if (noticeTimer.current) clearTimeout(noticeTimer.current); noticeTimer.current = setTimeout(() => setNotice(''), 4000); }
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
-  useEffect(() => { let stopped = false; api<Snapshot>(`/api/rooms/${code}`, { type: host ? 'start-day' : 'join' }).then(value => { if (!stopped) { setData(value); setDate(value.date); setError(''); } }).catch(e => { if (!stopped) setError(e.message); }); return () => { stopped = true; }; }, [code, host]);
+  useEffect(() => {
+    let stopped = false;
+    // Reset the robot on room entry, rather than during the live reconnect below.
+    api<Snapshot>(`/api/rooms/${code}`, host ? { type: 'start-day', dockInstructor: true } : { type: 'join' })
+      .then(value => { if (!stopped) { setData(value); setDate(value.date); setError(''); } })
+      .catch(e => { if (!stopped) setError(e.message); });
+    return () => { stopped = true; };
+  }, [code, host]);
   useEffect(() => {
     if (!date) return;
     let stopped = false; let socket: WebSocket | null = null; let retry = 0; let lastSignal = Date.now();
