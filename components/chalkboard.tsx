@@ -31,6 +31,7 @@ function fitBoard(board: HTMLDivElement, content: HTMLDivElement, caption: HTMLP
 
 export function Chalkboard({ message, code, active, onExpanded }: { message?: PublicMessage; code: string; active: boolean; onExpanded?: (expanded: boolean) => void }) {
   const caption = message?.text || (active ? '질문은 편하게 남겨주세요!' : '오늘 강의가 끝났어요.');
+  const welcome = !message && active;
   const boardRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const captionRef = useRef<HTMLParagraphElement>(null);
@@ -74,15 +75,25 @@ export function Chalkboard({ message, code, active, onExpanded }: { message?: Pu
     };
   }, [caption, message?.id, message?.url, message?.attachment?.name, onExpanded]);
 
-  return <div ref={boardRef} className="classroom-board fitted-chalkboard" role="region" aria-label="강의실 칠판">
+  return <div ref={boardRef} className="classroom-board fitted-chalkboard" data-welcome={welcome || undefined} role="region" aria-label="강의실 칠판">
+    {welcome && <svg className="chalkboard-drawing chalkboard-globe" viewBox="0 0 100 108" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="49" cy="67" r="32" />
+      <path d="M33 42l7 8-3 10 7 3 2 8 7 5-4 18M69 43l-7 8-1 11 9 2 7 7M18 72c14-8 47-12 64-7M40 37c4 15 10 26 19 35 8 7 12 10 17 12" />
+      <path className="chalkboard-leaves" d="M49 35c2-13 9-22 19-29M55 21C50 9 40 6 29 7c5 11 14 17 26 14ZM61 15c12 2 21-2 25-10-12-3-21 0-25 10Z" />
+      <path d="M9 45v8m-4-4h8m67 48v6m-3-3h6" />
+    </svg>}
+    {welcome && <svg className="chalkboard-drawing chalkboard-trees" viewBox="0 0 100 108" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 28c-4-4 1-9 7-9 2-6 9-8 15-4 4-5 12-2 13 4 7-1 10 3 9 6-1 5-9 6-15 4-7 3-16 3-22 0Z" />
+      <path className="chalkboard-leaves" d="m70 42-11 16 5-1-11 14 7-1-11 14 17-1v12m4-53 11 16-5-1 11 14-7-1 11 14-17-1v12M37 65 26 79l6-1-11 13 12-1v8m4-33 10 14-6-1 10 13-10-1v8" />
+      <path d="M8 55v7m-3.5-3.5h7m76-27v8m-4-4h8" />
+    </svg>}
     <div ref={contentRef} className="classroom-board-content">
-      <p ref={captionRef} className={!message ? 'classroom-board-welcome' : undefined}>{caption}</p>
+      <p ref={captionRef} className={!message ? 'classroom-board-welcome' : undefined}>
+        {welcome ? <>질문은 편하게 <span className="chalkboard-emphasis">남겨주세요!</span></> : caption}
+      </p>
       {message?.url && <a href={message.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true" />{new URL(message.url).hostname}</a>}
       {message?.attachment && <a href={`/api/rooms/${code}/files/${message.attachment.id}`} download={message.attachment.name}><Download size={14} aria-hidden="true" />{message.attachment.name}</a>}
     </div>
-    <svg className="classroom-board-sprout" width="34" height="39" viewBox="0 0 34 39" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 36c1-7 2-13-.5-18M17 25C8 26 4 19 3.5 14c7-.2 12 3 13.5 11Zm.1-7.5C15 10 22 4 30 3c.6 8-3.5 14.5-12.9 14.5Z" />
-    </svg>
-    <span className="classroom-board-ledge" aria-hidden="true" />
+    <div className="chalkboard-tray" aria-hidden="true"><i/><i/><i/></div>
   </div>;
 }

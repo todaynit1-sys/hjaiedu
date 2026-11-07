@@ -75,16 +75,6 @@
   white-space: pre-wrap;
   text-shadow: 0 1px 1px #182e2490;
 }
-.classroom-board-welcome::after {
-  content: "";
-  display: block;
-  width: clamp(60px, 22%, 125px);
-  height: 5px;
-  margin: -1px auto 2px;
-  border-bottom: 2px solid #f4edce;
-  border-radius: 50%;
-  transform: rotate(-2deg);
-}
 .classroom-board-content a {
   display: inline-block;
   margin: 2px 4px;
@@ -100,37 +90,6 @@
   outline: 2px solid #fff9db;
   outline-offset: -2px;
   border-radius: 3px;
-}
-.classroom-board-sprout {
-  position: absolute;
-  right: 8px;
-  bottom: 4px;
-  color: #d9efca;
-  opacity: .82;
-  pointer-events: none;
-  transform: rotate(7deg);
-}
-.classroom-board-ledge {
-  position: absolute;
-  left: -9px;
-  right: -9px;
-  bottom: -7px;
-  height: 8px;
-  border-radius: 2px 2px 5px 5px;
-  background: linear-gradient(#f7deaf, #dfb57c);
-  border-bottom: 2px solid #be9768;
-  box-shadow: 0 3px 4px #453a2615;
-}
-.classroom-board-ledge::before {
-  content: "";
-  position: absolute;
-  left: 9%;
-  bottom: 100%;
-  width: 23px;
-  height: 5px;
-  border-radius: 4px;
-  background: #f6f3e7;
-  transform: rotate(-2deg);
 }
 .classroom-seats {
   display: grid;
@@ -355,9 +314,6 @@
   }
   .classroom-board-content p { font-size: clamp(18px, 5.2vw, 26px); }
   .classroom-board-content a { font-size: 13px; }
-  .classroom-board-sprout { width: 18px; height: 24px; right: 4px; bottom: 2px; }
-  .classroom-board-ledge { left: -6px; right: -6px; height: 6px; bottom: -5px; }
-  .classroom-board-ledge::before { width: 17px; height: 4px; }
   .classroom-seats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: clamp(7px, 1.2dvh, 13px) 2px;

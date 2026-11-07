@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, BookOpen, Check, ClipboardList, Copy, Download, ExternalLink, FileSpreadsheet, FileText, Link2, LogOut, MessageCircle, MoreHorizontal, Paperclip, Pin, Plus, Presentation, QrCode, RotateCcw, Send, Settings2, Trash2, Users, WifiOff, X } from 'lucide-react';
 import { ClassroomScene } from './classroom-scene';
 import { ClassroomQuestion } from './classroom-activities';
-import { ClassroomMood } from './classroom-mood';
 import { ClassroomPolls } from './classroom-polls';
 import { Brand } from './brand';
 import { AboutLink } from './about-link';
 import { BRAND_MARK } from '../lib/brand';
 import { ContactLink } from './contact-link';
-import { ResetDialog, RESET_LABELS } from './reset-dialog';
+import { ResetDialog } from './reset-dialog';
 import { NewPoll } from './poll-card';
 import { PollManagementDialog } from './poll-management-dialog';
 import { ShareDialog } from './share-dialog';
@@ -18,6 +17,7 @@ import { fileSize, MAX_FILE_BYTES } from '../lib/files';
 import { SURVEY_RESPONSES_URL, SURVEY_URL } from '../lib/survey';
 import type { ClassroomMove, PublicMessage, ResetTarget, Snapshot } from '../lib/types';
 import '../app/view-tabs.css';
+import '../app/classroom-theme.css';
 
 function MessageText({ text }: { text: string }) {
   return <>{text.split(/(https?:\/\/[^\s<>]+)/g).map((part, i) => /^https?:\/\//.test(part) ? <a key={i} href={part} target="_blank" rel="noopener noreferrer">{part}</a> : part)}</>;
@@ -168,11 +168,8 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
     observedChat.current = { date: data.date, id: latest?.id };
   }, [data, view, host]);
   const pinned = data?.messages.find(m => m.pinned); const editable = Boolean(data && data.date === data.today); const active = Boolean(data?.active && editable && connected);
-  const moodPoll = data?.polls.find(poll => poll.kind === 'mood' && !poll.archived);
   const customPolls = data?.polls.filter(poll => poll.kind === 'custom' && !poll.archived) ?? [];
-  const previousPolls = data?.polls.filter(poll => poll.kind !== 'break' && poll.archived) ?? [];
-  const moodControl = moodPoll && <ClassroomMood key={moodPoll.id} poll={moodPoll} host={host} active={active} busy={busy}
-    onVote={option => action({ type: 'vote', pollId: moodPoll.id, option }, `${moodPoll.options[option]}로 응답했어요.`)} />;
+  const previousPolls = data?.polls.filter(poll => poll.kind === 'custom' && poll.archived) ?? [];
   const materialsButton = <button className="materials-button" onClick={() => setMaterials(true)} aria-label="참고자료 다운로드" aria-haspopup="dialog">
     <BookOpen size={15} aria-hidden="true" /><span>참고자료</span>
   </button>;
@@ -182,14 +179,13 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       <div className="settings-panel">
         <p className="daily-retention">오늘 {dateLabel(data.date)}<br />채팅·투표·첨부 자료는 한국 시간 자정에 초기화됩니다.</p>
         {host && active && <button onClick={() => setQuestions(true)} aria-haspopup="dialog"><Plus size={16} />새 투표 만들기</button>}
-        {host && active && moodPoll && <button onClick={() => setManagedPollId(moodPoll.id)} aria-haspopup="dialog"><Settings2 size={16} />컨디션 투표 관리</button>}
         {customPolls.length > 0 && <button onClick={() => setPollView('custom')} aria-haspopup="dialog"><ClipboardList size={16} />수업 투표 보기</button>}
         {previousPolls.length > 0 && <button onClick={() => setPollView('history')} aria-haspopup="dialog">이전 투표 결과 보기</button>}
         {host && !data.demo && <a href={SURVEY_RESPONSES_URL} target="_blank" rel="noopener noreferrer"><FileSpreadsheet size={16} />설문 응답 시트 보기</a>}
         {data.mode === 'local' && <p>로컬 미리보기입니다.</p>}
         {host && editable && <>
           <div className="room-reset-actions"><p>강사 초기화</p>
-            {(['chat', 'mood'] as const).map(target => <button key={target} disabled={busy || !connected} onClick={() => setResetTarget(target)}><RotateCcw size={14} />{RESET_LABELS[target]} 초기화</button>)}
+            <button disabled={busy || !connected} onClick={() => setResetTarget('chat')}><RotateCcw size={14} />채팅 초기화</button>
           </div>
           <button disabled={busy} onClick={() => safeAction({ type: 'active', active: !data.active }, data.active ? '오늘 강의를 종료했어요.' : '강의를 다시 시작했어요.')}>{data.active ? '오늘 강의 종료' : '강의 다시 시작'}</button>
         </>}
@@ -197,7 +193,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
       </div>
     </details>
   </div>;
-  return <div className={`live-room${host ? ' is-host' : ''}`} ref={roomRef}>
+  return <div className={`live-room classroom-themed${host ? ' is-host' : ''}`} ref={roomRef}>
     <a className="skip-link" href="#main">본문으로 건너뛰기</a>
     <header className="live-header"><Brand roomCode={code} hostAccess={!host} />
       <div className="live-header-actions"><AboutLink />
@@ -226,7 +222,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         </div>
         <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
         <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
-          <ClassroomScene data={data} host={host} visible={view === 'classroom'} onActivity={active ? classroomActivity : undefined} mood={moodControl} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+          <ClassroomScene data={data} host={host} visible={view === 'classroom'} onActivity={active ? classroomActivity : undefined} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
             onMove={active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">
@@ -258,9 +254,9 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {unread && <button className="new-messages" onClick={scrollLatest}><ArrowDown size={15} />새 메시지 보기</button>}
         </section>
         <Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
+        <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>
       </main>
     </>}
-    <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Check size={17} /><span>{notice}</span></>}</div>
     {materials && <MaterialsDialog onClose={() => setMaterials(false)} />}
     {share && <ShareDialog code={code} onClose={() => setShare(false)} />}
     {questions && <QuestionDialog busy={busy} onAction={action} onClose={() => setQuestions(false)} />}

@@ -1,0 +1,128 @@
+/* The light wood and blue classroom palette stays inside the live room. */
+.live-room.classroom-themed {
+  --forest: #214f9c;
+  --forest-dark: #1d3455;
+  --ink: #233a56;
+  --muted: #526780;
+  --line: #cbd9e7;
+  --mint: #e8f1fd;
+  --paper: #f3f6fa;
+  color: var(--ink);
+  background: linear-gradient(180deg, #fffaf1, #f2f6fc 230px);
+}
+
+.classroom-themed > .live-header {
+  height: 62px;
+  padding-inline: max(clamp(12px, 2vw, 28px), calc((100vw - 1624px) / 2));
+  border-bottom: 1px solid var(--line);
+  background: #fffdf7;
+  box-shadow: 0 2px 10px #243d5b0c;
+}
+.classroom-themed .live-header .brand { gap: 8px; }
+.classroom-themed .live-header .brand-access { min-width: 44px; }
+.classroom-themed .live-header .brand-mark {
+  width: 36px;
+  height: 36px;
+  padding: 5px;
+  border-radius: 10px;
+  background: #203759;
+  box-shadow: 0 2px 4px #20375924;
+}
+.classroom-themed .live-header .brand-title {
+  color: var(--forest-dark);
+  font-size: 19px;
+  font-weight: 780;
+}
+.classroom-themed .live-header .brand-wordmark small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.classroom-themed .live-header-actions { gap: 8px; }
+.classroom-themed .live-header :is(.about-link, .survey-link, .live-share, .room-settings summary, .icon-button) {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--forest-dark);
+  background: #fff;
+}
+.classroom-themed .live-header :is(.about-link, .survey-link, .live-share, .room-settings summary, .icon-button):hover {
+  border-color: #9ab7da;
+  color: var(--forest);
+  background: var(--mint);
+}
+.classroom-themed .live-header .live-share {
+  color: var(--forest);
+  background: var(--mint);
+}
+.classroom-themed .live-header .live-online,
+.classroom-themed .live-header .live-online b { color: var(--muted); }
+.classroom-themed .live-header .live-role {
+  border-radius: 6px;
+  color: var(--forest);
+  background: var(--mint);
+}
+.classroom-themed .live-header :focus-visible { outline-color: var(--forest); outline-offset: 2px; }
+.classroom-themed .live-header .settings-panel { top: calc(100% + 10px); }
+
+.classroom-themed .classroom-view-actions > .materials-button { border-radius: 10px; }
+.classroom-themed .classroom-view-actions > .classroom-question-trigger {
+  border-color: #b3cae6;
+  border-radius: 10px;
+  color: var(--forest);
+  background: var(--mint);
+}
+.classroom-themed .classroom-view-actions > .classroom-question-trigger:hover { background: #dbeafe; }
+.classroom-themed .room-view-workspace > .live-chat { border-color: var(--line); }
+.classroom-themed .live-chat-heading { border-color: var(--line); background: #fffdf7; }
+.classroom-themed .live-chat-heading h2 { color: var(--forest-dark); }
+.classroom-themed .chat-scroll { background: #fbfdff; }
+.classroom-themed .chat-bubble {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #fffdf7;
+}
+.classroom-themed .my-message .chat-bubble { background: var(--mint); }
+.classroom-themed .teacher-message .chat-bubble { border-color: #bfd2ec; background: #eef5ff; }
+
+.classroom-themed .room-view-workspace > .chat-composer {
+  padding: 6px 8px 3px;
+  border-color: var(--line);
+  background: #fffdf7;
+}
+.classroom-themed .chat-input-row {
+  border-color: #b2c9e4;
+  border-radius: 11px;
+  background: #fff;
+}
+.classroom-themed .chat-input-row:focus-within { border-color: var(--forest); box-shadow: 0 0 0 2px var(--mint); }
+.classroom-themed .chat-input-row textarea { min-width: 0; color: var(--ink); }
+.classroom-themed .chat-input-row textarea::placeholder { color: var(--muted); }
+.classroom-themed .chat-send { color: #fff; background: var(--forest); }
+.classroom-themed .chat-send:hover:not(:disabled) { background: var(--forest-dark); }
+.classroom-themed .composer-hint { margin-top: 2px; }
+.classroom-themed .room-view-workspace > .toast {
+  position: relative;
+  grid-column: 1;
+  grid-row: 2;
+  inset: auto;
+  align-self: end;
+  justify-self: center;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin-bottom: 8px;
+  background: var(--forest-dark);
+  transform: translateY(6px);
+}
+.classroom-themed .room-view-workspace > .toast.visible { transform: none; }
+.classroom-themed .classroom-question-dialog { border-color: var(--line); background: #fffdf7; }
+.classroom-themed .classroom-question-dialog .question-answer-list li { background: #fff; }
+
+@media (max-width: 760px) {
+  .classroom-themed > .live-header { height: 56px; padding-inline: 9px; gap: 4px; }
+  .classroom-themed .live-header .brand { gap: 4px; }
+  .classroom-themed .live-header .brand-mark { width: 30px; height: 30px; border-radius: 8px; }
+  .classroom-themed .live-header .brand-title { font-size: 15px; }
+  .classroom-themed .live-header .brand-wordmark small { font-size: 8px; }
+  .classroom-themed .live-header-actions { gap: 3px; }
+  .classroom-themed .room-view-workspace > .chat-composer { padding: 4px 5px 1px; }
+}

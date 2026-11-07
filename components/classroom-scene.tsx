@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { Check, ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
 import { Chalkboard } from './chalkboard';
-import { animalHeads } from './animal-heads';
-import { gardenHeads } from './garden-heads';
+import { AvatarArt } from './classroom-avatar';
 import { INSTRUCTOR_HOME, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
 import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
@@ -31,29 +30,6 @@ const characterNames: Record<Character, string> = {
   hamster: '볼빵햄찌', seal: '물범콩', mushroom: '버섯송이', acorn: '도토리', cloud: '몽실구름',
   chick: '삐약이', otter: '수달이', panda: '판다콩', axolotl: '아기우파'
 };
-
-const illustratedHeads: Partial<Record<Character, ReactNode>> = { ...animalHeads, ...gardenHeads };
-
-function StudentHead({ character }: { character: Character }) {
-  const illustration = illustratedHeads[character];
-  if (illustration) return illustration;
-  const head = character === 'cat'
-    ? 'M26 35c-2-4-2-9 0-14l.5-10q.1-3 3-1l9 5q7-2 13 0l8-5q3-1.8 3 1l-.1 10c4 6 3 13-1 17-4 4-10 5-16 5-10 0-16-2-19.4-8Z'
-    : 'M26 36c-2-5 0-12 4-17 5-6 11-8 18-7 9 1 17 9 17 18 0 7-4 11-9 13H35c-5-1-8-4-9-7Z';
-  return <g>
-    <path fill="#fffefa" d={head} />
-    {character === 'cat' && <g stroke="none" fill="#efb6a8"><path d="m29 13 .2 5 4-2Zm31 0-4 3 4 2Z" /></g>}
-    {character === 'sprout' && <g strokeWidth="1.55"><path d="m44 13 .3-5" /><path d="M44.5 10q-7 1-8-6 7-.5 8 6Zm.2.1Q45 .4 54 1q.2 8-9.3 9.1Z" fill="#a3d0a0" /></g>}
-    {character === 'cheer' && <path d="M44 13q-4-7 2-10m-2 8q2-5 6-4" />}
-    <g stroke="none" fill="#f1b8ae"><ellipse cx="33" cy="32" rx="3.3" ry="2.1" /><ellipse cx="56" cy="32" rx="3.3" ry="2.1" /></g>
-    {character === 'sleepy' ? <g><path d="M34 26q3 4 6 0m9 0q3 4 6 0" /><path d="m62 14 4-1-2 4 4-1m0-9 4-1-2 4 4-1" strokeWidth="1.4" /></g>
-      : character === 'cheer' ? <g><circle cx="38" cy="27" r="1.8" fill="currentColor" stroke="none" /><path d="m50 24 4 2-4 2" /></g>
-      : <g fill="currentColor" stroke="none"><circle cx="37.5" cy="27" r="1.8" /><circle cx="52" cy="27" r="1.8" /></g>}
-    {character === 'glasses' && <g strokeWidth="1.7"><circle cx="38" cy="26.5" r="5.3" /><circle cx="51" cy="26.5" r="5.3" /><path d="M43 26h3m-17-1 4 1m23 0 4-1" /></g>}
-    {character === 'cat' ? <g><path d="M41 31q2 4 4 0 2 4 4 0" /><path d="m30 30-6-1m6 4-6 1m35-4 6-1m-6 4 6 1" strokeWidth="1.1" /></g>
-      : character === 'cheer' ? <path fill="#eaa7a1" d="M41 31h8q-3 8-8 0Z" /> : <path d="M41 32q3.6 4.5 7.5-.2" />}
-  </g>;
-}
 
 function CharacterPicker({ current, onChange, onClose }: { current: Character; onChange: (value: Character) => Promise<void>; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -84,7 +60,7 @@ function CharacterPicker({ current, onChange, onClose }: { current: Character; o
     <div className="classroom-character-options" role="group" aria-label="캐릭터" aria-busy={saving}>
       {CHARACTERS.map(value => <button type="button" key={value} aria-pressed={current === value} disabled={saving} onClick={() => choose(value)}>
         {current === value && <Check className="classroom-character-check" size={15} aria-hidden="true" />}
-        <svg viewBox="16 -2 60 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><StudentHead character={value} /></svg>
+        <svg viewBox="16 0 58 53" aria-hidden="true"><AvatarArt character={value} pose="portrait" /></svg>
         <span>{characterNames[value]}</span>
       </button>)}
     </div>
@@ -141,22 +117,20 @@ function DeskDrawing({ number, character, mine, name }: { number: number; charac
     <path d="M16 44l5-6h48l5 6v9H16Z" className="classroom-desk-front"/>
     <path d="M16 44h58" stroke="#ad7949"/>
     </g>
-    {character && <>
-      <path d="M33 42q12-8 24 0l3 10q-15 8-30 0Z" fill="#d5e7de"/>
-      <g key={character} className="classroom-arrival"><g className="classroom-head"><StudentHead character={character} /></g></g>
-    </>}
+    {character && <g key={character} className="classroom-arrival">
+      <g className="classroom-head"><AvatarArt character={character} pose="seated" /></g>
+    </g>}
     <text x="45" y="75" textAnchor="middle" fill="currentColor" stroke="none" fontSize={nickname ? 10 : 11} fontWeight="750">{nickname ? label.slice(0, 5).join('') + (label.length > 5 ? '…' : '') : seatLabel(number)}</text>
-    {mine && <ellipse cx="45" cy="55" rx="30" ry="13" stroke="#4656a5" strokeWidth="2" strokeDasharray="3 4"/>}
+    {mine && <ellipse cx="45" cy="57" rx="29" ry="12" stroke="#72cff4" strokeWidth="3.4"/>}
   </svg>;
 }
 
-function WalkerBody({ character }: { character: Character }) {
-  return <svg viewBox="16 -2 60 66" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <ellipse cx="45" cy="60" rx="17" ry="3.5" fill="#10182e" opacity=".22" stroke="none"/>
-    <ellipse className="walker-foot left" cx="38" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
-    <ellipse className="walker-foot right" cx="52" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
-    <path className="walker-shirt" d="M34 37q11-6 22 0l3 13q-14 9-28 0Z" fill="#d5e7de"/>
-    <StudentHead character={character} />
+function WalkerBody({ character, mine, instructor }: { character: Character; mine?: boolean; instructor?: boolean }) {
+  return <svg viewBox="16 -2 60 70" aria-hidden="true">
+    <ellipse cx="45" cy="61" rx="18" ry="5" fill="#372318" opacity=".24"/>
+    {mine && <ellipse cx="45" cy="61" rx="21" ry="6" fill="#72cff430" stroke="#ecfcff" strokeWidth="3.5"/>}
+    {mine && <ellipse cx="45" cy="61" rx="21" ry="6" fill="none" stroke="#55c4ed" strokeWidth="1.5"/>}
+    <AvatarArt character={character} pose="walking" instructor={instructor} />
   </svg>;
 }
 
@@ -183,7 +157,7 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange, onMove, host = false, visible, onActivity }: { data: Snapshot; mood?: ReactNode; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (move: ClassroomMove) => Promise<void>; host?: boolean; visible: boolean; onActivity?: ClassroomAction }) {
+export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMove, host = false, visible, onActivity }: { data: Snapshot; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>; onMove?: (move: ClassroomMove) => Promise<void>; host?: boolean; visible: boolean; onActivity?: ClassroomAction }) {
   const seats = data.seats ?? [];
   const mySeat = seats.find(seat => seat.mine);
   const [choosingCharacter, setChoosingCharacter] = useState(false);
@@ -267,7 +241,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
 
   return <section className="classroom-scene auditorium-scene" data-world={world ? 'ready' : 'fallback'} aria-labelledby="classroom-title">
     <div className="auditorium-topbar">
-    <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2>{mood}</div>
+    <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2></div>
     <div className="auditorium-toolbar"><span>{canMoveHere && movement.autonomous ? '자율 이동 중' : canMoveHere && movement.moving ? '바닥을 눌러 이동' : view === 'near' ? '밀어서 둘러보기' : `3D 교실 · ${capacity}석`}</span>
       <div role="group" aria-label="교실 보기">
         <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')}>전체 보기</button>
@@ -314,7 +288,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
     </ol>
     {data.instructor && <WalkingAvatar position={instructorPosition ?? INSTRUCTOR_HOME} origin={INSTRUCTOR_HOME}
       floor={movement.floor} mine={host} instructor name="강사">
-      <WalkerBody character="glasses" />
+      <WalkerBody character="glasses" mine={host} instructor />
       <span className="classroom-walker-name">강사</span>
       {host && canMoveHere && !movement.moving && !movement.autonomous && <button className="classroom-walker-greet" type="button"
         aria-label="강사 캐릭터 움직이기" onClick={event => { event.stopPropagation(); movement.toggle(); }} />}
@@ -327,7 +301,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
       return <WalkingAvatar key={seat.number} position={position} origin={seatPoint(index)}
         floor={movement.floor} mine={seat.mine} number={seat.number} name={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id}><span>{bubble.text}</span></div>}
-        <WalkerBody character={seat.character ?? defaultCharacter(seat.number)} />
+        <WalkerBody character={seat.character ?? defaultCharacter(seat.number)} mine={seat.mine} />
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
         {headsInteractive && !seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
@@ -351,7 +325,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
             <option value="wander">자율 이동</option>
           </select>
         </>}
-        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={character=><StudentHead character={character}/>}/>
+        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={character=><AvatarArt character={character} pose="portrait"/>}/>
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">

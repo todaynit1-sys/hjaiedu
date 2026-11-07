@@ -20,7 +20,8 @@ async function readyStage(page) {
   assert(mainJoins.every(response=>response.status()===200),'Main room initialization failed');
   assert((await Promise.all(mainJoins.map(response=>response.json()))).every(room=>room.code==='MAMOAI'));
   await page.goto(base); await readyStage(page);
-  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isVisible(),false);
+  assert.equal(await page.getByLabel('채팅 메시지',{exact:true}).isVisible(),true);
+  assert.equal(await page.getByRole('group',{name:'오늘의 컨디션',exact:true}).count(),0);
   assert.equal(await page.getByLabel('강의실 참여 코드',{exact:true}).count(),0);
   await page.screenshot({ path: '.local/screenshots/home-desktop.png', fullPage: true });
   await page.keyboard.press('Tab'); assert.equal(await page.locator('.skip-link').evaluate(el=>el===document.activeElement),true);
@@ -79,7 +80,7 @@ async function readyStage(page) {
   await picker.waitFor();
   const choices = picker.getByRole('group',{name:'캐릭터',exact:true}).getByRole('button');
   assert.equal(await choices.count(), 20);
-  const drawings = await choices.evaluateAll(buttons => buttons.map(button => button.querySelector('svg[viewBox="16 -2 60 48"]').innerHTML));
+  const drawings = await choices.evaluateAll(buttons => buttons.map(button => button.querySelector('svg[viewBox]').outerHTML));
   assert.equal(new Set(drawings).size, 20, 'Each character needs a distinct illustration');
   await student.screenshot({ path: '.local/screenshots/character-picker-mobile.png' });
   await student.setViewportSize({width:320,height:568});
@@ -92,10 +93,18 @@ async function readyStage(page) {
     'The other student must see the selected axolotl on the correct desk');
   await student.setViewportSize({width:390,height:844});
   assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
-  await page.getByRole('button',{name:'채팅',exact:true}).click();
-  await page.getByLabel('채팅 메시지',{exact:true}).fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.'); await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
-  await page.getByRole('button',{name:'강의실',exact:true}).click();
-  await readyStage(page);
+  const teacherChatInput = page.getByLabel('채팅 메시지',{exact:true});
+  await teacherChatInput.fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.');
+  await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'강의실',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await page.getByRole('heading',{name:'실시간 채팅',exact:true}).count(),0);
+  const messageNotice = page.locator('.toast.visible').filter({hasText:'메시지를 보냈어요.'});
+  await messageNotice.waitFor();
+  await waitUntil(async()=> {
+    const toast = await messageNotice.boundingBox();
+    const composer = await page.locator('.chat-composer').boundingBox();
+    return toast && composer && toast.y+toast.height <= composer.y;
+  },'The send confirmation must stay above the persistent composer');
   await student.locator('.classroom-board-content').getByText('강사와 수강생이 함께 나누는 실시간 채팅입니다.',{exact:true}).waitFor({timeout:10000});
   await waitUntil(async()=>await student.getByRole('button',{name:'채팅',exact:true}).getAttribute('aria-describedby')==='new-chat-hint',
     'The auditorium view must notify students of incoming chat');
@@ -135,17 +144,15 @@ async function readyStage(page) {
   await page.getByRole('button',{name:'투표 시작하기'}).click();
   await student.getByRole('button',{name:/^수업 투표 \d+개 보기$/}).click();
   await student.getByRole('heading',{name:'실습을 따라오고 있나요?'}).waitFor({timeout:10000});
+  await student.getByRole('button',{name:'잘 따라가고 있어요',exact:true}).click();
+  await student.getByText('응답 완료',{exact:true}).waitFor();
   await student.getByRole('button',{name:'투표 창 닫기'}).click();
-  const newPoll = (await (await studentA.request.get(roomURL)).json()).polls.find(p=>p.kind==='mood'&&!p.archived);
-  const moods = student.getByRole('group',{name:'오늘의 컨디션',exact:true});
-  await moods.getByRole('button',{name:'좋아요 0명',exact:true}).click();
-  await waitUntil(async()=>{ const s=await(await teacher.request.get(roomURL)).json();return s.polls.find(p=>p.id===newPoll.id).counts[0]===1; },'Student vote did not arrive');
-  const peerMoods = second.getByRole('group',{name:'오늘의 컨디션',exact:true});
-  await peerMoods.getByRole('button',{name:'좋아요 1명',exact:true}).waitFor();
-  await moods.getByRole('button',{name:'보통이에요 0명',exact:true}).click();
-  await peerMoods.getByRole('button',{name:'보통이에요 1명',exact:true}).waitFor();
-  assert.equal(await peerMoods.getByRole('button',{name:'좋아요 0명',exact:true}).isVisible(), true);
-  assert.equal(await peerMoods.getByRole('button',{name:'조금 힘들어요 0명',exact:true}).isVisible(), true);
+  const votedPoll = (await (await teacher.request.get(roomURL)).json()).polls.find(p=>p.kind==='custom'&&!p.archived);
+  assert.deepEqual(votedPoll.counts,[1,0]);
+  await teacher.request.post(roomURL,{data:{type:'poll-reset',id:votedPoll.id}});
+  const newPoll = (await (await teacher.request.get(roomURL)).json()).polls.find(p=>p.kind==='custom'&&!p.archived);
+  assert.equal(await student.getByRole('group',{name:'오늘의 컨디션',exact:true}).count(),0);
+  assert.equal(await second.getByRole('group',{name:'오늘의 컨디션',exact:true}).count(),0);
   await teacher.request.post(roomURL,{data:{type:'active',active:false}});
   assert.equal((await studentA.request.post(roomURL,{data:{type:'vote',pollId:newPoll.id,option:0}})).status(),409);
   assert.equal((await studentA.request.post(roomURL,{data:{type:'message',text:'종료된 강의에 전송'}})).status(),409);
@@ -169,8 +176,10 @@ async function readyStage(page) {
           && floor.width / floor.height <= 2.36;
       }, 'The stage and screen should use the available width in a short desktop window');
     }
+    const classroomComposer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();
+    assert(classroomComposer && classroomComposer.y>=0 && classroomComposer.y+classroomComposer.height<=height,
+      'Classroom composer outside first viewport at '+width);
     if (width >= 761) {
-      assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).isVisible(),false,'Desktop auditorium reserves its full view for the stage');
       await chatButton.click();
       const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();
       assert(composer.y>=0 && composer.y+composer.height<=height,'Chat composer outside first viewport at '+width);
@@ -182,9 +191,6 @@ async function readyStage(page) {
       assert.equal(await student.getByLabel('채팅 메시지',{exact:true}).inputValue(),desktopDraft,'Desktop view changes preserve the chat draft');
       await classroomButton.click();
       await readyStage(student);
-    } else {
-      const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox();
-      assert(composer.y>=0 && composer.y+composer.height<=height,'Mobile composer outside first viewport at '+width);
     }
     const points = await student.locator('.classroom-seat').evaluateAll(items=>items.map(el=>({x:parseFloat(el.style.left), y:parseFloat(el.style.top)})));
     assert.equal(new Set(points.map(point=>point.x+'/'+point.y)).size,20,'Unique auditorium positions at '+width);
@@ -203,10 +209,6 @@ async function readyStage(page) {
       assert(picker.y+picker.height <= shell.y+1,'Avatar control must scroll into view above composer at '+width);
       await student.locator('.classroom-pane').evaluate(el=>{el.scrollTop=0;});
     }
-    const heading = await student.getByRole('heading',{name:'AI 강의실',exact:true}).boundingBox();
-    const mood = await moods.boundingBox();
-    assert(mood && mood.y <= heading.y+heading.height+16, 'Mood choices placed with the heading at '+width);
-    for (const choice of await moods.getByRole('button').all()) assert(await choice.isVisible());
     await student.screenshot({path:width === 1440 && height === 680 ? '.local/screenshots/auditorium-wide-short.png' : '.local/screenshots/student-'+width+'.png',fullPage:true});
   }
   await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'})});
@@ -220,7 +222,9 @@ async function readyStage(page) {
   await page.goto(base+'/join'); assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true,'Optional join overflow at 320');
   await student.getByLabel('강의실 설정',{exact:true}).click();
   await student.getByRole('button',{name:'이전 투표 결과 보기',exact:true}).click();
-  assert.equal(await student.locator('.compact-poll').count(),1); assert.match(await student.locator('.compact-poll-total').innerText(),/18명/);
+  assert.equal(await student.locator('.compact-poll').count(),1);
+  assert.match(await student.locator('.compact-poll-total').innerText(),/1명/);
+  await student.getByRole('heading',{name:'실습을 따라오고 있나요?'}).waitFor();
   await student.getByRole('button',{name:'투표 창 닫기'}).click();
   // Measure the rendered text and links, including a maximum-length post on a phone.
   const board = student.locator('.classroom-board');
@@ -442,9 +446,9 @@ async function readyStage(page) {
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,
     checks: ['instructor login', '20 visible desks', 'two students with distinct seat bubbles', 'teacher chalkboard',
-      'student avatar visible to peers', 'visible live mood counts and vote replacement',
+      'student avatar visible to peers', 'classroom without mood controls',
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
-      'full-width auditorium and separate desktop chat', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
+      'full-width auditorium and persistent composer', 'desktop classroom chat send', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
       'short-answer questions in classroom and chat, private submission, close and publication', 'group-photo PNG download', 'instructor movement and return visible to students',
       'student autonomous movement, manual takeover and return',
