@@ -51,7 +51,8 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
       (desk.y + desk.height * .35 - field.y) / field.height);
   }
   function toggle() {
-    move(current ? null : home());
+    const seatPosition = home();
+    move(current ? null : bounded(seatPosition.x + (seatPosition.x < .5 ? .025 : -.025), seatPosition.y + .055));
     floor.current?.focus({ preventScroll: true });
   }
   function click(event: MouseEvent<HTMLDivElement>) {
@@ -62,12 +63,13 @@ export function useClassroomMovement(roomDay: string, seat: ClassroomSeat | unde
     floor.current?.focus({ preventScroll: true });
   }
   function keyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (!onMove || event.target !== event.currentTarget) return;
+    if (!onMove || event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
     const directions: Record<string, [number, number]> = {
-      ArrowLeft: [-.04, 0], ArrowRight: [.04, 0], ArrowUp: [0, -.04], ArrowDown: [0, .04]
+      ArrowLeft: [-.04, 0], ArrowRight: [.04, 0], ArrowUp: [0, -.04], ArrowDown: [0, .04],
+      a: [-.04, 0], d: [.04, 0], w: [0, -.04], s: [0, .04]
     };
     if (event.key === 'Escape') { event.preventDefault(); move(null); return; }
-    const direction = directions[event.key];
+    const direction = directions[event.key] ?? directions[event.key.toLowerCase()];
     if (!direction) return;
     event.preventDefault();
     const from = current ?? home();

@@ -81,7 +81,14 @@
 .classroom-seat.is-mine .auditorium-seat-caption { background: #edf0ff; outline: 1px solid #697ac7; }
 .auditorium-scene .classroom-desk-hit { min-width: 44px; min-height: 44px; width: 100%; border-radius: 12px; }
 .auditorium-scene .classroom-seat-bubble { max-width: 135px; min-width: 65px; width: max-content; font-size: 11px; padding: 3px 6px; bottom: calc(100% - 4px); }
-.auditorium-scene .classroom-walker { width: 54px; }
+.auditorium-scene .classroom-walker { width: 54px; transform: translate(-50%, -35%); transition: none; }
+.auditorium-scene .classroom-walker > svg { animation: none; }
+.classroom-walker[data-walking] .walker-foot { animation: walker-step 260ms ease-in-out infinite alternate; }
+.classroom-walker[data-walking] .walker-foot.right { animation-direction: alternate-reverse; }
+@keyframes walker-step { from { transform: translate(0, 1px); } to { transform: translate(0, -4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .classroom-walker[data-walking] .walker-foot { animation: none; }
+}
 .auditorium-viewport[data-view="near"] .classroom-walker { width: 58px; }
 .auditorium-scene .classroom-walker-name { font-size: 10px; max-width: 100px; }
 .auditorium-scene .classroom-activity-badge { top: -9px; right: -5px; }

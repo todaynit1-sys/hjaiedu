@@ -278,12 +278,17 @@ async function readyStage(page) {
   assert.equal(await arrival.evaluate(el => getComputedStyle(el).animationName), 'classroom-arrive');
   await student.reload();
   await student.locator('.classroom-seat.is-mine[title="몽실구름"]').waitFor();
-  await student.getByRole('button',{name:'움직이기',exact:true}).click();
+  await student.getByRole('button',{name:'내 캐릭터 일어나기',exact:true}).tap();
   const floor = student.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
-  await floor.tap({position:{x:90,y:130}});
+  const bounds = await floor.boundingBox();
+  const destination = {x:Math.round(bounds.width*.84),y:Math.round(bounds.height*.72)};
+  await floor.tap({position:destination});
+  assert(await student.locator('.classroom-walker.is-mine').evaluate(el =>
+    el.getAnimations().some(animation => animation.effect.getKeyframes().length === 3)),
+    'A long crossing must animate through the central aisle');
   const walker = second.locator('.classroom-walker[title="몽실구름"]');
   await walker.waitFor();
-  await waitUntil(async () => Math.abs(parseFloat(await walker.evaluate(el=>el.style.left)) - 90 / (await floor.boundingBox()).width * 100) < 1,
+  await waitUntil(async () => Math.abs(parseFloat(await walker.evaluate(el=>el.style.left)) - destination.x / bounds.width * 100) < 1,
     'Touch/click movement must reach the other student');
   await floor.focus();
   await student.keyboard.press('ArrowRight');

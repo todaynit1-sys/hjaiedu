@@ -4,6 +4,7 @@ import { Chalkboard } from './chalkboard';
 import { animalHeads } from './animal-heads';
 import { gardenHeads } from './garden-heads';
 import { useClassroomMovement } from './classroom-movement';
+import { WalkingAvatar } from './walking-avatar';
 import { ActivityBadge, ClassroomActivities, QuizStatus, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
 import { AuditoriumRenderer, type AuditoriumProjection } from './auditorium-renderer';
@@ -250,7 +251,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
     <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
     {boardExpanded && screen}
     <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
-    <div className="auditorium-toolbar"><span>{view === 'near' ? '밀어서 둘러보기' : `반원 강당 · ${capacity}석`}</span>
+    <div className="auditorium-toolbar"><span>{canMoveHere && movement.moving ? '바닥을 눌러 이동' : view === 'near' ? '밀어서 둘러보기' : `반원 강당 · ${capacity}석`}</span>
       <div role="group" aria-label="강당 보기">
         <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')}>전체 보기</button>
         <button type="button" aria-pressed={view === 'near'} title="캐릭터를 크게 보고 눌러 인사하기" onClick={() => { if (view === 'near') centerNearView(); else setView('near'); }}>내 주변</button>
@@ -286,7 +287,8 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
             {seat && !walking && <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>}
             {headsInteractive && seat && !seat.mine && !walking && !host && onActivity && <button className="classroom-desk-hit classroom-greet-hit" type="button" aria-label={`${seat.name}에게 인사하기`}
               onClick={event => { event.stopPropagation(); void greet(seat.number); }}/>}
-            {headsInteractive && seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={event => {event.stopPropagation(); setChoosingCharacter(true);}} />}
+            {seat?.mine && canMoveHere && !walking && <button className="classroom-desk-hit" type="button" aria-label="내 캐릭터 일어나기"
+              title="일어나서 움직이기" onClick={event => {event.stopPropagation(); movement.toggle();}} />}
           </div>
         </li>;
       })}
@@ -295,15 +297,22 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
       const position = seat.mine ? movement.position : seat.position;
       if (!position) return null;
       const bubble = bubbles.get(seat.number);
-      return <div key={seat.number} className={`classroom-walker${seat.mine ? ' is-mine' : ''}`}
-        data-seat={seat.number} style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%`, zIndex:Math.round(position.y*100)+1 }} title={seat.name}>
+      const index = seat.number - firstSeat;
+      return <WalkingAvatar key={seat.number} position={position} origin={world?.seats[index] ?? fallbackSeat(index)}
+        floor={movement.floor} mine={seat.mine} number={seat.number} name={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id}><span>{bubble.text}</span></div>}
-        <svg key={`${position.x}/${position.y}`} viewBox="16 -2 60 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><StudentHead character={seat.character ?? defaultCharacter(seat.number)} /></svg>
+        <svg viewBox="16 -2 60 66" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <ellipse cx="45" cy="60" rx="17" ry="3.5" fill="#10182e" opacity=".22" stroke="none"/>
+          <ellipse className="walker-foot left" cx="38" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
+          <ellipse className="walker-foot right" cx="52" cy="56" rx="5.5" ry="3.5" fill="#dce9f6"/>
+          <path d="M34 37q11-6 22 0l3 13q-14 9-28 0Z" fill="#d5e7de"/>
+          <StudentHead character={seat.character ?? defaultCharacter(seat.number)} />
+        </svg>
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
         {headsInteractive && !seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
           onClick={event=>{event.stopPropagation(); void greet(seat.number);}}/>}
-      </div>;
+      </WalkingAvatar>;
     })}
     </div>
     </div>
@@ -321,7 +330,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
         <button type="button" aria-label="뒤 좌석 보기" disabled={pageIndex === pages.length - 1} onClick={() => turnPage(1)}><ChevronRight size={17} aria-hidden="true" /></button>
       </div>}
     </div>
-    {onMove && <p id="classroom-move-hint" className={movement.moving ? 'classroom-move-hint' : 'sr-only'}>터치·클릭한 곳으로 이동 · 방향키로 조종 · Esc로 착석</p>}
+    {onMove && <p id="classroom-move-hint" className={movement.moving ? 'classroom-move-hint' : 'sr-only'}>내 캐릭터를 눌러 일어나기 · 바닥을 터치하거나 방향키로 이동 · Esc로 착석</p>}
     {movement.error && <p role="alert" className="error">{movement.error}</p>}
     {activityError && <p role="alert" className="error">{activityError}</p>}
     {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}
