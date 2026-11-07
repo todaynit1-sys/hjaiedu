@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { AUDITORIUM_PAGE_SIZE, auditoriumCapacity, auditoriumQuizPosition, auditoriumSeat } from '../lib/auditorium.ts';
 
 test('nicknames keep daily seat identity and are used for new chat messages', () => {
   const room = newRoom('닉네임 수업');
@@ -220,4 +221,40 @@ test('reset requires host, validates targets and cannot clear a new day from a s
   assert.throws(() => mutate(room, { type: 'room-reset', target: 'all' }, null, true), /항목/);
   assert.throws(() => mutate(room, { type: 'room-reset', target: 'chat', date: '2020-01-01' }, null, true), /지난 강의/);
   assert.deepEqual(room, before);
+});
+
+test('auditorium expands from twenty to fifty distinct curved seats in bounds', () => {
+  assert.equal(AUDITORIUM_PAGE_SIZE, 50);
+  for (const [highest, expected] of [[0, 20], [1, 20], [20, 20], [21, 30], [30, 30], [31, 40], [40, 40], [41, 50], [50, 50], [500, 50]]) {
+    assert.equal(auditoriumCapacity(highest), expected);
+  }
+  for (const capacity of [20, 30, 40, 50]) {
+    const seats = Array.from({ length: capacity }, (_, index) => auditoriumSeat(index, capacity));
+    assert.equal(new Set(seats.map(seat => `${seat.x}/${seat.y}`)).size, capacity);
+    assert(seats.every(seat => seat.x >= .06 && seat.x <= .94 && seat.y >= .08 && seat.y <= .92));
+    for (let row = 0; row < 5; row++) {
+      const current = seats.filter(seat => seat.row === row);
+      assert.equal(current.length, capacity / 5);
+      assert(current.at(-1)!.x > .5 && current[0].x < .5);
+      assert(current[Math.floor(current.length / 2) - 1].y > current[0].y);
+    }
+  }
+});
+
+test('fifty OX participants have unique positions per side without renumbering overflow aliases', () => {
+  for (const choice of ['O', 'X'] as const) {
+    const positions = Array.from({ length: 50 }, (_, index) => auditoriumQuizPosition(index + 1, choice));
+    assert.equal(new Set(positions.map(position => `${position.x}/${position.y}`)).size, 50);
+    assert(positions.every(position => position.x >= .06 && position.x <= .94 && position.y >= .08 && position.y <= .92));
+    assert(positions.every(position => choice === 'O' ? position.x < .5 : position.x > .5));
+  }
+  const room = newRoom('쉰 명 이후의 재입장');
+  for (let index = 1; index <= 51; index++) mutate(room, { type: 'heartbeat' }, `guest-${index}`, false);
+  mutate(room, { type: 'quiz-start', question: '좌석 번호는 유지되나요?', answer: 'O' }, null, true);
+  const id = ensureDay(room).quiz!.id;
+  mutate(room, { type: 'quiz-answer', quizId: id, choice: 'O' }, 'guest-51', false);
+  const mine = snapshot(room, today(), 'guest-51', 'local').seats.find(seat => seat.mine)!;
+  assert.equal(mine.number, 51);
+  assert.equal(mine.name, '수강생 51');
+  assert.deepEqual(mine.position, auditoriumQuizPosition(1, 'O'));
 });

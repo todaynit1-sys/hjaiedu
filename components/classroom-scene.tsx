@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
 import { Chalkboard } from './chalkboard';
 import { animalHeads } from './animal-heads';
 import { gardenHeads } from './garden-heads';
 import { useClassroomMovement } from './classroom-movement';
 import { ActivityBadge, ClassroomActivities, QuizStatus, type ClassroomAction } from './classroom-activities';
+import { AuditoriumArt } from './auditorium-art';
+import { AUDITORIUM_PAGE_SIZE, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
 import { CHARACTERS, defaultCharacter, type Character, type ClassroomPosition, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
+import '../app/auditorium.css';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = AUDITORIUM_PAGE_SIZE;
 const BUBBLE_TIME = 18_000;
 const seatLabel = (number: number) => String(number).padStart(2, '0');
 const seatPage = (number: number) => Math.floor((number - 1) / PAGE_SIZE);
@@ -128,13 +131,17 @@ function NicknameDialog({ current, onSave, onClose }: { current: string; onSave:
 function DeskDrawing({ number, character, mine, name }: { number: number; character?: Character; mine: boolean; name?: string }) {
   const nickname = name && name !== `수강생 ${seatLabel(number)}` ? name : '';
   const label = Array.from(nickname);
-  return <svg className="classroom-desk" data-nickname={nickname || undefined} viewBox="0 0 90 68" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {character ? <g key={character} className="classroom-arrival"><g className="classroom-head"><StudentHead character={character} /></g></g> : <path className="classroom-empty-chair" d="M29 38v-8c0-3 2-5 5-5h22c3 0 5 2 5 5v8" />}
-    <path d="m14 56 .5 6m60-6-.5 6" />
-    <rect className="classroom-desk-front" x="7" y="36.5" width="76" height="22" rx="7.2" />
-    <path d="M14.5 39.5h61" stroke="white" strokeOpacity=".8" strokeWidth="1" />
-    <text x="45" y="52.7" textAnchor="middle" fill="currentColor" stroke="none" fontSize={nickname ? 10 : 13.8} fontWeight="750">{nickname ? label.slice(0, 5).join('') + (label.length > 5 ? '…' : '') : seatLabel(number)}</text>
-    {mine && <path d="M22 63q22 4 46 0" stroke="#4656a5" strokeWidth="2.8" />}
+  return <svg className="classroom-desk" data-nickname={nickname || undefined} viewBox="0 0 90 78" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <ellipse cx="45" cy="67" rx="25" ry="5" fill="#283452" opacity=".1" stroke="none"/>
+    <path d="M26 43V32q0-8 8-8h22q8 0 8 8v11" className="classroom-empty-chair"/>
+    <path d="M21 49v8q0 9 24 9t24-9v-8" className="classroom-desk-front"/>
+    <ellipse cx="45" cy="49" rx="24" ry="10" className="classroom-desk-front"/>
+    {character && <>
+      <path d="M33 42q12-8 24 0l3 10q-15 8-30 0Z" fill="#d5e7de"/>
+      <g key={character} className="classroom-arrival"><g className="classroom-head"><StudentHead character={character} /></g></g>
+    </>}
+    <text x="45" y="75" textAnchor="middle" fill="currentColor" stroke="none" fontSize={nickname ? 10 : 11} fontWeight="750">{nickname ? label.slice(0, 5).join('') + (label.length > 5 ? '…' : '') : seatLabel(number)}</text>
+    {mine && <ellipse cx="45" cy="55" rx="30" ry="13" stroke="#4656a5" strokeWidth="2" strokeDasharray="3 4"/>}
   </svg>;
 }
 
@@ -176,12 +183,30 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   const pages = [...new Set([0, ...seats.map(seat => seatPage(seat.number))])].sort((a, b) => a - b);
   const [selectedPage, setSelectedPage] = useState<{ roomDay: string; page: number } | null>(null);
   const roomDay = `${data.code}/${data.date}`;
+  const viewport = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<'overview' | 'near'>('overview');
   const movement = useClassroomMovement(roomDay, mySeat, onMove);
   const page = selectedPage?.roomDay === roomDay && pages.includes(selectedPage.page)
     ? selectedPage.page : mySeat ? seatPage(mySeat.number) : 0;
   const pageIndex = pages.indexOf(page);
   const canMoveHere = Boolean(onMove && mySeat && seatPage(mySeat.number) === page);
   const firstSeat = page * PAGE_SIZE + 1;
+  const pageSeats = seats.filter(seat => seatPage(seat.number) === page);
+  const capacity = auditoriumCapacity(Math.max(1, ...pageSeats.map(seat => seat.number - page * PAGE_SIZE)));
+  const headsInteractive = view === 'near';
+  function centerNearView() {
+    if (!viewport.current || !movement.floor.current) return;
+    const point = mySeat && seatPage(mySeat.number) === page
+      ? movement.position ?? auditoriumSeat(mySeat.number - firstSeat, capacity)
+      : {x: .5, y: .5};
+    const field = movement.floor.current;
+    const visibleFloor = viewport.current;
+    visibleFloor.scrollTo({left: point.x * field.clientWidth - visibleFloor.clientWidth / 2,
+      top: point.y * field.clientHeight - visibleFloor.clientHeight / 2, behavior: 'instant'});
+  }
+  useLayoutEffect(() => {
+    if (view === 'near') centerNearView();
+  }, [view, page, roomDay, capacity, mySeat?.number]);
   const bubbles = useSeatBubbles(data);
   // Old instructor posts and the seeded demo cards predate the author field.
   const teacher = data.messages.reduce<PublicMessage | undefined>(
@@ -189,49 +214,63 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
   const latest = data.messages.at(-1);
   const turnPage = (offset: number) => setSelectedPage({ roomDay, page: pages[pageIndex + offset] });
 
-  return <section className={`classroom-scene${data.quiz ? ' has-quiz' : ''}`} aria-labelledby="classroom-title">
+  return <section className={`classroom-scene auditorium-scene${data.quiz ? ' has-quiz' : ''}`} aria-labelledby="classroom-title">
     <div className="classroom-scene-heading"><h2 id="classroom-title"><DeskIcon />AI 강의실</h2>{mood}</div>
     <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
-    <Chalkboard message={data.quiz ? {id: data.quiz.id, text: data.quiz.question, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher} code={data.code} active={data.active} />
+    <div className="auditorium-stage"><Chalkboard message={data.quiz ? {id: data.quiz.id, text: data.quiz.question, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher} code={data.code} active={data.active} /></div>
     <QuizStatus key={data.quiz?.id ?? 'none'} data={data} host={host} onAction={onActivity}/>
+    <div className="auditorium-toolbar"><span>{view === 'near' ? '밀어서 둘러보기' : `반원 강당 · ${capacity}석`}</span>
+      <div role="group" aria-label="강당 보기">
+        <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')}>전체 보기</button>
+        <button type="button" aria-pressed={view === 'near'} title="캐릭터를 크게 보고 눌러 인사하기" onClick={() => { if (view === 'near') centerNearView(); else setView('near'); }}>내 주변</button>
+      </div>
+    </div>
+    <p id="auditorium-view-hint" className="sr-only">내 주변에서는 화면을 밀어 둘러보고 캐릭터를 눌러 인사할 수 있어요.</p>
+    <div ref={viewport} className="auditorium-viewport" data-view={view} aria-label="강당 객석" aria-describedby="auditorium-view-hint" role="region">
     <div ref={movement.floor} className="classroom-floor" data-moving={movement.moving && Boolean(onMove) || undefined}
+      style={{'--auditorium-columns':capacity / 5} as CSSProperties}
       role="group" aria-label="캐릭터 이동 영역" aria-describedby={onMove ? 'classroom-move-hint' : undefined}
       tabIndex={canMoveHere ? 0 : undefined} onClick={canMoveHere ? movement.click : undefined} onKeyDown={canMoveHere ? movement.keyDown : undefined}>
+    <AuditoriumArt/>
     {data.quiz?.open && <div className="classroom-quiz-zones" aria-hidden="true"><span>O</span><span>X</span></div>}
-    <ol className="classroom-seats" aria-label={`강의실 좌석 ${firstSeat}번부터 ${firstSeat + PAGE_SIZE - 1}번까지`} start={firstSeat}>
-      {Array.from({ length: PAGE_SIZE }, (_, index) => {
+    <ol className="classroom-seats" aria-label={`강의실 좌석 ${firstSeat}번부터 ${firstSeat + capacity - 1}번까지`} start={firstSeat}>
+      {Array.from({ length: capacity }, (_, index) => {
         const number = firstSeat + index;
         const seat = seats.find(item => item.number === number);
         const bubble = seat && bubbles.get(number);
         const character = seat && (seat.character ?? defaultCharacter(number));
         const walking = seat?.mine ? movement.moving : Boolean(seat?.position);
-        return <li key={number} data-character={character} title={seat?.name} className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
+        const point = auditoriumSeat(index, capacity);
+        return <li key={number} data-character={character} title={seat?.name}
+          style={{left:`${point.x * 100}%`,top:`${point.y * 100}%`,zIndex:Math.round(point.y*100)}}
+          className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
           <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{character && ', ' + characterNames[character]}{seat?.mine ? ', 내 자리' : ''}</span>
           <div className="classroom-desk-wrap">
             {bubble && !walking && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
             <DeskDrawing number={number} character={walking ? undefined : character} mine={Boolean(seat?.mine)} name={seat?.name} />
             {seat && !walking && <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>}
-            {seat && !seat.mine && !walking && !host && onActivity && <button className="classroom-desk-hit classroom-greet-hit" type="button" aria-label={`${seat.name}에게 인사하기`}
+            {headsInteractive && seat && !seat.mine && !walking && !host && onActivity && <button className="classroom-desk-hit classroom-greet-hit" type="button" aria-label={`${seat.name}에게 인사하기`}
               onClick={event => { event.stopPropagation(); void greet(seat.number); }}/>}
-            {seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={() => setChoosingCharacter(true)} />}
+            {headsInteractive && seat?.mine && onCharacterChange && <button className="classroom-desk-hit" type="button" aria-haspopup="dialog" aria-label={`${seatLabel(number)}번 내 자리 캐릭터 바꾸기`} onClick={event => {event.stopPropagation(); setChoosingCharacter(true);}} />}
           </div>
         </li>;
       })}
     </ol>
-    {seats.filter(seat => seatPage(seat.number) === page).map(seat => {
+    {pageSeats.map(seat => {
       const position = seat.mine ? movement.position : seat.position;
       if (!position) return null;
       const bubble = bubbles.get(seat.number);
       return <div key={seat.number} className={`classroom-walker${seat.mine ? ' is-mine' : ''}`}
-        data-seat={seat.number} style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }} title={seat.name}>
+        data-seat={seat.number} style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%`, zIndex:Math.round(position.y*100)+1 }} title={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id}><span>{bubble.text}</span></div>}
         <svg key={`${position.x}/${position.y}`} viewBox="16 -2 60 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><StudentHead character={seat.character ?? defaultCharacter(seat.number)} /></svg>
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
-        {!seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
+        {headsInteractive && !seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
           onClick={event=>{event.stopPropagation(); void greet(seat.number);}}/>}
       </div>;
     })}
+    </div>
     </div>
     <div className="classroom-seating-footer">
       <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat" title={mySeat.name}>내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
@@ -243,7 +282,7 @@ export function ClassroomScene({ data, mood, onCharacterChange, onNicknameChange
       </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">
         <button type="button" aria-label="앞 좌석 보기" disabled={pageIndex === 0} onClick={() => turnPage(-1)}><ChevronLeft size={17} aria-hidden="true" /></button>
-        <span aria-live="polite">{seatLabel(firstSeat)}–{seatLabel(firstSeat + PAGE_SIZE - 1)}</span>
+        <span aria-live="polite">{seatLabel(firstSeat)}–{seatLabel(firstSeat + capacity - 1)}</span>
         <button type="button" aria-label="뒤 좌석 보기" disabled={pageIndex === pages.length - 1} onClick={() => turnPage(1)}><ChevronRight size={17} aria-hidden="true" /></button>
       </div>}
     </div>

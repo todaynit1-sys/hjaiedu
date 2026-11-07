@@ -1,5 +1,6 @@
 const randomUUID = () => crypto.randomUUID();
 import { CHARACTERS, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type Room, type Snapshot } from './types.ts';
+import { auditoriumQuizPosition } from './auditorium.ts';
 
 export class AppError extends Error {
   status: number;
@@ -126,8 +127,7 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
       if (!day.quiz?.open || action.quizId !== day.quiz.id) throw new AppError('이 OX 퀴즈는 마감됐어요.', 409);
       if (action.choice !== 'O' && action.choice !== 'X') throw new AppError('O 또는 X를 골라주세요.');
       day.quiz.answers[guest] = action.choice;
-      const index = (seatNumber(day.participants[guest]) - 1) % 20;
-      (day.positions ??= {})[guest] = { x: (action.choice === 'O' ? .12 : .62) + index % 4 * .07, y: .22 + Math.floor(index / 4) * .13 };
+      (day.positions ??= {})[guest] = auditoriumQuizPosition(seatNumber(day.participants[guest]), action.choice);
     }
     return;
   }

@@ -137,21 +137,20 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
     assert.equal(await student.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true, 'Overflow at '+width);
     assert.equal(await student.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true,'Page scroll at '+width);
     const composer = await student.getByLabel('채팅 메시지',{exact:true}).boundingBox(); assert(composer.y>=0 && composer.y+composer.height<=height,'Composer outside first viewport at '+width);
-    const columns = await student.locator('.classroom-seats').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
-    assert.equal(columns, width >= 761 ? 5 : 4, 'Seat columns at '+width);
+    const points = await student.locator('.classroom-seat').evaluateAll(items=>items.map(el=>({x:parseFloat(el.style.left), y:parseFloat(el.style.top)})));
+    assert.equal(new Set(points.map(point=>point.x+'/'+point.y)).size,20,'Unique auditorium positions at '+width);
+    assert(points.every(point=>point.x>0 && point.x<100 && point.y>0 && point.y<100),'All seats inside auditorium at '+width);
+    assert(points[0].y<points[1].y && points[3].y<points[2].y,'First row curves around stage at '+width);
     assert.equal(await student.locator('.classroom-seat').count(), 20);
-    const lastDesk = await student.locator('.classroom-seat').last().boundingBox();
+    const deskBottom = await student.locator('.classroom-seat').evaluateAll(items=>Math.max(...items.map(el=>el.getBoundingClientRect().bottom)));
     const footer = await student.locator('.classroom-seating-footer').boundingBox();
-    assert(lastDesk.y + lastDesk.height <= footer.y + 1, 'Desk rows overlap the controls at '+width);
+    assert(deskBottom <= footer.y + 1, 'Desk rows overlap the controls at '+width);
     if (width < 761) {
+      await student.getByRole('button',{name:'캐릭터 선택',exact:true}).scrollIntoViewIfNeeded();
       const shell = await student.locator('.chat-composer').boundingBox();
       const picker = await student.getByRole('button',{name:'캐릭터 선택',exact:true}).boundingBox();
-      if (picker.y+picker.height > shell.y+1 || lastDesk.y+lastDesk.height > shell.y+1) {
-        await student.screenshot({ path: '.local/screenshots/geometry-'+width+'.png' });
-        const sizes = await student.locator('.classroom-scene, .classroom-board, .classroom-seats, .classroom-seating-footer, .chat-composer, .classroom-pane').evaluateAll(items =>
-          items.map(el => [el.className,el.getBoundingClientRect().y,el.getBoundingClientRect().height,el.hasAttribute('data-expanded')]));
-        assert.fail('Normal classroom, last desk and avatar picker must fit above the composer at '+width+': '+JSON.stringify(sizes));
-      }
+      assert(picker.y+picker.height <= shell.y+1,'Avatar control must scroll into view above composer at '+width);
+      await student.locator('.classroom-pane').evaluate(el=>{el.scrollTop=0;});
     }
     const heading = await student.getByRole('heading',{name:'AI 강의실',exact:true}).boundingBox();
     const mood = await moods.boundingBox();
@@ -263,6 +262,8 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   require('node:fs').copyFileSync(await photo.path(),'.local/screenshots/classroom-group-photo.png');
   await activities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
   const greetingRequest = target => target.waitForResponse(response => response.request().method()==='POST' && response.url().endsWith('/api/rooms/'+code) && response.request().postDataJSON()?.type==='greet');
+  await second.getByRole('button',{name:'내 주변',exact:true}).click();
+  await student.getByRole('button',{name:'내 주변',exact:true}).click();
   const firstGreeting = greetingRequest(second);
   await second.getByRole('button',{name:'몽실구름에게 인사하기',exact:true}).click();
   const firstResponse = await firstGreeting;
@@ -285,14 +286,16 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   await student.getByRole('button',{name:'O 선택',exact:true}).click();
   await second.locator('.classroom-walker[title="몽실구름"]').waitFor();
   await waitUntil(async()=>parseFloat(await second.locator('.classroom-walker[title="몽실구름"]').evaluate(el=>el.style.left))<50,'Quiz answer moves character to O zone');
-  const quizLastDesk = await student.locator('.classroom-seat').last().boundingBox();
+  await student.getByRole('button',{name:'전체 보기',exact:true}).click();
+  const quizDeskBottom = await student.locator('.classroom-seat').evaluateAll(items=>Math.max(...items.map(el=>el.getBoundingClientRect().bottom)));
   const quizFooter = await student.locator('.classroom-seating-footer').boundingBox();
-  assert(quizLastDesk.y+quizLastDesk.height <= quizFooter.y+1,'Quiz desks must not overlap activity controls');
+  assert(quizDeskBottom <= quizFooter.y+1,'Quiz desks must not overlap activity controls');
   await student.screenshot({path:'.local/screenshots/classroom-quiz-mobile.png'});
   await page.getByRole('button',{name:'정답 공개',exact:true}).click();
   await student.getByText('정답은 O · 참여 1명',{exact:true}).waitFor();
   await page.getByRole('button',{name:'퀴즈 닫기',exact:true}).click();
   await student.getByRole('button',{name:'내 자리로',exact:true}).click();
+  await verifyAuditoriumCapacity(browser, teacher, base, waitUntil);
   assert.deepEqual(errors,[]);
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,
@@ -306,4 +309,151 @@ async function waitUntil(fn, message) { for (let i=0;i<40;i++) { if(await fn()) 
   console.log('PASS: 20-seat classroom, two students, teacher chalkboard, mobile tabs, materials, voting, moderation and 1440/390/320 layouts.');
   await browser.close();
 })().catch(e=>{ console.error(e);process.exit(1); });
+
+async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
+  const WebSocket = require('ws');
+  const contexts = [];
+  const sockets = [];
+  const pages = [];
+  const created = await teacher.request.post(base+'/api/rooms', {data:{title:'강당 50명 확인'}});
+  assert.equal(created.status(),200);
+  const {code} = await created.json();
+  const roomPath = '/api/rooms/'+code;
+  const liveURL = base.replace(/^http/,'ws')+roomPath+'/live';
+
+  async function joinStudent() {
+    const context = await browser.newContext({viewport:{width:1440,height:900},isMobile:true,hasTouch:true});
+    contexts.push(context);
+    const joined = await context.request.post(base+roomPath,{data:{type:'join'}});
+    assert.equal(joined.status(),200);
+    const cookies = await context.cookies(base);
+    const socket = new WebSocket(liveURL, {headers:{
+      Cookie:cookies.map(cookie=>cookie.name+'='+cookie.value).join('; '),
+      Origin:base
+    }});
+    sockets.push(socket);
+    socket.on('message',()=>{});
+    socket.on('error',()=>{});
+    await new Promise((resolve,reject)=>{
+      const timer = setTimeout(()=>reject(new Error('Student WebSocket did not open')),10000);
+      socket.once('open',()=>{clearTimeout(timer);resolve();});
+      socket.once('error',error=>{clearTimeout(timer);reject(error);});
+    });
+    return context;
+  }
+
+  try {
+    for (let index=0;index<50;index++) await joinStudent();
+    const instructor = await teacher.newPage();
+    pages.push(instructor);
+    await instructor.setViewportSize({width:1440,height:900});
+    await instructor.goto(base+'/host?room='+code);
+    await instructor.getByRole('heading',{name:'강당 50명 확인',exact:true}).waitFor();
+    await waitUntil(async()=>await instructor.locator('.classroom-seat.is-occupied').count()===50,
+      'The auditorium must render all fifty real connected students');
+    assert.equal(await instructor.locator('.classroom-seat').count(),50);
+    await instructor.getByText('반원 강당 · 50석',{exact:true}).waitFor();
+    const positions = await instructor.locator('.classroom-seat').evaluateAll(seats=>seats.map(seat=>({
+      x:parseFloat(seat.style.left),y:parseFloat(seat.style.top)
+    })));
+    assert.equal(new Set(positions.map(point=>point.x+','+point.y)).size,50);
+    assert(positions.every(point=>point.x>=6&&point.x<=94&&point.y>=8&&point.y<=92),
+      'Every auditorium seat must be within the interactive floor');
+    const lowestSeat = await instructor.locator('.classroom-seat').evaluateAll(seats=>Math.max(...seats.map(seat=>seat.getBoundingClientRect().bottom)));
+    const footer = await instructor.locator('.classroom-seating-footer').boundingBox();
+    assert(lowestSeat<=footer.y+1,'Fifty-seat auditorium overlaps the activity controls');
+
+    const student = await contexts[49].newPage();
+    pages.push(student);
+    await student.goto(base+'/room/'+code);
+    await student.locator('.classroom-seat.is-mine').waitFor();
+    await student.getByRole('button',{name:'닉네임 설정',exact:true}).click();
+    const nickname = student.getByRole('dialog',{name:'닉네임 설정',exact:true});
+    await nickname.getByLabel('수업에서 사용할 이름').fill('강당 오십번');
+    await nickname.getByRole('button',{name:'저장하기',exact:true}).click();
+    const fiftieth = instructor.locator('.classroom-seat[title="강당 오십번"]');
+    await fiftieth.waitFor();
+    assert.match(await fiftieth.innerText(),/^50번/);
+    await student.getByRole('button',{name:'활동',exact:true}).click();
+    const activities = student.getByRole('dialog',{name:'교실 활동',exact:true});
+    await activities.getByRole('button',{name:'박수',exact:true}).click();
+    await fiftieth.locator('[data-kind="clap"]').waitFor();
+    await instructor.screenshot({path:'.local/screenshots/auditorium-50-desktop.png',fullPage:true});
+    await activities.getByRole('button',{name:'교실 활동 닫기',exact:true}).click();
+
+    await student.setViewportSize({width:320,height:568});
+    assert.equal(await student.locator('.classroom-greet-hit').count(),0,
+      'Overview must not expose overlapping tiny avatar hit targets');
+    await student.getByRole('button',{name:'내 주변',exact:true}).click();
+    const floor = student.getByRole('group',{name:'캐릭터 이동 영역',exact:true});
+    const visibleFloor = student.getByRole('region',{name:'강당 객석',exact:true});
+    const ownTarget = student.locator('.classroom-seat.is-mine .classroom-desk-hit');
+    const targetRect = await ownTarget.boundingBox();
+    assert(targetRect.width>=44&&targetRect.height>=44,
+      'Nearby view must provide a touch-sized own-avatar control');
+    const floorRect = await floor.boundingBox();
+    assert(floorRect.width>=760,'Nearby view must enlarge the real interaction canvas');
+    const desk = await student.locator('.classroom-seat.is-mine .classroom-desk').boundingBox();
+    const expectedArrowX = Math.max(.06,Math.min(.94,(desk.x+desk.width/2-floorRect.x)/floorRect.width-.04));
+    await floor.evaluate(element=>element.focus({preventScroll:true}));
+    await student.keyboard.press('ArrowLeft');
+    const walker = instructor.locator('.classroom-walker[title="강당 오십번"]');
+    await walker.waitFor();
+    await waitUntil(async()=>Math.abs(parseFloat(await walker.evaluate(element=>element.style.left))/100-expectedArrowX)<.0002,
+      'Arrow movement in a scrolled nearby view must retain normalized screen coordinates');
+
+    const touchPoint = await visibleFloor.evaluate(element=>{
+      const bounds = element.getBoundingClientRect();
+      for (const yRatio of [.2,.4,.6,.8]) for (const xRatio of [.2,.4,.6,.8]) {
+        const x=bounds.x+bounds.width*xRatio,y=bounds.y+bounds.height*yRatio;
+        const hit=document.elementFromPoint(x,y);
+        if (hit?.closest('.classroom-floor')&&!hit.closest('button')) return {x,y};
+      }
+      return null;
+    });
+    assert(touchPoint,'Nearby view needs a reachable floor area for touch movement');
+    const touchFloorRect = await floor.boundingBox();
+    const expectedTouchX = Math.max(.06,Math.min(.94,(touchPoint.x-touchFloorRect.x)/touchFloorRect.width));
+    const expectedTouchY = Math.max(.08,Math.min(.92,(touchPoint.y-touchFloorRect.y)/touchFloorRect.height));
+    await student.touchscreen.tap(touchPoint.x,touchPoint.y);
+    await waitUntil(async()=>{
+      const actual=await walker.evaluate(element=>({x:parseFloat(element.style.left)/100,y:parseFloat(element.style.top)/100}));
+      // Touch-generated clicks may round the viewport point to a CSS pixel.
+      return Math.abs(actual.x-expectedTouchX)<=1/touchFloorRect.width
+        &&Math.abs(actual.y-expectedTouchY)<=1/touchFloorRect.height;
+    },'Touch movement must map the scrolled nearby canvas to the same location for other participants').catch(async error=>{
+      const actual=await walker.evaluate(element=>({x:parseFloat(element.style.left)/100,y:parseFloat(element.style.top)/100}));
+      error.message+=' '+JSON.stringify({actual,expected:{x:expectedTouchX,y:expectedTouchY},
+        deltaPixels:{x:(actual.x-expectedTouchX)*touchFloorRect.width,y:(actual.y-expectedTouchY)*touchFloorRect.height},touchPoint});
+      throw error;
+    });
+    await student.screenshot({path:'.local/screenshots/auditorium-50-mobile.png'});
+    await student.getByRole('button',{name:'내 자리로',exact:true}).click();
+    await waitUntil(async()=>await walker.count()===0,'The fiftieth student must be able to return to their original seat');
+
+    sockets[0].close(1000);
+    await waitUntil(async()=>sockets[0].readyState===WebSocket.CLOSED,'First student did not disconnect');
+    await contexts[0].close();
+    const laterContext = await joinStudent();
+    const laterStudent = await laterContext.newPage();
+    pages.push(laterStudent);
+    await laterStudent.goto(base+'/room/'+code);
+    await waitUntil(async()=>await laterStudent.locator('.classroom-own-seat b').innerText()==='51',
+      'A later daily student must keep seat fifty-one instead of being renumbered');
+    await laterStudent.getByText('반원 강당 · 20석',{exact:true}).waitFor();
+    assert.equal(await laterStudent.locator('.classroom-seat').count(),20);
+    assert.equal(await laterStudent.getByRole('button',{name:'앞 좌석 보기',exact:true}).isEnabled(),true);
+    console.log('PASS: fifty real students, expanded auditorium, peer reactions, mobile nearby movement and daily seat overflow.');
+  } finally {
+    await Promise.allSettled(pages.map(page=>page.close()));
+    await Promise.allSettled(sockets.map(socket=>new Promise(resolve=>{
+      if (socket.readyState===WebSocket.CLOSED) {resolve();return;}
+      const timer=setTimeout(()=>{socket.terminate();resolve();},1500);
+      socket.once('close',()=>{clearTimeout(timer);resolve();});
+      if (socket.readyState===WebSocket.OPEN) socket.close(1000);
+      else if (socket.readyState===WebSocket.CONNECTING) socket.terminate();
+    })));
+    await Promise.allSettled(contexts.map(context=>context.close()));
+  }
+}
 
