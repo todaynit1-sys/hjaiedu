@@ -116,8 +116,13 @@ try {
   assert.equal((await request(path, { ...instructorMove, position: { x: 2, y: .56 } }, host)).response.status, 400);
   assert.equal((await request(path, instructorMove, host)).response.status, 200);
   await until(() => students[0].peer.latest?.instructor?.position?.y === .56, 'Instructor movement did not broadcast');
-  assert.deepEqual((await request(path, dockRequest, host)).data.instructor.position, instructorMove.position,
-    'Another host tab keeps the live instructor in place');
+  assert.deepEqual((await request(path, { type: 'start-day' }, host)).data.instructor.position, instructorMove.position,
+    'Automatic reconnect preserves the live instructor position');
+  assert.deepEqual((await request(path, dockRequest, host)).data.instructor, {},
+    'Explicit entry docks the instructor even with another live host tab');
+  await until(() => teacher.latest?.instructor && !teacher.latest.instructor.position
+    && students[0].peer.latest?.instructor && !students[0].peer.latest.instructor.position,
+  'The new dock position did not reach the already connected host and students');
   assert.equal(students[0].peer.latest.online, 50);
   assert.equal(students[0].peer.latest.seats.length, 50);
   const studentWander = { type: 'move', wander: true };

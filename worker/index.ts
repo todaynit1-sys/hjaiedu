@@ -277,10 +277,11 @@ export class ClassBoard extends DurableObject<Env> {
         } else if (input.type === 'start-day') {
           if (!host) throw new AppError('강사 로그인이 필요합니다.', 401);
           const day = room.days[today()];
-          // An already connected instructor keeps control when another host tab opens.
-          if (input.dockInstructor === true && day?.instructor && !this.attendance(code).instructor) {
+          // Explicit room entry also docks the robot when an older host tab is still connected.
+          if (input.dockInstructor === true && day?.instructor) {
             delete day.instructor;
             this.files.saveRoom(room);
+            this.broadcast(room);
           }
         } else if (input.type === 'heartbeat') {
           if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
