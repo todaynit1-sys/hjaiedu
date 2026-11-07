@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AUDITORIUM_PAGE_SIZE, auditoriumCapacity, auditoriumQuizPosition, auditoriumSeat } from '../lib/auditorium.ts';
+import type { AvatarCustomization } from '../lib/avatar-customization.ts';
 
 test('nicknames keep daily seat identity and are used for new chat messages', () => {
   const room = newRoom('닉네임 수업');
@@ -167,6 +168,31 @@ test('a signed student selects only their own character and it survives chat res
   const view = snapshot(room, today(), 'two', 'local');
   assert.deepEqual(view.seats.map(seat => seat.character), ['cat', 'sprout']);
   assert.equal('characters' in view, false);
+  mutate(room, { type: 'active', active: false }, null, true);
+  assert.throws(() => mutate(room, change, 'one', false), /강의실에 입장/);
+});
+test('avatar customization shares validated options for the signed seat and returns to the legacy preset', () => {
+  const room = newRoom('캐릭터 꾸미기');
+  for (const guest of ['one', 'two']) mutate(room, { type: 'heartbeat' }, guest, false);
+  const avatar: AvatarCustomization = {
+    hair: 'waves', hairColor: 'brown', skin: 'peach', expression: 'smile',
+    clothing: 'cardigan', clothingColor: 'sky', accessory: 'glasses'
+  };
+  const change = { type: 'avatar-customize', avatar: { ...avatar, markup: '<svg>' }, guest: 'two', seatNumber: 2 };
+  assert.throws(() => mutate(room, change, null, false), /참여/);
+  assert.throws(() => mutate(room, change, 'one', true), /수강생만/);
+  assert.throws(() => mutate(room, change, 'unknown', false), /강의실에 입장/);
+  assert.throws(() => mutate(room, { ...change, avatar: { hair: 'waves' } }, 'one', false), /꾸미기 항목/);
+  assert.throws(() => mutate(room, { ...change, avatar: { ...avatar, hairColor: '<img>' } }, 'one', false), /꾸미기 항목/);
+  mutate(room, change, 'one', false);
+  const view = snapshot(room, today(), 'two', 'local');
+  assert.deepEqual(view.seats[0].avatar, avatar);
+  assert.equal(view.seats[1].avatar, undefined);
+  assert.equal('avatars' in view, false);
+  mutate(room, { type: 'character', character: 'cat' }, 'one', false);
+  const seat = snapshot(room, today(), 'one', 'local').seats[0];
+  assert.equal(seat.character, 'cat');
+  assert.equal(seat.avatar, undefined);
   mutate(room, { type: 'active', active: false }, null, true);
   assert.throws(() => mutate(room, change, 'one', false), /강의실에 입장/);
 });

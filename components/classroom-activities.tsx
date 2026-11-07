@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CircleHelp, Hand, Heart, MessageSquare, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
-import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type Character, type ClassroomSeat, type ReactionKind, type Snapshot } from '../lib/types';
+import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type ClassroomSeat, type ReactionKind, type Snapshot } from '../lib/types';
 import '../app/classroom-activities.css';
 
 export type ClassroomAction = (input: Record<string, unknown>) => Promise<void>;
@@ -168,7 +168,7 @@ function QuestionDialog({ round, host, onAction, onClose }: {
 }
 
 export function ClassroomActivities({ data, host, onAction, renderHead }: {
-  data: Snapshot; host: boolean; onAction?: ClassroomAction; renderHead: (character: Character) => ReactNode;
+  data: Snapshot; host: boolean; onAction?: ClassroomAction; renderHead: (seat: ClassroomSeat) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const hands = data.seats.filter(seat => seat.activity?.handAt).sort((a,b) => a.activity!.handAt! - b.activity!.handAt!);
@@ -181,7 +181,7 @@ export function ClassroomActivities({ data, host, onAction, renderHead }: {
 
 function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: {
   data: Snapshot; host: boolean; hands: ClassroomSeat[]; onAction?: ClassroomAction;
-  renderHead: (character: Character) => ReactNode; onClose: () => void;
+  renderHead: (seat: ClassroomSeat) => ReactNode; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const photo = useRef<SVGSVGElement>(null);
@@ -259,7 +259,7 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
             <text x="450" y="110" textAnchor="middle" fill="#fffef7" fontSize="20">{data.title.slice(0,36)}</text>
             <text x="450" y="138" textAnchor="middle" fill="#dce9df" fontSize="16">{data.date} · AI환경연구소</text>
             {photoSeats.map((seat,index)=><g key={seat.number} transform={`translate(${45+index%6*140},${185+Math.floor(index/6)*110})`}>
-              <svg x="17" y="0" width="88" height="68" viewBox="0 0 90 68" fill="none" stroke="#283452" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{renderHead(seat.character)}</svg>
+              <svg x="17" y="0" width="88" height="68" viewBox="0 0 90 68" fill="none" stroke="#283452" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{renderHead(seat)}</svg>
               <text x="60" y="83" fill="#283452" fontSize="15" textAnchor="middle">{Array.from(seat.name).slice(0,9).join('')}</text>
             </g>)}
             <text x="450" y={photoHeight-20} textAnchor="middle" fontSize="16" fill="#4656a5">신현준 연구사 실시간 강의실 · 함께 배우는 우리</text>

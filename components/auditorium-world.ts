@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { AUDITORIUM_SCREEN, auditoriumSeat } from '../lib/auditorium';
+import { createAuditoriumActors, type AuditoriumActorFrame } from './auditorium-actors';
 
 export type AuditoriumAnchor = { x: number; y: number; scale: number; row: number };
 export type AuditoriumScreenBounds = { left: number; top: number; width: number; height: number };
@@ -9,8 +10,34 @@ export type AuditoriumWorld = {
   layout(capacity: number): AuditoriumAnchor[];
   screenBounds(): AuditoriumScreenBounds;
   setBackdrop(enabled: boolean): void;
+  floorPoint(x: number, y: number): { x: number; z: number };
+  renderActors(actors: AuditoriumActorFrame[]): void;
   dispose(): void;
 };
+
+export function createAvatarPreviewWorld(canvas: HTMLCanvasElement) {
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(172, 180, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1.14, 1.14, 1.19, -1.19, .1, 15);
+  camera.position.set(2.3, 2.3, 6);
+  camera.lookAt(0, 1.03, 0);
+  scene.add(new THREE.HemisphereLight('#fff9ed', '#879bbb', 2.1));
+  const sunlight = new THREE.DirectionalLight('#fff0d2', 2.4);
+  sunlight.position.set(-3, 5, 6);
+  scene.add(sunlight);
+  const actors = createAuditoriumActors(scene);
+  return {
+    draw(appearance: Pick<AuditoriumActorFrame, 'character' | 'avatar'>) {
+      actors.update([{ ...appearance, id: 'preview', x: 0, z: 0, scale: 1, heading: .14, stride: 0, seated: false }]);
+      renderer.render(scene, camera);
+    },
+    dispose() { actors.dispose(); renderer.dispose(); renderer.forceContextLoss(); },
+  };
+}
 
 const BACK_WALL_Z = -8.9;
 const WALL_SLOPE = .16;
@@ -189,6 +216,7 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   geometries.add(desktopBox);
   geometries.add(shadowPlane);
   scene.add(architecture, seating);
+  const actors = createAuditoriumActors(scene);
   const floorAnchorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   let anchors: AuditoriumAnchor[] = [];
   let backdropEnabled = false;
@@ -556,6 +584,15 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   function render() {
     if (!disposed) renderer.render(scene, camera);
   }
+  function floorPoint(x: number, y: number) {
+    const point = fromScreen(x, y, floorAnchorPlane);
+    return { x: point.x, z: point.z };
+  }
+  function renderActors(frames: AuditoriumActorFrame[]) {
+    if (disposed) return;
+    actors.update(frames);
+    render();
+  }
   function setBackdrop(enabled: boolean) {
     if (disposed || backdropEnabled === enabled) return;
     backdropEnabled = enabled;
@@ -644,6 +681,7 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   function dispose() {
     if (disposed) return;
     disposed = true;
+    actors.dispose();
     clearSeating();
     scene.traverse(object => {
       if (object instanceof THREE.InstancedMesh) object.dispose();
@@ -656,5 +694,5 @@ export function createAuditoriumWorld(canvas: HTMLCanvasElement): AuditoriumWorl
   }
 
   resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
-  return { resize, layout, screenBounds: () => AUDITORIUM_SCREEN, setBackdrop, dispose };
+  return { resize, layout, screenBounds: () => AUDITORIUM_SCREEN, setBackdrop, floorPoint, renderActors, dispose };
 }

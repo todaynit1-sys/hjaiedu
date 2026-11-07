@@ -1,6 +1,7 @@
 const randomUUID = () => crypto.randomUUID();
 import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
 import { auditoriumQuizPosition } from './auditorium.ts';
+import { parseAvatarCustomization } from './avatar-customization.ts';
 
 const QUESTION_RESPONSE_LIMIT = 256;
 
@@ -92,6 +93,7 @@ export function snapshot(room: Room, date: string, guest: string | null, mode: '
     if (!name) return [];
     const number = seatNumber(name);
     return [{ number, name: day.nicknames?.[id] ?? name, mine: guest === id, character: day.characters?.[id] ?? defaultCharacter(number), ...(day.positions?.[id] ? { position: day.positions[id] } : {}),
+      ...(day.avatars?.[id] ? { avatar: day.avatars[id] } : {}),
       ...(day.wanderers?.[id] ? { wanderSince: day.wanderers[id] } : {}),
       ...(day.activities?.[id] ? { activity: day.activities[id] } : {}),
       ...(day.quiz?.answers[id] ? { quizChoice: day.quiz.answers[id] } : {}) }];
@@ -245,13 +247,20 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     (day.nicknames ??= {})[guest] = nickname;
     return;
   }
-  if (action.type === 'character') {
+  if (action.type === 'character' || action.type === 'avatar-customize') {
     if (host) throw new AppError('수강생만 캐릭터를 고를 수 있어요.', 403);
     if (!guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
     if (!day.active || !day.participants?.[guest]) throw new AppError('강의실에 입장한 뒤 캐릭터를 골라주세요.', 409);
+    if (action.type === 'avatar-customize') {
+      const avatar = parseAvatarCustomization(action.avatar);
+      if (!avatar) throw new AppError('캐릭터의 꾸미기 항목을 다시 골라주세요.');
+      (day.avatars ??= {})[guest] = avatar;
+      return;
+    }
     const character = CHARACTERS.find(choice => choice === action.character);
     if (!character) throw new AppError('목록에서 캐릭터를 골라주세요.');
     (day.characters ??= {})[guest] = character;
+    delete day.avatars?.[guest];
     return;
   }
   if (action.type === 'heartbeat') {

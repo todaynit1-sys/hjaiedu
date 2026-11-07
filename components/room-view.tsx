@@ -230,7 +230,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
         </div>
         <span id="new-chat-hint" className="sr-only" role="status">{hasNewChat ? '새 채팅 메시지가 있어요.' : ''}</span>
         <div id="classroom-pane" className="classroom-pane" hidden={view !== 'classroom'}>
-          <ClassroomScene data={data} host={host} visible={view === 'classroom'} view={sceneView} nearRequest={nearRequest} onActivity={active ? classroomActivity : undefined} onCharacterChange={!host && active ? character => action({ type: 'character', character }, '내 캐릭터를 바꿨어요.') : undefined}
+          <ClassroomScene data={data} host={host} visible={view === 'classroom'} view={sceneView} nearRequest={nearRequest} onActivity={active ? classroomActivity : undefined} onAvatarChange={!host && active ? avatar => action({ type: 'avatar-customize', avatar }, '꾸민 캐릭터를 저장했어요.') : undefined}
             onMove={active ? moveCharacter : undefined}
             onNicknameChange={!host && active ? nickname => action({ type: 'nickname', nickname }, '닉네임을 저장했어요.') : undefined} />
           {(customPolls.length > 0 || (host && active)) && <div className="classroom-poll-tools">

@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import type { AvatarCustomization } from '../lib/avatar-customization';
 import type { Character, ClassroomPosition } from '../lib/types';
 import { AvatarArt } from './classroom-avatar';
 
-export function WalkingAvatar({ position, origin, dockExit, floor, mine, number, instructor, name, character, scale, children }: {
+export function WalkingAvatar({ position, origin, dockExit, floor, mine, number, instructor, name, character, avatar, scale, children }: {
   position?: ClassroomPosition | null;
   origin: ClassroomPosition;
   dockExit?: ClassroomPosition;
@@ -12,6 +13,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
   instructor?: boolean;
   name: string;
   character: Character;
+  avatar?: AvatarCustomization;
   scale?: number;
   children?: ReactNode;
 }) {
@@ -24,10 +26,18 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
   const stepTimer = useRef<number | undefined>(undefined);
   const [seated, setSeated] = useState(shouldSit);
 
-  useLayoutEffect(() => () => {
-    animation.current?.cancel();
-    animation.current = null;
-    window.clearTimeout(stepTimer.current);
+  useLayoutEffect(() => {
+    const node = element.current;
+    return () => {
+      animation.current?.cancel();
+      animation.current = null;
+      window.clearTimeout(stepTimer.current);
+      if (node) {
+        delete node.dataset.travelling;
+        delete node.dataset.walking;
+        delete node.dataset.returning;
+      }
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -44,6 +54,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     animation.current?.cancel();
     animation.current = null;
     window.clearTimeout(stepTimer.current);
+    delete node.dataset.travelling;
     delete node.dataset.walking;
     delete node.dataset.returning;
     if (!width || !height || (old.shouldSit && shouldSit && !interrupted)
@@ -84,6 +95,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     }
 
     setSeated(false);
+    node.dataset.travelling = '';
     if (shouldSit) node.dataset.returning = '';
     const facing = points.find(point => Math.abs(point.x - from.x) > .008);
     if (facing) node.dataset.facing = facing.x < from.x ? 'left' : 'right';
@@ -99,14 +111,17 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
       offset: distances[index] / distance,
     })), { duration: Math.min(1650, Math.max(150, distance * 2.2)), delay: riseDuration, easing: 'linear', fill: 'backwards' });
     animation.current = walk;
-    walk.onfinish = () => {
+    const settle = () => {
       if (animation.current !== walk) return;
       animation.current = null;
       window.clearTimeout(stepTimer.current);
+      delete node.dataset.travelling;
       delete node.dataset.walking;
       delete node.dataset.returning;
       setSeated(shouldSit);
     };
+    walk.onfinish = settle;
+    walk.oncancel = settle;
   }, [x, y, shouldSit, dockExit?.x, dockExit?.y, floor]);
 
   const className = `classroom-actor${position || instructor ? ' classroom-walker' : ''}${mine ? ' is-mine' : ''}${instructor ? ' is-instructor' : ''}`;
@@ -115,10 +130,11 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     '--actor-depth': .81 + .27 * y,
     ...(scale === undefined ? {} : { '--actor-scale': `${scale * 100}%` }),
   } as CSSProperties;
-  return <div ref={element} className={className} data-seat={number} data-pose={seated ? 'seated' : 'standing'} data-facing="right" title={name} style={style}>
+  return <div ref={element} className={className} data-seat={number} data-customized={avatar ? 'true' : undefined}
+    data-pose={seated ? 'seated' : 'standing'} data-facing="right" title={name} style={style}>
     <svg className="classroom-actor-sprite" viewBox="15 -2 60 66" aria-hidden="true">
       {mine && <ellipse className="classroom-actor-ring" cx="45" cy="60.1" rx="20" ry="3.1" fill="#72cff442" stroke="#ecfcff" strokeWidth="1.6" />}
-      <AvatarArt character={character} pose="actor" instructor={instructor} />
+      <AvatarArt character={character} avatar={avatar} pose="actor" instructor={instructor} />
     </svg>
     {children}
   </div>;

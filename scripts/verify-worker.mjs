@@ -207,6 +207,21 @@ try {
   const duplicate = await connect(path, students[0].cookie);
   await until(() => duplicate.latest?.online === 50, 'Duplicate tab count is wrong');
   assert.deepEqual(duplicate.latest.seats.filter(s => s.mine), [{ number: 1, name: '수강생 01', mine: true, character: 'cat' }]);
+  const avatar = {
+    hair: 'waves', hairColor: 'brown', skin: 'peach', expression: 'grin',
+    clothing: 'puffer', clothingColor: 'sage', accessory: 'headphones'
+  };
+  const customize = { type: 'avatar-customize', avatar: { ...avatar, markup: '<svg>' }, seatNumber: 2, guest: 'another-student' };
+  assert.equal((await request(path, customize)).response.status, 401);
+  assert.equal((await request(path, customize, host)).response.status, 403);
+  assert.equal((await request(path, { ...customize, avatar: { ...avatar, accessory: 'wrong' } }, students[0].cookie)).response.status, 400);
+  const savedAvatar = await request(path, customize, students[0].cookie);
+  assert.equal(savedAvatar.response.status, 200);
+  assert.deepEqual(savedAvatar.data.seats[0].avatar, avatar);
+  assert.equal(savedAvatar.data.seats[1].avatar, undefined);
+  assert.equal('avatars' in savedAvatar.data, false);
+  await until(() => teacher.latest.seats[0].avatar?.accessory === 'headphones' &&
+    students[1].peer.latest.seats[0].avatar?.accessory === 'headphones', 'Customized appearance did not broadcast');
   duplicate.ws.send('ping'); await until(() => duplicate.pong, 'Automatic hibernation ping response missing');
   assert.equal((await request(path,{type:'greet',seatNumber:2},students[0].cookie)).response.status,200);
   const reciprocalGreeting = await request(path,{type:'greet',seatNumber:1},students[1].cookie);
@@ -218,6 +233,10 @@ try {
   const rejoined = await connect(path, students[0].cookie);
   await until(() => rejoined.latest?.seats.some(s => s.number === 1 && s.mine), 'Reconnect must restore the original daily seat');
   assert.equal(rejoined.latest.seats.find(s => s.mine).character, 'cat');
+  assert.deepEqual(rejoined.latest.seats.find(s => s.mine).avatar, avatar);
+  assert.equal((await request(path, pick, students[0].cookie)).response.status, 200);
+  await until(() => rejoined.latest.seats.find(s => s.mine)?.avatar === undefined &&
+    teacher.latest.seats[0].avatar === undefined, 'Choosing a preset must clear the custom appearance');
   rejoined.ws.close(1000);
   await until(() => teacher.latest?.online === 49, 'Reconnected tab did not close');
   await request(path, { type: 'poll-reset', id: pollId }, host);

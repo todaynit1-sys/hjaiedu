@@ -77,24 +77,63 @@ async function readyStage(page) {
   await waitUntil(async () => (await occupied.count()) === 2, 'Expected one desk for each connected student');
   assert.equal(await page.locator('.classroom-seats > li').count(), 20);
   assert.equal(await student.locator('.classroom-seat.is-mine').count(), 1);
-  await student.getByRole('button',{name:'캐릭터 선택',exact:true}).click();
-  const picker = student.getByRole('dialog',{name:'캐릭터 선택',exact:true});
-  await picker.waitFor();
-  const choices = picker.getByRole('group',{name:'캐릭터',exact:true}).getByRole('button');
-  assert.equal(await choices.count(), 20);
-  const drawings = await choices.evaluateAll(buttons => buttons.map(button => button.querySelector('svg[viewBox]').outerHTML));
-  assert.equal(new Set(drawings).size, 20, 'Each character needs a distinct illustration');
-  await student.screenshot({ path: '.local/screenshots/character-picker-mobile.png' });
   await student.setViewportSize({width:320,height:568});
-  assert(await choices.evaluateAll(buttons => buttons.every(button => {
-    const rect = button.getBoundingClientRect();
-    return rect.width >= 44 && rect.height >= 44;
-  })), 'All choices are tappable on a small phone');
-  await picker.getByRole('button',{name:'아기우파',exact:true}).click();
-  await waitUntil(async () => (await second.locator('.classroom-seat[data-character="axolotl"]').filter({hasText:'수강생 01'}).count()) === 1,
-    'The other student must see the selected axolotl on the correct desk');
+  const customize = student.getByRole('button',{name:'캐릭터 꾸미기',exact:true});
+  await customize.click();
+  const editor = student.getByRole('dialog',{name:'내 캐릭터 꾸미기',exact:true});
+  const categories = editor.getByRole('group',{name:'꾸미기 종류',exact:true});
+  const preview = editor.locator('.avatar-preview-art canvas[data-ready="true"]');
+  await preview.waitFor();
+  const defaultPreview = await preview.screenshot();
+  const avatarChoices = [
+    ['머리', ['단발','분홍']], ['얼굴', ['꿀빛','꾸벅꾸벅']],
+    ['옷', ['니트','하늘색']], ['소품', ['고양이 귀']],
+  ];
+  for (const [category, choices] of avatarChoices) {
+    await categories.getByRole('button',{name:category,exact:true}).click();
+    assert(await editor.locator('.avatar-category, .avatar-options-grid button').evaluateAll(buttons => buttons.every(button => {
+      const rect = button.getBoundingClientRect();
+      return rect.width >= 44 && rect.height >= 44;
+    })), 'All avatar choices are tappable at 320px in '+category);
+    for (const choice of choices) {
+      const option = editor.getByRole('button',{name:choice,exact:true});
+      await option.click();
+      assert.equal(await option.getAttribute('aria-pressed'),'true');
+    }
+    assert(await preview.evaluate(canvas => {
+      const art = canvas.getBoundingClientRect();
+      const workspace = canvas.closest('.avatar-editor-workspace').getBoundingClientRect();
+      return art.top >= workspace.top-1 && art.bottom <= workspace.bottom+1;
+    }), 'The full 3D preview must remain visible while choosing '+category+' at 320px');
+  }
+  assert(!(await preview.screenshot()).equals(defaultPreview),'The rendered 3D preview must react to the avatar draft');
+  await student.screenshot({path:'.local/screenshots/avatar-editor-mobile.png'});
+  const expectedAvatar = {hair:'bob',hairColor:'pink',skin:'honey',expression:'sleepy',clothing:'knit',clothingColor:'sky',accessory:'cat'};
+  const pendingSnapshot = await (await studentB.request.get(roomURL)).json();
+  assert.equal(pendingSnapshot.seats.find(seat=>seat.number===1).avatar,undefined,'The editor must keep an unsubmitted draft private');
+  await editor.getByRole('button',{name:'꾸민 모습 저장',exact:true}).click();
+  await editor.waitFor({state:'hidden'});
+  await second.locator('.classroom-actor[data-seat="1"][data-customized="true"]').waitFor();
+  await second.bringToFront();
+  await second.locator('canvas.auditorium-world[data-avatars="true"]').waitFor();
+  const sharedSnapshot = await (await studentB.request.get(roomURL)).json();
+  assert.deepEqual(sharedSnapshot.seats.find(seat=>seat.number===1).avatar,expectedAvatar,
+    'The other student must see the saved avatar on the correct seat');
+  await student.bringToFront();
+  await student.reload();
+  await readyStage(student);
+  await customize.click();
+  for (const [category, choices] of avatarChoices) {
+    await categories.getByRole('button',{name:category,exact:true}).click();
+    for (const choice of choices) {
+      assert.equal(await editor.getByRole('button',{name:choice,exact:true}).getAttribute('aria-pressed'),'true',
+        'Reloaded editor must keep '+choice);
+    }
+  }
+  assert.equal(await editor.getByRole('button',{name:'꾸민 모습 저장',exact:true}).isEnabled(),false);
+  await editor.getByRole('button',{name:'캐릭터 꾸미기 닫기',exact:true}).click();
   await student.setViewportSize({width:390,height:844});
-  assert.equal(await page.getByRole('button',{name:'캐릭터 선택',exact:true}).count(), 0);
+  assert.equal(await page.getByRole('button',{name:'캐릭터 꾸미기',exact:true}).count(), 0);
   const teacherChatInput = page.getByLabel('채팅 메시지',{exact:true});
   await teacherChatInput.fill('강사와 수강생이 함께 나누는 실시간 채팅입니다.');
   await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
@@ -205,10 +244,10 @@ async function readyStage(page) {
     const footer = await student.locator('.classroom-seating-footer').boundingBox();
     assert(deskBottom <= footer.y + 1, 'Desk rows overlap the controls at '+width);
     if (width < 761) {
-      await student.getByRole('button',{name:'캐릭터 선택',exact:true}).scrollIntoViewIfNeeded();
+      await customize.scrollIntoViewIfNeeded();
       const shell = await student.locator('.chat-composer').boundingBox();
-      const picker = await student.getByRole('button',{name:'캐릭터 선택',exact:true}).boundingBox();
-      assert(picker.y+picker.height <= shell.y+1,'Avatar control must scroll into view above composer at '+width);
+      const customizeButton = await customize.boundingBox();
+      assert(customizeButton.y+customizeButton.height <= shell.y+1,'Avatar control must scroll into view above composer at '+width);
       await student.locator('.classroom-pane').evaluate(el=>{el.scrollTop=0;});
     }
     await student.screenshot({path:width === 1440 && height === 680 ? '.local/screenshots/auditorium-wide-short.png' : '.local/screenshots/student-'+width+'.png',fullPage:true});
@@ -295,7 +334,7 @@ async function readyStage(page) {
   await second.emulateMedia({reducedMotion:'reduce'});
   await student.reload();
   await student.locator('.classroom-seat.is-mine[title="몽실구름"]').waitFor();
-  const peerActor = second.locator('.classroom-actor[data-seat="1"]');
+  const peerActor = second.locator('.classroom-actor[data-seat="1"][data-customized="true"]');
   await peerActor.waitFor();
   const seatedActor = await peerActor.elementHandle();
   const seatedAnchor = await peerActor.evaluate(el=>({left:el.style.left,top:el.style.top}));
@@ -485,7 +524,7 @@ async function readyStage(page) {
   assert.equal(roomGets,0,'The room must use WebSocket push instead of HTTP polling'); assert(liveConnections>=1,'No live WebSocket was opened');
   writeFileSync('.local/browser-verification.json', JSON.stringify({ passed: true, code,
     checks: ['instructor login', '20 visible desks', 'two students with distinct seat bubbles', 'teacher chalkboard',
-      'student avatar visible to peers', 'classroom without mood controls',
+      '3D avatar editor at 320px, draft privacy, peer update and reload persistence', 'classroom without mood controls',
       'adaptive chalk size', '2000-character chalkboard with line breaks, link and file at 320/390/1440',
       'single-line 320px classroom toolbar', 'full-width auditorium and persistent composer', 'desktop classroom chat send', 'desktop and mobile tab draft', 'chat unread indicator', 'reference PDFs', 'polls and archive', 'Korean IME', 'moderation and QR',
       'WebSocket delivery', '1440/810/390/320 layouts', 'raised hands and acknowledgments', 'reactions and reciprocal greetings',
@@ -667,6 +706,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await student.getByRole('button',{name:'내 자리로',exact:true}).click();
     await waitUntil(async()=>await walker.count()===0,'The fiftieth student must be able to return to their original seat');
 
+    await instructor.bringToFront();
     const canvas = instructor.locator('canvas.auditorium-world');
     const lossControl = await canvas.evaluateHandle(element=>element.getContext('webgl2')?.getExtension('WEBGL_lose_context'));
     assert(await lossControl.evaluate(extension=>Boolean(extension)),'The WebGL fixture needs the genuine context-loss extension');
@@ -676,6 +716,8 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     await fallback.locator('.auditorium-seat-base').first().waitFor();
     assert(await fallback.locator('img.auditorium-backdrop').isVisible(),
       'A context loss must keep the painted classroom behind the SVG furniture');
+    assert(await fallback.locator('.classroom-actor-sprite').first().isVisible(),
+      'A context loss must show the SVG avatar fallback');
     await instructor.setViewportSize({width:1280,height:810});
     await instructor.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.notEqual((await canvas.boundingBox()).width,widthBeforeLoss,'The lost canvas must be resized during this check');
@@ -683,6 +725,7 @@ async function verifyAuditoriumCapacity(browser, teacher, base, waitUntil) {
     assert.equal(await instructor.locator('.classroom-seat.is-occupied').count(),50,'Context loss must retain the live participants');
     await lossControl.evaluate(extension=>extension.restoreContext());
     await readyStage(instructor);
+    await instructor.locator('canvas.auditorium-world[data-avatars="true"]').waitFor();
     assert.equal(await canvas.evaluate(element=>element.getContext('webgl2').isContextLost()),false);
     const frame = require('pngjs').PNG.sync.read(await canvas.screenshot({
       style:'.world-screen,.classroom-seats,.classroom-actor,img.auditorium-backdrop{visibility:hidden!important}'

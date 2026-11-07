@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
-import { Check, ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Smile, X } from 'lucide-react';
+import { AvatarEditor } from './avatar-editor';
 import { Chalkboard } from './chalkboard';
 import { AvatarArt } from './classroom-avatar';
 import { INSTRUCTOR_HOME, seatExit, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
 import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
-import { AuditoriumRenderer, type AuditoriumProjection } from './auditorium-renderer';
+import { AuditoriumRenderer, type AuditoriumActorProfile, type AuditoriumProjection } from './auditorium-renderer';
 import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
-import { CHARACTERS, defaultCharacter, type Character, type ClassroomMove, type PublicMessage, type Snapshot } from '../lib/types';
+import { defaultCharacter, type AvatarCustomization, type Character, type ClassroomMove, type PublicMessage, type Snapshot } from '../lib/types';
 import '../app/classroom-scene.css';
 import '../app/auditorium.css';
 
@@ -23,43 +24,6 @@ const characterNames: Record<Character, string> = {
   hamster: '볼빵햄찌', seal: '물범콩', mushroom: '버섯송이', acorn: '도토리', cloud: '몽실구름',
   chick: '삐약이', otter: '수달이', panda: '판다콩', axolotl: '아기우파'
 };
-
-function CharacterPicker({ current, onChange, onClose }: { current: Character; onChange: (value: Character) => Promise<void>; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const inFlight = useRef(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const element = dialog.current;
-    element?.showModal();
-    element?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
-    return () => { element?.close(); previous?.focus(); };
-  }, []);
-  async function choose(value: Character) {
-    if (inFlight.current) return;
-    if (value === current) { onClose(); return; }
-    inFlight.current = true;
-    setSaving(true); setError('');
-    try { await onChange(value); onClose(); }
-    catch (cause) {
-      inFlight.current = false; setSaving(false);
-      setError(cause instanceof Error ? cause.message : '저장하지 못했어요. 다시 골라주세요.');
-    }
-  }
-  return <dialog ref={dialog} className="classroom-character-dialog" aria-labelledby="character-picker-title" aria-describedby="character-picker-hint" onCancel={event => { event.preventDefault(); if (!saving) onClose(); }}>
-    <div className="classroom-picker-heading"><h2 id="character-picker-title">캐릭터 선택</h2><button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label="캐릭터 선택 닫기"><X size={20} /></button></div>
-    <p id="character-picker-hint">{CHARACTERS.length}명 중 내 책상에 앉을 친구를 골라주세요.</p>
-    <div className="classroom-character-options" role="group" aria-label="캐릭터" aria-busy={saving}>
-      {CHARACTERS.map(value => <button type="button" key={value} aria-pressed={current === value} disabled={saving} onClick={() => choose(value)}>
-        {current === value && <Check className="classroom-character-check" size={15} aria-hidden="true" />}
-        <svg viewBox="16 0 58 53" aria-hidden="true"><AvatarArt character={value} pose="portrait" /></svg>
-        <span>{characterNames[value]}</span>
-      </button>)}
-    </div>
-    {error && <p className="error" role="alert">{error}</p>}
-  </dialog>;
-}
 
 function NicknameDialog({ current, onSave, onClose }: { current: string; onSave: (nickname: string) => Promise<void>; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -137,8 +101,8 @@ function useSeatBubbles(data: Snapshot) {
   return bubbles;
 }
 
-export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMove, host = false, visible, view, nearRequest, onActivity }: {
-  data: Snapshot; onCharacterChange?: (value: Character) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>;
+export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove, host = false, visible, view, nearRequest, onActivity }: {
+  data: Snapshot; onAvatarChange?: (value: AvatarCustomization) => Promise<void>; onNicknameChange?: (nickname: string) => Promise<void>;
   onMove?: (move: ClassroomMove) => Promise<void>; host?: boolean; visible: boolean; view: 'overview' | 'near'; nearRequest: number;
   onActivity?: ClassroomAction;
 }) {
@@ -175,6 +139,13 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
   const canMoveHere = Boolean(onMove && ownMotion && onOwnPage);
   const firstSeat = page * PAGE_SIZE + 1;
   const pageSeats = seats.filter(seat => seatPage(seat.number) === page);
+  const hasInstructor = Boolean(data.instructor);
+  const actorProfiles = useMemo<AuditoriumActorProfile[]>(() => {
+    const profiles: AuditoriumActorProfile[] = seats.filter(seat => seatPage(seat.number) === page)
+      .map(seat => ({ id: String(seat.number), character: seat.character ?? defaultCharacter(seat.number), avatar: seat.avatar }));
+    if (hasInstructor) profiles.push({ id: 'instructor', character: 'glasses', instructor: true });
+    return profiles;
+  }, [seats, page, hasInstructor]);
   const capacity = auditoriumCapacity(Math.max(1, ...pageSeats.map(seat => seat.number - page * PAGE_SIZE)));
   const world = projection?.seats.length === capacity ? projection : null;
   const seatPoint = (index: number) => world?.seats[index] ?? auditoriumSeat(index, capacity);
@@ -234,7 +205,7 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
       tabIndex={canMoveHere ? 0 : undefined} onClick={canMoveHere ? movement.click : undefined} onKeyDown={canMoveHere ? movement.keyDown : undefined}>
     <img className="auditorium-backdrop" src="/classroom/sunlit-classroom.jpg" width="1672" height="941" alt="" aria-hidden="true"
       decoding="async" fetchPriority="high" onLoad={() => setBackdrop(true)} onError={() => setBackdrop(false)}/>
-    <AuditoriumRenderer capacity={capacity} backdrop={backdrop} onLayout={setProjection}/>
+    <AuditoriumRenderer capacity={capacity} backdrop={backdrop} visible={visible} actors={actorProfiles} onLayout={setProjection}/>
     {!world && !backdrop && <AuditoriumArt/>}
     {!boardExpanded && screen}
     <ol className="classroom-seats" aria-label={`강의실 좌석 ${firstSeat}번부터 ${firstSeat + capacity - 1}번까지`} start={firstSeat}>
@@ -247,7 +218,7 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
         return <li key={number} data-character={character} title={seat?.name}
           style={{left:`${point.x * 100}%`,top:`${point.y * 100}%`,zIndex:Math.round(point.y*100),width:`${point.scale*100}%`}}
           className={`classroom-seat${seat ? ' is-occupied' : ''}${seat?.mine ? ' is-mine' : ''}`}>
-          <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{character && ', ' + characterNames[character]}{seat?.mine ? ', 내 자리' : ''}</span>
+          <span className="sr-only">{seatLabel(number)}번 {seat ? seat.name : '빈 자리'}{seat?.avatar ? ', 꾸민 캐릭터' : character && ', ' + characterNames[character]}{seat?.mine ? ', 내 자리' : ''}</span>
           <div className="classroom-desk-wrap">
             <DeskDrawing number={number} name={seat?.name} />
             {world && <span className="auditorium-seat-caption" aria-hidden="true">{seat?.name && seat.name !== `수강생 ${seatLabel(number)}` ? seat.name : seatLabel(number)}</span>}
@@ -270,7 +241,7 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
       const bubble = bubbles.get(seat.number);
       const point = seatPoint(seat.number - firstSeat);
       return <WalkingAvatar key={`${roomDay}/${seat.number}`} position={position} origin={point} dockExit={seatExit(point)} scale={point.scale}
-        floor={movement.floor} character={seat.character ?? defaultCharacter(seat.number)} mine={seat.mine} number={seat.number} name={seat.name}>
+        floor={movement.floor} character={seat.character ?? defaultCharacter(seat.number)} avatar={seat.avatar} mine={seat.mine} number={seat.number} name={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
@@ -283,7 +254,7 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
     <div className="classroom-seating-footer">
       <div className="classroom-seat-info">{mySeat && <span className="classroom-own-seat" title={mySeat.name}>내 자리 <b>{seatLabel(mySeat.number)}</b></span>}
         {mySeat && onNicknameChange && <button className="classroom-character-trigger" type="button" aria-label="닉네임 설정" aria-haspopup="dialog" onClick={() => setEditingNickname(true)}><Pencil size={15} aria-hidden="true" />닉네임</button>}
-        {mySeat && onCharacterChange && <button className="classroom-character-trigger" type="button" aria-label="캐릭터 선택" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터</button>}
+        {mySeat && onAvatarChange && <button className="classroom-character-trigger" type="button" aria-label="캐릭터 꾸미기" aria-haspopup="dialog" onClick={() => setChoosingCharacter(true)}><Smile size={15} aria-hidden="true" />캐릭터</button>}
         {canMoveHere && <>
           <button className="classroom-character-trigger" type="button" onClick={movement.toggle}>
             {movement.moving || movement.autonomous ? host ? '칠판 앞으로' : '내 자리로' : '움직이기'}
@@ -295,7 +266,7 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
             <option value="wander">자율 이동</option>
           </select>
         </>}
-        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={character=><AvatarArt character={character} pose="portrait"/>}/>
+        <ClassroomActivities data={data} host={host} onAction={onActivity} renderHead={seat=><AvatarArt character={seat.character} avatar={seat.avatar} pose="portrait"/>}/>
         <span className="classroom-student-count">수강생 {seats.length}명</span>
       </div>
       {pages.length > 1 && <div className="classroom-page-controls" role="group" aria-label="좌석 범위 선택">
@@ -310,8 +281,8 @@ export function ClassroomScene({ data, onCharacterChange, onNicknameChange, onMo
     </p>}
     {movement.error && <p role="alert" className="error">{movement.error}</p>}
     {activityError && <p role="alert" className="error">{activityError}</p>}
-    {choosingCharacter && mySeat && onCharacterChange && <CharacterPicker key={roomDay} current={mySeat.character ?? defaultCharacter(mySeat.number)}
-      onChange={onCharacterChange} onClose={() => setChoosingCharacter(false)} />}
+    {choosingCharacter && mySeat && <AvatarEditor key={roomDay} character={mySeat.character ?? defaultCharacter(mySeat.number)}
+      current={mySeat.avatar} onSave={onAvatarChange} onClose={() => setChoosingCharacter(false)} />}
     {editingNickname && mySeat && onNicknameChange && <NicknameDialog key={roomDay} current={mySeat.name} onSave={onNicknameChange} onClose={() => setEditingNickname(false)} />}
   </section>;
 }

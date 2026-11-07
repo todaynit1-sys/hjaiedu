@@ -1,3 +1,6 @@
+import type { AvatarCustomization } from './avatar-customization.ts';
+export type { AvatarCustomization } from './avatar-customization.ts';
+
 export const MAIN_ROOM_CODE = 'MAMOAI';
 export const CHARACTERS = [
   'smile', 'sprout', 'cheer', 'glasses', 'sleepy', 'cat',
@@ -29,9 +32,9 @@ export type PublicQuestionRound = Omit<QuestionRound, 'answers'> & {
   myAnswer: string | null;
   answers?: Array<{ seatNumber: number; name: string; text: string }>;
 };
-export type ClassroomSeat = AvatarMotion & { number: number; name: string; mine: boolean; character: Character; activity?: SeatActivity; quizChoice?: 'O' | 'X' };
+export type ClassroomSeat = AvatarMotion & { number: number; name: string; mine: boolean; character: Character; avatar?: AvatarCustomization; activity?: SeatActivity; quizChoice?: 'O' | 'X' };
 export type Poll = { id: string; question: string; options: string[]; kind: PollKind; open: boolean; archived: boolean; votes: Record<string, number> };
-export type Day = { date: string; active: boolean; messages: Message[]; polls: Poll[]; presence: Record<string, number>; participants?: Record<string, string>; characters?: Record<string, Character>; nicknames?: Record<string, string>; positions?: Record<string, ClassroomPosition>; wanderers?: Record<string, number>; instructor?: AvatarMotion; activities?: Record<string, SeatActivity>; greetings?: Record<string, { to: number; at: number }>; quiz?: OxQuiz; questionRound?: QuestionRound };
+export type Day = { date: string; active: boolean; messages: Message[]; polls: Poll[]; presence: Record<string, number>; participants?: Record<string, string>; characters?: Record<string, Character>; avatars?: Record<string, AvatarCustomization>; nicknames?: Record<string, string>; positions?: Record<string, ClassroomPosition>; wanderers?: Record<string, number>; instructor?: AvatarMotion; activities?: Record<string, SeatActivity>; greetings?: Record<string, { to: number; at: number }>; quiz?: OxQuiz; questionRound?: QuestionRound };
 export type Room = { code: string; title: string; createdAt: string; demo: boolean; days: Record<string, Day> };
 export type PublicPoll = Omit<Poll, 'votes'> & { counts: number[]; total: number; myVote: number | null };
 export type Snapshot = {

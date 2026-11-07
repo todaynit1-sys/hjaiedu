@@ -115,6 +115,12 @@
   animation: none; overflow: visible; transform-origin: 50% 94%;
   scale: var(--actor-depth); transition: scale 180ms ease-out;
 }
+.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor-sprite { visibility: hidden; }
+.classroom-floor:has(> canvas[data-avatars="true"]) .classroom-actor.is-mine::before {
+  content: ""; position: absolute; inset: auto 14% 0; height: 9%;
+  border: 1.5px solid #e8fbff; border-radius: 50%;
+  box-shadow: 0 0 0 1px #4fcbef, 0 0 8px #71dcf9a0; background: #71dcf925;
+}
 .classroom-actor[data-facing="left"][data-pose="standing"] .classroom-actor-sprite { transform: scaleX(-1); }
 .classroom-actor .classroom-actor-body { transform-origin: 45px 50px; transition: transform 145ms ease-out; }
 .classroom-actor :is(.classroom-actor-legs, .classroom-actor-standing-arms, .classroom-actor-seated-arms, .classroom-actor-shadow) {
@@ -141,8 +147,6 @@
 .auditorium-scene .classroom-activity-badge { top: -4px; right: -5px; }
 .auditorium-scene .classroom-seating-footer { flex: none; margin: 6px 7px 0; min-height: 44px; }
 .auditorium-scene .classroom-character-trigger { min-height: 44px; border-radius: 11px; border-color: #cbd9e7; background: #fffdf9; color: #254164; }
-.auditorium-scene .classroom-character-options button { border-color: #dbe4f0; background: #fffaf1; }
-.auditorium-scene .classroom-character-options button[aria-pressed="true"] { border-color: #668fc2; background: #eaf5ff; }
 .auditorium-scene .classroom-own-seat { color: #354d7b; }
 .auditorium-scene .classroom-student-count, .auditorium-scene .classroom-move-hint { color: #506780; }
 .classroom-move-mode {

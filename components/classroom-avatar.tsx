@@ -1,20 +1,47 @@
 import { memo, useId } from 'react';
+import type { AvatarCustomization } from '../lib/avatar-customization';
 import type { Character } from '../lib/types';
 
-type Hair = 'waves' | 'crop' | 'spiky' | 'bob' | 'bun' | 'curls' | 'part' | 'long';
-type Accessory = 'sprout' | 'clip' | 'glasses' | 'beanie' | 'cat' | 'ribbon' | 'earmuffs'
-  | 'frog' | 'headphones' | 'scarf' | 'mushroom' | 'star' | 'axolotl';
 type Outfit = {
-  hair: Hair;
+  hair: AvatarCustomization['hair'];
   hairLight: string;
   hairDark: string;
   skin: string;
   skinShade: string;
   shirt: string;
   shirtShade: string;
-  accessory?: Accessory;
-  detail?: 'knit' | 'puffer' | 'cardigan';
+  accessory?: AvatarCustomization['accessory'];
+  detail?: AvatarCustomization['clothing'];
 };
+
+type ColorPart = 'hairColor' | 'skin' | 'clothingColor';
+
+export const avatarPalettes = {
+  hairColor: {
+    black: ['#5f5148', '#2f2928'],
+    brown: ['#906450', '#46302d'],
+    blond: ['#e3bd6d', '#9a6139'],
+    pink: ['#eea7b2', '#aa607e'],
+    silver: ['#f0edf1', '#9f9ab0'],
+    navy: ['#596280', '#292b40'],
+  },
+  skin: {
+    porcelain: ['#ffdfcb', '#e8a18e'],
+    peach: ['#f5cbb0', '#d69474'],
+    honey: ['#eab98e', '#ca876c'],
+    bronze: ['#dba37d', '#b46f55'],
+    deep: ['#ac7258', '#744635'],
+  },
+  clothingColor: {
+    cream: ['#f7e9d2', '#b4a087'],
+    sage: ['#a3a96c', '#626e45'],
+    sky: ['#9ac0d8', '#53789d'],
+    lavender: ['#d2b7d7', '#8b779d'],
+    rose: ['#f0ae96', '#a75850'],
+    amber: ['#f0ba71', '#ba7747'],
+    navy: ['#627da7', '#384963'],
+  },
+} as const satisfies { [Part in ColorPart]: Record<AvatarCustomization[Part], readonly [string, string]> };
 
 const avatars: Record<Character, Outfit> = {
   smile:    { hair: 'waves', hairLight: '#76584c', hairDark: '#302723', skin: '#ffddbf', skinShade: '#e8a185', shirt: '#a3a96c', shirtShade: '#626e45', detail: 'cardigan' },
@@ -44,7 +71,66 @@ const teacher: Outfit = {
   shirt: '#688d85', shirtShade: '#345450', accessory: 'glasses'
 };
 
-const hairPaths: Record<Hair, string> = {
+const starterColors: Record<Character, readonly [
+  hairColor: AvatarCustomization['hairColor'],
+  skin: AvatarCustomization['skin'],
+  clothingColor: AvatarCustomization['clothingColor'],
+]> = {
+  smile: ['brown', 'porcelain', 'sage'],
+  sprout: ['brown', 'porcelain', 'cream'],
+  cheer: ['brown', 'porcelain', 'sky'],
+  glasses: ['navy', 'porcelain', 'cream'],
+  sleepy: ['black', 'peach', 'cream'],
+  cat: ['navy', 'porcelain', 'lavender'],
+  rabbit: ['blond', 'porcelain', 'cream'],
+  puppy: ['brown', 'honey', 'amber'],
+  frog: ['black', 'peach', 'sage'],
+  bear: ['brown', 'bronze', 'amber'],
+  penguin: ['navy', 'porcelain', 'sky'],
+  hamster: ['blond', 'porcelain', 'amber'],
+  seal: ['silver', 'peach', 'sky'],
+  mushroom: ['brown', 'porcelain', 'rose'],
+  acorn: ['brown', 'peach', 'amber'],
+  cloud: ['silver', 'bronze', 'sky'],
+  chick: ['blond', 'porcelain', 'amber'],
+  otter: ['brown', 'bronze', 'sky'],
+  panda: ['black', 'porcelain', 'cream'],
+  axolotl: ['pink', 'porcelain', 'lavender'],
+};
+
+function presetExpression(character: Character): AvatarCustomization['expression'] {
+  if (character === 'sleepy') return 'sleepy';
+  return character === 'cheer' || character === 'smile' ? 'grin' : 'smile';
+}
+
+export function starterAvatar(character: Character): AvatarCustomization {
+  const outfit = avatars[character];
+  const [hairColor, skin, clothingColor] = starterColors[character];
+  return {
+    hair: outfit.hair, hairColor, skin, clothingColor,
+    expression: presetExpression(character),
+    clothing: outfit.detail ?? 'plain',
+    accessory: outfit.accessory ?? 'none',
+  };
+}
+
+function customOutfit(avatar: AvatarCustomization): Outfit {
+  const [hairLight, hairDark] = avatarPalettes.hairColor[avatar.hairColor];
+  const [skin, skinShade] = avatarPalettes.skin[avatar.skin];
+  const [shirt, shirtShade] = avatarPalettes.clothingColor[avatar.clothingColor];
+  return {
+    hair: avatar.hair, hairLight, hairDark, skin, skinShade, shirt, shirtShade,
+    accessory: avatar.accessory, detail: avatar.clothing,
+  };
+}
+
+export function avatarAppearance(character: Character, avatar?: AvatarCustomization, instructor = false) {
+  const outfit = instructor ? teacher : avatar ? customOutfit(avatar) : avatars[character];
+  const expression = instructor ? 'smile' : avatar?.expression ?? presetExpression(character);
+  return { ...outfit, expression, pants: '#586074', pantsLight: '#6a7486', shoes: '#584c47' };
+}
+
+const hairPaths: Record<AvatarCustomization['hair'], string> = {
   waves: 'M29 31q-3-1-4-5 3-1 2-5-4-4 1-7 1-5 7-7 2-4 8-3 3-1 6 1 8-2 12 4 6 1 5 7 3 3 0 8l-5 7-2-10q-4 1-6-5-4 7-12 7 2-3 2-5-5 6-11 7l-.8 6Z',
   crop: 'M29 30q-4-5-2-12 0-7 8-11 6-3 12-2 13 0 17 8 3 6-1 15l-3-2-1-9q-9 5-18 1-3 4-9 6l-1 6Z',
   spiky: 'M29 30q-3-4-3-9l-3-5 7-2-1-5 8 .4L41 4l7 3 6-4 3 5 8-1-1 6 5 4-4 4 1 5-5 4-2-11-5 3-5-5-7 6-1-5-7 5-2 7Z',
@@ -101,13 +187,14 @@ function Face({ sleepy, delighted, shade }: { sleepy: boolean; delighted: boolea
   </g>;
 }
 
-export const AvatarArt = memo(function AvatarArt({ character, pose, instructor = false }: {
+export const AvatarArt = memo(function AvatarArt({ character, avatar, pose, instructor = false }: {
   character: Character;
+  avatar?: AvatarCustomization;
   pose: 'portrait' | 'seated' | 'walking' | 'actor';
   instructor?: boolean;
 }) {
   const id = useId();
-  const outfit = instructor ? teacher : avatars[character];
+  const outfit = avatarAppearance(character, avatar, instructor);
   const standingArms = pose === 'walking' || pose === 'actor';
   const seatedArms = pose === 'seated' || pose === 'actor';
   const sleeve = `url(#${id}-shirt)`;
@@ -128,8 +215,8 @@ export const AvatarArt = memo(function AvatarArt({ character, pose, instructor =
     {standingArms && <>
       <ellipse className="classroom-actor-shadow" cx="45" cy="60.1" rx="16.2" ry="3.1" fill="#44302c" opacity=".2" stroke="none" />
       <g className="classroom-actor-legs">
-        <g className="walker-foot left"><path d="M35.5 49.5h8l-.5 7.2h-7Z" fill="#586074" /><path d="M35.8 55.7q3 1.6 7.5 0l.3 2.1q-1.5 2.5-8.5 1.2-2.5-.9.7-3.3Z" fill="#584c47" /><path d="M35.1 58.6q4.4.8 7.4-.1" stroke="#cbbba8" strokeWidth=".8" /></g>
-        <g className="walker-foot right"><path d="M46 49.5h8.5l-1 7.2h-7Z" fill="#6a7486" /><path d="M46.5 55.5q3.1 1.6 7.6.1 3 1.5 2.8 2.6-.8 1.8-9.3 1.1-2.1-.5-1.1-3.8Z" fill="#584c47" /><path d="M48 58.6q4.2.8 7.6-.2" stroke="#cbbba8" strokeWidth=".8" /></g>
+        <g className="walker-foot left"><path d="M35.5 49.5h8l-.5 7.2h-7Z" fill={outfit.pants} /><path d="M35.8 55.7q3 1.6 7.5 0l.3 2.1q-1.5 2.5-8.5 1.2-2.5-.9.7-3.3Z" fill={outfit.shoes} /><path d="M35.1 58.6q4.4.8 7.4-.1" stroke="#cbbba8" strokeWidth=".8" /></g>
+        <g className="walker-foot right"><path d="M46 49.5h8.5l-1 7.2h-7Z" fill={outfit.pantsLight} /><path d="M46.5 55.5q3.1 1.6 7.6.1 3 1.5 2.8 2.6-.8 1.8-9.3 1.1-2.1-.5-1.1-3.8Z" fill={outfit.shoes} /><path d="M48 58.6q4.2.8 7.6-.2" stroke="#cbbba8" strokeWidth=".8" /></g>
       </g>
     </>}
     <g className="classroom-actor-body">
@@ -150,7 +237,7 @@ export const AvatarArt = memo(function AvatarArt({ character, pose, instructor =
       <path d="M29.7 25.4q-1-10.5 8.2-13.7 10-3.5 18 2.9 5 4.5 4.5 11.5-.4 10.5-8.4 13.5-5.7 2.5-13.4.5-7.8-2-8.9-14.7Z" fill={skin} stroke="#855847" />
       <path d={hairPaths[outfit.hair]} fill={hair} stroke={outfit.hairDark} strokeWidth="1.1" />
       <path d="M30 17q1-5 7-8 5-2 11-1m3 1q5 1 8 4m-23-1q-2 3-4 6" stroke="#fff1d8" strokeWidth="1.05" opacity=".27" fill="none" />
-      <Face sleepy={character === 'sleepy' && !instructor} delighted={character === 'cheer' || character === 'smile'} shade={outfit.skinShade} />
+      <Face sleepy={outfit.expression === 'sleepy'} delighted={outfit.expression === 'grin'} shade={outfit.skinShade} />
       <HairAccessory accessory={outfit.accessory} />
     </g>
     {outfit.accessory === 'scarf' && <path d="M36 39q8 2.7 18-1l1.5 3.7q-3 .8-4.1 1.3l1 5.8-4.1.7-1.5-5.7q-6 .8-11.4-2.4Z" fill="#d69279" stroke="#925b54" />}
