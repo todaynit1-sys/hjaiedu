@@ -221,9 +221,10 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
   const alertMessage = data?.messages.find(message => message.id === messageAlert);
   const round = data?.questionRound;
   const joinedAsStudent = !host && Boolean(data?.seats.some(seat => seat.mine));
-  const questionCardKey = joinedAsStudent && round
+  // The instructor only ever gets the results card, once answers are published.
+  const questionCardKey = round && (joinedAsStudent || host)
     ? round.published && round.answers ? `${round.id}/results`
-      : data?.active && round.open && round.myAnswer === null ? `${round.id}/question` : undefined
+      : !host && data?.active && round.open && round.myAnswer === null ? `${round.id}/question` : undefined
     : undefined;
   const alertQuestion = !questionOpen && questionCardKey && questionCardKey !== dismissedQuestionCard ? round : undefined;
   function toggleQuestion(open: boolean) {
@@ -338,7 +339,7 @@ export function RoomView({ code, host, onBack, onLogout }: { code: string; host:
           {unread && <button className="new-messages" onClick={scrollLatest}><ArrowDown size={15} />새 메시지 보기</button>}
         </section>
         <Composer host={host} busy={busy} active={active} onAction={action} onUpload={attachFile} />
-        {!host && <ClassroomAlerts message={alertMessage} question={alertQuestion}
+        {<ClassroomAlerts host={host} message={host ? undefined : alertMessage} question={alertQuestion}
           onOpenChat={() => { setChatTarget(messageAlert); setMessageAlert(undefined); setTab('all'); setView('chat'); }}
           onAnswerQuestion={active && joinedAsStudent ? submitQuestionAnswer : undefined}
           onDismissMessage={() => setMessageAlert(undefined)}

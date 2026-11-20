@@ -171,7 +171,8 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
   // Old instructor posts and the seeded demo cards predate the author field.
   const teacher = data.messages.reduce<PublicMessage | undefined>(
     (latest, message) => message.author === 'student' ? latest : message, undefined);
-  const currentQuestion = data.questionRound?.open ? data.questionRound : undefined;
+  // The question stays on the board until the instructor takes it down, even after answers are revealed.
+  const currentQuestion = data.questionRound;
   const messageKey = `${currentQuestion?.id ?? teacher?.id ?? 'welcome'}/${world?.width ?? 'fallback'}x${world?.height ?? ''}/${backdrop}`;
   const boardExpanded = expandedMessage === messageKey;
   const recordExpansion = useCallback((expanded: boolean) => {
@@ -187,6 +188,9 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
   const screen = <div className={`auditorium-stage world-screen${boardExpanded ? ' is-expanded' : ''}`} style={screenStyle}>
     <Chalkboard message={currentQuestion ? {id: currentQuestion.id, text: currentQuestion.prompt, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher}
       code={data.code} active={data.active} onExpanded={recordExpansion}/>
+    {currentQuestion && <p className="board-question-tally" data-state={currentQuestion.published ? 'published' : currentQuestion.open ? 'open' : 'closed'}>
+      {currentQuestion.published ? '답변 공개됨 · ' : currentQuestion.open ? '' : '마감 · '}응답 <b>{currentQuestion.total}</b>{seats.length > 0 && ` / ${seats.length}명`}
+    </p>}
   </div>;
 
   return <section className="classroom-scene auditorium-scene" data-world={world ? 'ready' : 'fallback'} aria-labelledby="classroom-title">

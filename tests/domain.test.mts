@@ -315,3 +315,22 @@ test('only the instructor scolds a seated student, and forgiving clears it', () 
   mutate(room, {type:'active', active:false}, null, true);
   assert.throws(() => mutate(room, scold, null, true), /종료/);
 });
+
+test('question answers stay hidden from the instructor screen until published, then the board can be cleared', () => {
+  const room = newRoom('질문');
+  mutate(room, {type:'heartbeat'}, 'a', false);
+  mutate(room, {type:'heartbeat'}, 'b', false);
+  mutate(room, {type:'question-start', prompt:'오늘 배운 점은?'}, null, true);
+  const roundId = ensureDay(room).questionRound!.id;
+  mutate(room, {type:'question-answer', roundId, text:'요약하기'}, 'a', false);
+  const before = snapshot(room, today(), null, 'local', undefined, true, true).questionRound!;
+  assert.equal(before.total, 1);
+  assert.equal(before.answers, undefined);
+  assert.throws(() => mutate(room, {type:'question-clear', roundId}, null, true), /마감한 뒤/);
+  assert.throws(() => mutate(room, {type:'question-clear', roundId}, 'a', false), /강사 로그인/);
+  mutate(room, {type:'question-publish', roundId}, null, true);
+  const after = snapshot(room, today(), null, 'local', undefined, true, true).questionRound!;
+  assert.deepEqual(after.answers, [{ seatNumber: 1, name: '수강생 01', text: '요약하기' }]);
+  mutate(room, {type:'question-clear', roundId}, null, true);
+  assert.equal(snapshot(room, today(), 'a', 'local').questionRound, undefined);
+});

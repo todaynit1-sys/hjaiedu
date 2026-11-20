@@ -73,7 +73,8 @@ function publicQuestion(day: Day, guest: string | null, viewerHost: boolean): Pu
     total: entries.length, myAnswer: guest ? round.answers[guest] ?? null : null
   };
   const participant = guest !== null && Object.hasOwn(day.participants ?? {}, guest);
-  if (viewerHost || (round.published && participant)) {
+  // Answers stay hidden from everyone, the projected instructor screen included, until published.
+  if (round.published && (viewerHost || participant)) {
     question.answers = entries.flatMap(([id, answer]) => {
       const alias = day.participants?.[id];
       return alias ? [{ seatNumber: seatNumber(alias), name: day.nicknames?.[id] ?? alias, text: answer }] : [];
@@ -134,11 +135,16 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     round.answers[guest] = answer;
     return;
   }
-  if (action.type === 'question-start' || action.type === 'question-close' || action.type === 'question-publish') {
+  if (['question-start', 'question-close', 'question-publish', 'question-clear'].includes(String(action.type))) {
     if (!host) throw new AppError('강사 로그인이 필요합니다.', 403);
     if (!day.active) throw new AppError('강의가 종료됐어요.', 409);
     const round = day.questionRound;
-    if (action.type === 'question-start') {
+    if (action.type === 'question-clear') {
+      // Takes the question off the chalkboard; its answers are discarded with it.
+      if (!round || round.id !== action.roundId) throw new AppError('현재 질문을 확인해주세요.', 409);
+      if (round.open) throw new AppError('질문을 마감한 뒤 칠판에서 내려주세요.', 409);
+      delete day.questionRound;
+    } else if (action.type === 'question-start') {
       if (round?.open) throw new AppError('진행 중인 질문을 먼저 마감해주세요.', 409);
       const prompt = text(action.prompt, '질문', QUESTION_PROMPT_MAX_LENGTH);
       day.questionRound = { id: randomUUID(), prompt, open: true, published: false, answers: {} };

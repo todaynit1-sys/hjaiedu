@@ -130,7 +130,7 @@ export function ClassroomQuestion({ data, onAction, host, open, onOpenChange }: 
       {Boolean(count) && <b className="question-trigger-count" aria-hidden="true">{count}</b>}
     </button>
     {count !== undefined && <span id={countId} className="sr-only">답변 {count}개</span>}
-    {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host}
+    {open && <QuestionDialog key={round?.id ?? 'new'} round={round} host={host} students={data.seats.length}
       onAction={onAction} onClose={() => {
         onOpenChange(false);
         requestAnimationFrame(() => trigger.current?.focus());
@@ -138,8 +138,8 @@ export function ClassroomQuestion({ data, onAction, host, open, onOpenChange }: 
   </>;
 }
 
-function QuestionDialog({ round, host, onAction, onClose }: {
-  round: Snapshot['questionRound']; host: boolean; onAction?: ClassroomAction; onClose: () => void;
+function QuestionDialog({ round, host, students, onAction, onClose }: {
+  round: Snapshot['questionRound']; host: boolean; students: number; onAction?: ClassroomAction; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const requestPending = useRef(false);
@@ -195,6 +195,7 @@ function QuestionDialog({ round, host, onAction, onClose }: {
         <p role="status" className="question-meta">
           {round.open ? '답변 받는 중' : round.published ? '답변 공개됨' : '마감됨'} · 답변 {round.total}개
         </p>
+        {host && <p className="question-tally" aria-hidden="true"><b>{round.total}</b> / {students}명 응답</p>}
       </div>}
 
       {!host && round?.open && <form className="question-form"
@@ -202,7 +203,7 @@ function QuestionDialog({ round, host, onAction, onClose }: {
         <label htmlFor={answerId}>내 답변</label>
         <textarea id={answerId} value={answer} maxLength={QUESTION_ANSWER_MAX_LENGTH} rows={3} required disabled={busy || !onAction}
           aria-describedby={visibilityId} onChange={event => setDraft(event.target.value)} placeholder="짧게 적어주세요." />
-        <p id={visibilityId} className="question-meta">공개 전에는 강사와 본인만 볼 수 있어요. 공개하면 이름과 답변이 모두에게 보여요.</p>
+        <p id={visibilityId} className="question-meta">공개 전에는 나만 볼 수 있어요. 강사가 공개하면 이름과 답변이 모두에게 보여요.</p>
         <div className="question-actions">
           <button type="submit" className="primary" disabled={busy || !onAction || !answer.trim()}>
             {round.myAnswer ? '답변 수정' : '답변 보내기'}
@@ -221,12 +222,18 @@ function QuestionDialog({ round, host, onAction, onClose }: {
         {round.open && <button type="button" disabled={busy}
           onClick={() => void send({type:'question-close', roundId:round.id}, '질문을 마감했어요.')}>질문 마감</button>}
         <button type="button" className="primary" disabled={busy || round.total === 0}
-          onClick={() => void send({type:'question-publish', roundId:round.id}, '수강생 화면에 답변을 띄웠어요.')}>답변 띄우기</button>
-        <p className="question-meta">{round.open ? '답변을 띄우면 질문이 마감되고, 수강생 화면에 이름과 답변이 보여요.' : '수강생 화면에 이름과 답변을 띄워요.'}</p>
+          onClick={() => void send({type:'question-publish', roundId:round.id}, '답변을 공개했어요.')}>답변 공개하기</button>
+        <p className="question-meta">답변 내용은 공개하기 전까지 강사 화면에도 보이지 않아요. 공개하면 질문이 마감되고 누가 어떤 답을 했는지 모두에게 보여요.</p>
       </div>}
 
-      {round && (host || round.published) && <section className="question-responses" aria-label={host ? '수강생 답변' : '공개된 답변'}>
-        <h3>{host ? '수강생 답변' : '공개된 답변'}</h3>
+      {host && round && !round.open && onAction && <div className="question-actions">
+        <button type="button" disabled={busy}
+          onClick={() => void send({type:'question-clear', roundId:round.id}, '칠판에서 질문을 내렸어요.')}>칠판에서 내리기</button>
+        <p className="question-meta">질문과 답변을 정리하고 칠판을 원래대로 돌려요.</p>
+      </div>}
+
+      {round?.published && <section className="question-responses" aria-label="공개된 답변">
+        <h3>공개된 답변</h3>
         {round.answers?.length ? <ul className="question-answer-list">{round.answers.map(item => (
           <li key={item.seatNumber}>
             <b>{item.name}</b>

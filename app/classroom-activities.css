@@ -83,3 +83,14 @@
 @media (prefers-reduced-motion: reduce) {
   .classroom-actor:has(.classroom-activity-badge) .classroom-actor-face { animation: none; }
 }
+/* Response tally under the chalkboard question; answers themselves stay hidden until published. */
+.board-question-tally {
+  position: absolute; top: 100%; right: 2%; z-index: 2; margin: 5px 0 0;
+  padding: 3px 11px; border: 1.5px solid #e8c988; border-radius: 999px;
+  background: #fffbef; color: #714709; font-size: clamp(11px, 1.1vw, 15px); font-weight: 720;
+  white-space: nowrap; box-shadow: 0 3px 10px #3a2a0a24; pointer-events: none;
+}
+.board-question-tally b { font-size: 1.2em; }
+.board-question-tally[data-state="published"] { border-color: #a8c9bd; background: #f6fcfa; color: #265a4d; }
+.question-tally { margin: 4px 0 0; color: var(--forest-dark); font-size: 15px; }
+.question-tally b { font-size: 26px; }

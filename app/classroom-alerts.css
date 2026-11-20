@@ -194,3 +194,7 @@
     display: none;
   }
 }
+/* The instructor screen is usually projected, so published answers get a wider, larger card there. */
+.classroom-alerts[data-host] .classroom-alerts-stack { width: min(100%, 560px); }
+.classroom-alerts[data-host] .classroom-alert-answers b { font-size: 15px; }
+.classroom-alerts[data-host] .classroom-alert-answers p { font-size: 16px; }

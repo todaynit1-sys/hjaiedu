@@ -93,7 +93,8 @@ function QuestionResultsCard({ round, onDismiss }: { round: PublicQuestionRound;
   </ClassroomAlert>;
 }
 
-export function ClassroomAlerts({ message, question, onOpenChat, onDismissMessage, onDismissQuestion, onAnswerQuestion }: {
+export function ClassroomAlerts({ host = false, message, question, onOpenChat, onDismissMessage, onDismissQuestion, onAnswerQuestion }: {
+  host?: boolean;
   message?: PublicMessage;
   question?: PublicQuestionRound;
   onOpenChat: () => void;
@@ -112,7 +113,7 @@ export function ClassroomAlerts({ message, question, onOpenChat, onDismissMessag
       {question?.published ? <span key={`${question.id}-published`}>답변 {question.total}개가 공개됐어요.</span>
         : question && <span key={question.id}>새 질문. {questionText}</span>}
     </div>
-    {(message || question) && <aside className="classroom-alerts" aria-label="강의 알림">
+    {(message || question) && <aside className="classroom-alerts" data-host={host || undefined} aria-label="강의 알림">
       <div className="classroom-alerts-stack">
         {question?.published ? <QuestionResultsCard round={question} onDismiss={onDismissQuestion} />
           : question && <QuestionCard key={question.id} round={question} onAnswer={onAnswerQuestion} onDismiss={onDismissQuestion} />}

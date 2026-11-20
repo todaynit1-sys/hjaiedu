@@ -154,7 +154,7 @@ try {
   assert.equal(started.response.status, 200);
   const roundId = started.data.questionRound.id;
   assert.deepEqual(started.data.questionRound, {
-    id: roundId, prompt: startQuestion.prompt, open: true, published: false, total: 0, myAnswer: null, answers: []
+    id: roundId, prompt: startQuestion.prompt, open: true, published: false, total: 0, myAnswer: null
   });
   assert.equal((await request(path, startQuestion, host)).response.status, 409);
   const answer = { type: 'question-answer', roundId, text: '짧게 요약하기' };
@@ -172,14 +172,16 @@ try {
   assert.equal(edited.data.questionRound.myAnswer, changedText);
   assert.equal(edited.data.questionRound.total, 1);
   assert.equal((await request(path, { ...answer, text: peerText }, students[1].cookie)).response.status, 200);
-  await until(() => teacher.latest?.questionRound?.answers?.length === 2 &&
+  await until(() => teacher.latest?.questionRound?.total === 2 &&
     students[0].peer.latest?.questionRound?.total === 2 && students[2].peer.latest?.questionRound?.total === 2,
   'Question answers did not broadcast to the correct viewers');
   const sharedAnswers = [
     { seatNumber: 1, name: '수강생 01', text: changedText },
     { seatNumber: 2, name: '수강생 02', text: peerText }
   ];
-  assert.deepEqual(teacher.latest.questionRound.answers, sharedAnswers);
+  // The projected instructor screen sees only the count until answers are published.
+  assert.equal(teacher.latest.questionRound.answers, undefined);
+  assert(!JSON.stringify(teacher.latest).includes(changedText));
   assert.equal(students[0].peer.latest.questionRound.myAnswer, changedText);
   assert.equal(students[0].peer.latest.questionRound.answers, undefined);
   assert.equal(students[2].peer.latest.questionRound.myAnswer, null);
@@ -200,6 +202,8 @@ try {
   assert.equal(published.data.questionRound.published, true);
   await until(() => students[2].peer.latest?.questionRound?.published === true, 'Question publication did not broadcast');
   assert.deepEqual(students[2].peer.latest.questionRound.answers, sharedAnswers);
+  await until(() => teacher.latest?.questionRound?.answers?.length === 2, 'Published answers did not reach the instructor');
+  assert.deepEqual(teacher.latest.questionRound.answers, sharedAnswers);
   assert.deepEqual((await request(path, undefined, students[2].cookie)).data.questionRound.answers, sharedAnswers);
   assert.equal((await request(path, undefined, main[0].cookie)).data.questionRound.answers, undefined);
   const visitor = await request(path);
