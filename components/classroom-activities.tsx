@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CircleHelp, Hand, Heart, MessageSquare, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
-import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, SCOLD_TIME, type ClassroomSeat, type ReactionKind, type ScoldKind, type Snapshot } from '../lib/types';
+import { QUESTION_BANK } from '../lib/question-bank';
+import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_KEY_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, SCOLD_TIME, type ClassroomSeat, type ReactionKind, type ScoldKind, type Snapshot } from '../lib/types';
 import '../app/classroom-activities.css';
 import '../app/classroom-scold.css';
 import { saveClassroomMemory } from '../lib/classroom-portfolio';
@@ -36,6 +37,11 @@ export function ActivityBadge({ seat, updatedAt }: { seat: ClassroomSeat; update
     {(reaction || greeting) && <span title={reaction ? reactions[reaction.kind].label : `${greeting!.from}번 친구가 인사했어요`}><KindIcon size={16} />
       <span className="sr-only">{reaction ? reactions[reaction.kind].label : `${greeting!.from}번 친구가 인사했어요`}</span></span>}
   </span>;
+}
+
+/** Numbers the built-in questions 1-30 across sessions, matching the handout. */
+function bankNumber(section: number, index: number) {
+  return QUESTION_BANK.slice(0, section).reduce((sum, item) => sum + item.questions.length, 0) + index + 1;
 }
 
 export type ScoldChoice = ScoldKind | 'forgive';
@@ -147,7 +153,12 @@ function QuestionDialog({ round, host, students, onAction, onClose }: {
   const promptId = useId();
   const answerId = useId();
   const visibilityId = useId();
+  const bankId = useId();
+  const keyId = useId();
+  const keyHintId = useId();
   const [prompt, setPrompt] = useState('');
+  const [modelAnswer, setModelAnswer] = useState('');
+  const [bankChoice, setBankChoice] = useState('');
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -221,7 +232,7 @@ function QuestionDialog({ round, host, students, onAction, onClose }: {
       {host && round && !round.published && onAction && <div className="question-actions">
         {round.open && <button type="button" disabled={busy}
           onClick={() => void send({type:'question-close', roundId:round.id}, '질문을 마감했어요.')}>질문 마감</button>}
-        <button type="button" className="primary" disabled={busy || round.total === 0}
+        <button type="button" className="primary" disabled={busy}
           onClick={() => void send({type:'question-publish', roundId:round.id}, '답변을 공개했어요.')}>답변 공개하기</button>
         <p className="question-meta">답변 내용은 공개하기 전까지 강사 화면에도 보이지 않아요. 공개하면 질문이 마감되고 누가 어떤 답을 했는지 모두에게 보여요.</p>
       </div>}
@@ -231,6 +242,11 @@ function QuestionDialog({ round, host, students, onAction, onClose }: {
           onClick={() => void send({type:'question-clear', roundId:round.id}, '칠판에서 질문을 내렸어요.')}>칠판에서 내리기</button>
         <p className="question-meta">질문과 답변을 정리하고 칠판을 원래대로 돌려요.</p>
       </div>}
+
+      {round?.published && round.key && <section className="question-key" aria-label="정답">
+        <h3>정답</h3>
+        <p>{round.key}</p>
+      </section>}
 
       {round?.published && <section className="question-responses" aria-label="공개된 답변">
         <h3>공개된 답변</h3>
@@ -243,10 +259,27 @@ function QuestionDialog({ round, host, students, onAction, onClose }: {
       </section>}
 
       {host && !round?.open && onAction && <form className="question-form"
-        onSubmit={event => { event.preventDefault(); if (prompt.trim()) void send({type:'question-start', prompt:prompt.trim()}); }}>
+        onSubmit={event => { event.preventDefault(); if (prompt.trim()) void send({type:'question-start', prompt:prompt.trim(), key:modelAnswer.trim()}); }}>
+        <label htmlFor={bankId}>내장 질문에서 고르기</label>
+        <select id={bankId} className="question-bank-select" value={bankChoice} disabled={busy} onChange={event => {
+          const value = event.target.value;
+          setBankChoice(value);
+          const [section, index] = value.split(':').map(Number);
+          const picked = QUESTION_BANK[section]?.questions[index];
+          if (picked) { setPrompt(picked.prompt); setModelAnswer(picked.answer); }
+        }}>
+          <option value="">직접 입력하기</option>
+          {QUESTION_BANK.map((section, sectionIndex) => <optgroup key={section.title} label={section.title}>
+            {section.questions.map((item, index) => <option key={item.prompt} value={`${sectionIndex}:${index}`}>{bankNumber(sectionIndex, index)}. {item.prompt}</option>)}
+          </optgroup>)}
+        </select>
         <label htmlFor={promptId}>{round ? '새 질문' : '질문'}</label>
         <textarea id={promptId} value={prompt} maxLength={QUESTION_PROMPT_MAX_LENGTH} rows={2} required disabled={busy}
           onChange={event => setPrompt(event.target.value)} placeholder="수강생에게 물어볼 질문을 적어주세요." />
+        <label htmlFor={keyId}>정답 (선택)</label>
+        <textarea id={keyId} value={modelAnswer} maxLength={QUESTION_KEY_MAX_LENGTH} rows={2} disabled={busy}
+          onChange={event => setModelAnswer(event.target.value)} placeholder="답변을 공개할 때 함께 보여줄 정답이에요." aria-describedby={keyHintId} />
+        <p id={keyHintId} className="question-meta">정답은 공개 전까지 강사 화면에도 보이지 않아요. 공개하면 칠판과 답변 카드에 수강생 답과 함께 떠요.</p>
         {round && <p className="question-meta">새 질문을 출제하면 이전 질문과 답변을 대체해요.</p>}
         <div className="question-actions">
           <button type="submit" className="primary" disabled={busy || !prompt.trim()}>질문 올리기</button>

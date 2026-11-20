@@ -186,7 +186,8 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
     '--screen-height': `${screenBounds.height*100}cqh`
   } as CSSProperties;
   const screen = <div className={`auditorium-stage world-screen${boardExpanded ? ' is-expanded' : ''}`} style={screenStyle}>
-    <Chalkboard message={currentQuestion ? {id: currentQuestion.id, text: currentQuestion.prompt, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher}
+    <Chalkboard message={currentQuestion ? {id: currentQuestion.id, text: currentQuestion.published && currentQuestion.key ? `${currentQuestion.prompt}
+정답: ${currentQuestion.key}` : currentQuestion.prompt, createdAt: data.updatedAt, pinned: false, url: null, mine: false, author: 'host'} : teacher}
       code={data.code} active={data.active} onExpanded={recordExpansion}/>
     {currentQuestion && <p className="board-question-tally" data-state={currentQuestion.published ? 'published' : currentQuestion.open ? 'open' : 'closed'}>
       {currentQuestion.published ? '답변 공개됨 · ' : currentQuestion.open ? '' : '마감 · '}응답 <b>{currentQuestion.total}</b>{seats.length > 0 && ` / ${seats.length}명`}

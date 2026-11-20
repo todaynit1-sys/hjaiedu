@@ -1,5 +1,5 @@
 const randomUUID = () => crypto.randomUUID();
-import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, REACTIONS, SCOLD_KINDS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
+import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, QUESTION_KEY_MAX_LENGTH, REACTIONS, SCOLD_KINDS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
 import { auditoriumQuizPosition } from './auditorium.ts';
 import { parseAvatarCustomization } from './avatar-customization.ts';
 
@@ -70,7 +70,9 @@ function publicQuestion(day: Day, guest: string | null, viewerHost: boolean): Pu
   const entries = Object.entries(round.answers);
   const question: PublicQuestionRound = {
     id: round.id, prompt: round.prompt, open: round.open, published: round.published,
-    total: entries.length, myAnswer: guest ? round.answers[guest] ?? null : null
+    total: entries.length, myAnswer: guest ? round.answers[guest] ?? null : null,
+    // The model answer stays off every screen, the projected instructor one included, until published.
+    ...(round.published && round.key ? { key: round.key } : {})
   };
   const participant = guest !== null && Object.hasOwn(day.participants ?? {}, guest);
   // Answers stay hidden from everyone, the projected instructor screen included, until published.
@@ -147,7 +149,8 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     } else if (action.type === 'question-start') {
       if (round?.open) throw new AppError('진행 중인 질문을 먼저 마감해주세요.', 409);
       const prompt = text(action.prompt, '질문', QUESTION_PROMPT_MAX_LENGTH);
-      day.questionRound = { id: randomUUID(), prompt, open: true, published: false, answers: {} };
+      const key = typeof action.key === 'string' && action.key.trim() ? text(action.key, '정답', QUESTION_KEY_MAX_LENGTH) : undefined;
+      day.questionRound = { id: randomUUID(), prompt, ...(key ? { key } : {}), open: true, published: false, answers: {} };
     } else {
       if (!round || round.id !== action.roundId) throw new AppError('현재 질문을 확인해주세요.', 409);
       round.open = false;

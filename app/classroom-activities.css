@@ -102,3 +102,7 @@
   .classroom-question-dialog .question-answer-list b { display: block; margin-bottom: 2px; font-size: 13px; }
   .classroom-question-dialog .question-answer-text { font-size: 16px; line-height: 1.5; }
 }
+.question-bank-select { width: 100%; min-height: 44px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--forest-dark); font: inherit; font-size: 14px; }
+.question-key { display: grid; gap: 4px; padding: 10px 12px; border: 1.5px solid #e8c988; border-radius: 10px; background: #fffbef; }
+.question-key h3 { margin: 0; color: #8a5a0c; font-size: 13px; }
+.question-key p { margin: 0; color: #4a3206; font-size: 16px; font-weight: 700; white-space: pre-wrap; overflow-wrap: anywhere; }

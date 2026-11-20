@@ -30,8 +30,11 @@ export type OxQuiz = { id: string; question: string; open: boolean; answer: 'O' 
 export type PublicQuiz = Omit<OxQuiz, 'answer' | 'answers'> & { answer?: 'O' | 'X'; counts: [number, number]; myAnswer: 'O' | 'X' | null };
 export const QUESTION_PROMPT_MAX_LENGTH = 160;
 export const QUESTION_ANSWER_MAX_LENGTH = 200;
-export type QuestionRound = { id: string; prompt: string; open: boolean; published: boolean; answers: Record<string, string> };
-export type PublicQuestionRound = Omit<QuestionRound, 'answers'> & {
+/** The instructor's model answer, revealed only when answers are published. */
+export const QUESTION_KEY_MAX_LENGTH = 300;
+export type QuestionRound = { id: string; prompt: string; key?: string; open: boolean; published: boolean; answers: Record<string, string> };
+export type PublicQuestionRound = Omit<QuestionRound, 'answers' | 'key'> & {
+  key?: string;
   total: number;
   myAnswer: string | null;
   answers?: Array<{ seatNumber: number; name: string; text: string }>;

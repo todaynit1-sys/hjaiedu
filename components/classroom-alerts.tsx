@@ -83,6 +83,7 @@ function QuestionCard({ round, onAnswer, onDismiss }: {
 function QuestionResultsCard({ round, onDismiss }: { round: PublicQuestionRound; onDismiss: () => void }) {
   return <ClassroomAlert kind="results" title="공개된 답변" dismissLabel="공개된 답변 닫기" onDismiss={onDismiss}>
     <p className="classroom-alert-prompt">{round.prompt}</p>
+    {round.key && <p className="classroom-alert-key"><b>정답</b>{round.key}</p>}
     <p className="classroom-alert-count">답변 {round.total}개</p>
     {round.answers?.length ? <ul className="classroom-alert-answers" tabIndex={0} aria-label="수강생 답변">
       {round.answers.map(answer => <li key={answer.seatNumber}>

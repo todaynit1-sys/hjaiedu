@@ -334,3 +334,22 @@ test('question answers stay hidden from the instructor screen until published, t
   mutate(room, {type:'question-clear', roundId}, null, true);
   assert.equal(snapshot(room, today(), 'a', 'local').questionRound, undefined);
 });
+
+test('a model answer stays hidden from every screen until the instructor publishes', () => {
+  const room = newRoom('정답');
+  mutate(room, {type:'heartbeat'}, 'a', false);
+  mutate(room, {type:'question-start', prompt:'AI가 사실이 아닌 내용을 지어내는 현상은?', key:'환각(Hallucination)'}, null, true);
+  const roundId = ensureDay(room).questionRound!.id;
+  mutate(room, {type:'question-answer', roundId, text:'환각'}, 'a', false);
+  for (const view of [snapshot(room, today(), null, 'local', undefined, true, true), snapshot(room, today(), 'a', 'local')]) {
+    assert.equal(view.questionRound!.key, undefined);
+    assert(!JSON.stringify(view).includes('Hallucination'));
+  }
+  assert.throws(() => mutate(room, {type:'question-start', prompt:'새 질문', key:'가'.repeat(301)}, null, true), /진행 중|정답/);
+  mutate(room, {type:'question-publish', roundId}, null, true);
+  assert.equal(snapshot(room, today(), 'a', 'local').questionRound!.key, '환각(Hallucination)');
+  assert.equal(snapshot(room, today(), null, 'local', undefined, true, true).questionRound!.key, '환각(Hallucination)');
+  mutate(room, {type:'question-clear', roundId}, null, true);
+  mutate(room, {type:'question-start', prompt:'정답 없는 질문', key:'  '}, null, true);
+  assert.equal(ensureDay(room).questionRound!.key, undefined);
+});
