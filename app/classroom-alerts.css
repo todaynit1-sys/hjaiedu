@@ -198,3 +198,17 @@
 .classroom-alerts[data-host] .classroom-alerts-stack { width: min(100%, 560px); }
 .classroom-alerts[data-host] .classroom-alert-answers b { font-size: 15px; }
 .classroom-alerts[data-host] .classroom-alert-answers p { font-size: 16px; }
+/* Phones: larger question and answer text so names and answers read at arm's length. */
+@media (max-width: 760px) {
+  .classroom-alerts-stack { width: 100%; }
+  .classroom-alert:is([data-kind="question"], [data-kind="results"]) { padding: 6px 12px 12px; row-gap: 7px; }
+  .classroom-alert-title { font-size: 15px; }
+  .classroom-alert-prompt { font-size: 17px; line-height: 1.45; }
+  .classroom-alert-count, .classroom-alert-status, .classroom-alert-form-footer p { font-size: 13px; }
+  .classroom-alert-answers { max-height: min(22rem, 48dvh); }
+  .classroom-alert-answers li { padding: 9px 11px; border-radius: 9px; }
+  .classroom-alert-answers li + li { margin-top: 7px; }
+  .classroom-alert-answers b { display: block; margin-bottom: 2px; font-size: 13px; }
+  .classroom-alert-answers p { font-size: 16px; line-height: 1.5; }
+  .classroom-alert-form .classroom-alert-action { font-size: 14px; }
+}

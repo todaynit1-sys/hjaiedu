@@ -94,3 +94,11 @@
 .board-question-tally[data-state="published"] { border-color: #a8c9bd; background: #f6fcfa; color: #265a4d; }
 .question-tally { margin: 4px 0 0; color: var(--forest-dark); font-size: 15px; }
 .question-tally b { font-size: 26px; }
+@media (max-width: 760px) {
+  .board-question-tally { right: 50%; translate: 50% 0; margin-top: 4px; padding: 3px 12px; font-size: 13px; }
+  .classroom-question-dialog .question-prompt { font-size: 17px; line-height: 1.45; }
+  .classroom-question-dialog .question-meta { font-size: 13.5px; }
+  .classroom-question-dialog .question-answer-list li { padding: 10px 12px; }
+  .classroom-question-dialog .question-answer-list b { display: block; margin-bottom: 2px; font-size: 13px; }
+  .classroom-question-dialog .question-answer-text { font-size: 16px; line-height: 1.5; }
+}
