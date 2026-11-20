@@ -21,7 +21,11 @@ export type AvatarMotion = { position?: ClassroomPosition; wanderSince?: number 
 export type ClassroomMove = ClassroomPosition | null | 'wander';
 export const REACTIONS = ['understood', 'clap', 'confused', 'wave', 'heart'] as const;
 export type ReactionKind = typeof REACTIONS[number];
-export type SeatActivity = { handAt?: number; reaction?: { kind: ReactionKind; at: number }; greeting?: { from: number; at: number } };
+export const SCOLD_KINDS = ['chalk', 'focus', 'hands'] as const;
+export type ScoldKind = typeof SCOLD_KINDS[number];
+/** How long each instructor scolding stays on a student, in milliseconds. */
+export const SCOLD_TIME: Record<ScoldKind, number> = { chalk: 5_000, focus: 7_000, hands: 30_000 };
+export type SeatActivity = { handAt?: number; reaction?: { kind: ReactionKind; at: number }; greeting?: { from: number; at: number }; scold?: { kind: ScoldKind; at: number } };
 export type OxQuiz = { id: string; question: string; open: boolean; answer: 'O' | 'X'; answers: Record<string, 'O' | 'X'> };
 export type PublicQuiz = Omit<OxQuiz, 'answer' | 'answers'> & { answer?: 'O' | 'X'; counts: [number, number]; myAnswer: 'O' | 'X' | null };
 export const QUESTION_PROMPT_MAX_LENGTH = 160;

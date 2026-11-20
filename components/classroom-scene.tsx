@@ -5,7 +5,7 @@ import { Chalkboard } from './chalkboard';
 import { StorybookAvatarArt } from './storybook-avatar-art';
 import { INSTRUCTOR_HOME, seatExit, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
-import { ActivityBadge, ClassroomActivities, type ClassroomAction } from './classroom-activities';
+import { ActivityBadge, ClassroomActivities, ScoldEffect, ScoldMenu, ScoldNotice, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
 import { AuditoriumRenderer, type AuditoriumActorProfile, type AuditoriumProjection } from './auditorium-renderer';
 import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, STORYBOOK_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
@@ -111,6 +111,8 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
   const [choosingCharacter, setChoosingCharacter] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
   const [activityError, setActivityError] = useState('');
+  const [scoldingSeat, setScoldingSeat] = useState<number | null>(null);
+  const closeScoldMenu = useCallback(() => setScoldingSeat(null), []);
   async function greet(number: number) {
     if (!onActivity) return;
     setActivityError('');
@@ -191,6 +193,7 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
     <h2 id="classroom-title" className="sr-only">AI 강의실</h2>
     <span className="sr-only classroom-mobile-announcement" role="status">{latest && `${latest.authorName ?? '강사'}: ${latest.text}`}</span>
     {boardExpanded && screen}
+    <ScoldNotice seat={mySeat} updatedAt={data.updatedAt}/>
     <p id="auditorium-view-hint" className="sr-only">내 주변에서는 화면을 밀어 둘러보고 캐릭터를 눌러 인사할 수 있어요.</p>
     <div ref={viewport} className="auditorium-viewport" data-view={view} aria-label="교실 좌석" aria-describedby="auditorium-view-hint" role="region">
     <div ref={movement.floor} className="classroom-floor" data-backdrop={backdrop || undefined} data-moving={canMoveHere && (movement.moving || movement.autonomous) || undefined}
@@ -238,6 +241,12 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
         {bubble && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
         <span className="classroom-walker-name">{seat.name}</span>
         <ActivityBadge seat={seat} updatedAt={data.updatedAt}/>
+        <ScoldEffect seat={seat} updatedAt={data.updatedAt}/>
+        {host && onActivity && data.active && <button className="classroom-walker-greet classroom-scold-hit" type="button" aria-haspopup="menu"
+          aria-expanded={scoldingSeat === seat.number} aria-label={`${seat.name} 혼내기`}
+          onClick={event => { event.stopPropagation(); setScoldingSeat(scoldingSeat === seat.number ? null : seat.number); }}/>}
+        {host && onActivity && scoldingSeat === seat.number && <ScoldMenu seat={seat} scolded={Boolean(seat.activity?.scold)} onClose={closeScoldMenu}
+          onChoose={kind => onActivity({type:'scold', seatNumber:seat.number, kind})}/>}
         {position && headsInteractive && !seat.mine && !host && onActivity && <button className="classroom-walker-greet" type="button" aria-label={`${seat.name}에게 인사하기`}
           onClick={event=>{event.stopPropagation(); void greet(seat.number);}}/>}
       </WalkingAvatar>;

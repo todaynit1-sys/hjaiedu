@@ -295,3 +295,23 @@ test('fifty OX participants have unique positions per side without renumbering o
   assert.equal(mine.name, '수강생 51');
   assert.deepEqual(mine.position, auditoriumQuizPosition(1, 'O'));
 });
+
+test('only the instructor scolds a seated student, and forgiving clears it', () => {
+  const room = newRoom('혼내기');
+  mutate(room, {type:'heartbeat'}, 'a', false);
+  mutate(room, {type:'heartbeat'}, 'b', false);
+  const scold = {type:'scold', seatNumber:2, kind:'hands'};
+  assert.throws(() => mutate(room, scold, 'a', false), /강사 로그인/);
+  assert.throws(() => mutate(room, {...scold, seatNumber:9}, null, true), /수강생이 없어요/);
+  assert.throws(() => mutate(room, {...scold, kind:'slap'}, null, true), /방법/);
+  mutate(room, {type:'hand', raised:true}, 'b', false);
+  mutate(room, scold, null, true);
+  const seats = snapshot(room, today(), 'b', 'local').seats;
+  assert.equal(seats[0].activity?.scold, undefined);
+  assert.equal(seats[1].activity?.scold?.kind, 'hands');
+  assert.ok(seats[1].activity?.handAt, 'scolding keeps the raised hand');
+  mutate(room, {...scold, kind:'forgive'}, null, true);
+  assert.equal(ensureDay(room).activities!.b.scold, undefined);
+  mutate(room, {type:'active', active:false}, null, true);
+  assert.throws(() => mutate(room, scold, null, true), /종료/);
+});

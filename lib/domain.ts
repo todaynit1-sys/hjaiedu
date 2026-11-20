@@ -1,5 +1,5 @@
 const randomUUID = () => crypto.randomUUID();
-import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, REACTIONS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
+import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, REACTIONS, SCOLD_KINDS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
 import { auditoriumQuizPosition } from './auditorium.ts';
 import { parseAvatarCustomization } from './avatar-customization.ts';
 
@@ -184,6 +184,18 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
       day.quiz.answers[guest] = action.choice;
       (day.positions ??= {})[guest] = auditoriumQuizPosition(seatNumber(day.participants[guest]), action.choice);
     }
+    return;
+  }
+  if (action.type === 'scold') {
+    if (!host) throw new AppError('강사 로그인이 필요합니다.', 403);
+    if (!day.active) throw new AppError('강의가 종료됐어요.', 409);
+    const target = Object.entries(day.participants ?? {}).find(([, name]) => seatNumber(name) === action.seatNumber);
+    if (!target) throw new AppError('그 자리에 앉은 수강생이 없어요.', 404);
+    if (action.kind === 'forgive') { delete day.activities?.[target[0]]?.scold; return; }
+    const kind = SCOLD_KINDS.find(value => value === action.kind);
+    if (!kind) throw new AppError('혼내는 방법을 골라주세요.');
+    // Only the latest scolding per student is kept, so repeated taps never grow storage.
+    ((day.activities ??= {})[target[0]] ??= {}).scold = { kind, at: Date.now() };
     return;
   }
   if (['quiz-start', 'quiz-reveal', 'quiz-clear', 'hand-lower'].includes(String(action.type))) {

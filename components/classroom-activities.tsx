@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CircleHelp, Hand, Heart, MessageSquare, PartyPopper, Sparkles, ThumbsUp, X } from 'lucide-react';
-import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, type ClassroomSeat, type ReactionKind, type Snapshot } from '../lib/types';
+import { QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, SCOLD_TIME, type ClassroomSeat, type ReactionKind, type ScoldKind, type Snapshot } from '../lib/types';
 import '../app/classroom-activities.css';
+import '../app/classroom-scold.css';
 import { saveClassroomMemory } from '../lib/classroom-portfolio';
 import { ClassroomPortfolio, photoReflectionLines, renderGroupPhoto, useDownloadPhoto } from './classroom-portfolio';
 import { StorybookAvatarArt } from './storybook-avatar-art';
@@ -35,6 +36,79 @@ export function ActivityBadge({ seat, updatedAt }: { seat: ClassroomSeat; update
     {(reaction || greeting) && <span title={reaction ? reactions[reaction.kind].label : `${greeting!.from}번 친구가 인사했어요`}><KindIcon size={16} />
       <span className="sr-only">{reaction ? reactions[reaction.kind].label : `${greeting!.from}번 친구가 인사했어요`}</span></span>}
   </span>;
+}
+
+export type ScoldChoice = ScoldKind | 'forgive';
+export const SCOLD_OPTIONS: { kind: ScoldKind; label: string; hint: string }[] = [
+  { kind: 'chalk', label: '분필 던지기', hint: '딱! 하고 맞아요' },
+  { kind: 'focus', label: '집중! 꾸중', hint: '머리 위에 호통' },
+  { kind: 'hands', label: '손 들고 벌서기', hint: '30초 동안' }
+];
+const scoldNotice: Record<ScoldKind, string> = {
+  chalk: '강사님이 분필을 던졌어요! 정신 차려요.',
+  focus: '강사님이 집중하라고 혼냈어요!',
+  hands: '손 들고 벌서는 중이에요. 30초만 버텨요!'
+};
+
+/** Returns the scolding still on screen for a seat, re-rendering when it runs out. */
+export function useLiveScold(seat: ClassroomSeat | undefined, updatedAt: string) {
+  const offset = useMemo(() => Date.parse(updatedAt) - Date.now(), [updatedAt]);
+  const [, tick] = useState(0);
+  const scold = seat?.activity?.scold;
+  const now = Date.now() + offset;
+  const expires = scold ? scold.at + SCOLD_TIME[scold.kind] : 0;
+  const live = scold && expires > now ? scold : undefined;
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setTimeout(() => tick(value => value + 1), Math.max(1, expires - Date.now() - offset + 1));
+    return () => clearTimeout(timer);
+  }, [live, expires, offset]);
+  return live ? { ...live, elapsed: now - live.at } : undefined;
+}
+
+export function ScoldEffect({ seat, updatedAt }: { seat: ClassroomSeat; updatedAt: string }) {
+  const scold = useLiveScold(seat, updatedAt);
+  if (!scold) return null;
+  // A negative delay resumes the animation at the shared moment, so late joiners stay in sync.
+  const style = { animationDelay: `-${Math.min(scold.elapsed, 4_000)}ms` };
+  return <div className="classroom-scold" data-kind={scold.kind} key={scold.at} aria-hidden="true">
+    {scold.kind === 'chalk' && <><span className="classroom-chalk" style={style} /><span className="classroom-bonk" style={style}>딱!</span></>}
+    {scold.kind === 'focus' && <span className="classroom-shout" style={style}>집중!!</span>}
+    {scold.kind === 'hands' && <span className="classroom-punish-tag"><Hand size={13} /><Hand size={13} />벌서는 중
+      <i style={{ animationDuration: `${SCOLD_TIME.hands}ms`, animationDelay: `-${scold.elapsed}ms` }} /></span>}
+  </div>;
+}
+
+export function ScoldNotice({ seat, updatedAt }: { seat?: ClassroomSeat; updatedAt: string }) {
+  const scold = useLiveScold(seat, updatedAt);
+  if (!scold) return null;
+  return <p className="classroom-scold-notice" key={scold.at} role="status">{scoldNotice[scold.kind]}</p>;
+}
+
+export function ScoldMenu({ seat, scolded, onChoose, onClose }: { seat: ClassroomSeat; scolded: boolean; onChoose: (kind: ScoldChoice) => Promise<void>; onClose: () => void }) {
+  const menu = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    menu.current?.querySelector('button')?.focus();
+    const away = (event: PointerEvent) => { if (!menu.current?.parentElement?.contains(event.target as Node)) onClose(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('pointerdown', away); document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', escape); };
+  }, [onClose]);
+  async function choose(kind: ScoldChoice) {
+    setBusy(true); setError('');
+    try { await onChoose(kind); onClose(); }
+    catch (cause) { setBusy(false); setError(cause instanceof Error ? cause.message : '다시 시도해주세요.'); }
+  }
+  return <div className="classroom-scold-menu" ref={menu} role="menu" aria-label={`${seat.name} 혼내기`}
+    onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}>
+    <p>{seat.name} 혼내기</p>
+    {SCOLD_OPTIONS.map(item => <button key={item.kind} type="button" role="menuitem" disabled={busy} onClick={() => choose(item.kind)}>
+      <b>{item.label}</b><small>{item.hint}</small></button>)}
+    {scolded && <button type="button" role="menuitem" className="is-forgive" disabled={busy} onClick={() => choose('forgive')}><b>용서해주기</b><small>바로 풀어줘요</small></button>}
+    {error && <p className="error" role="alert">{error}</p>}
+  </div>;
 }
 
 export function ClassroomQuestion({ data, onAction, host, open, onOpenChange }: {
@@ -272,6 +346,15 @@ function ActivitiesDialog({ data, host, hands, onAction, renderHead, onClose }: 
       {host && <section aria-label="질문 대기"><h3>손든 순서 · {hands.length}명</h3>
         {hands.length ? <ol className="activity-hand-queue">{hands.map(seat => <li key={seat.number}><span>{String(seat.number).padStart(2,'0')} · {seat.name}</span>
           <button type="button" disabled={busy || !onAction} onClick={() => run({type:'hand-lower',seatNumber:seat.number})}>응답 완료</button></li>)}</ol> : <p>손을 든 수강생이 여기에 표시돼요.</p>}
+      </section>}
+      {host && <section aria-label="수강생 혼내기"><h3>혼내기</h3>
+        <p>교실에서 수강생 캐릭터를 눌러도 혼낼 수 있어요. 분필·호통은 몇 초, 벌서기는 30초 뒤 풀려요.</p>
+        {data.seats.length ? <ul className="activity-scold-list">{data.seats.map(seat => <li key={seat.number}>
+          <span>{String(seat.number).padStart(2,'0')} · {seat.name}</span>
+          <span className="activity-scold-buttons">{SCOLD_OPTIONS.map(item => <button key={item.kind} type="button" disabled={busy || !onAction}
+            onClick={() => run({type:'scold', seatNumber:seat.number, kind:item.kind})}>{item.label}</button>)}
+            {seat.activity?.scold && <button type="button" disabled={busy || !onAction} onClick={() => run({type:'scold', seatNumber:seat.number, kind:'forgive'})}>용서</button>}</span>
+        </li>)}</ul> : <p>접속한 수강생이 없어요.</p>}
       </section>}
       <section aria-label="수업 단체사진"><h3>오늘의 단체사진</h3><p>지금 접속한 수강생 {photoSeats.length}명{includeInstructor ? '과 강사' : ''}의 캐릭터와 닉네임을 사진에 담아요.</p>
         <button type="button" disabled={busy} onClick={()=>setTakingPhoto(value=>!value)}>{takingPhoto ? '사진 접기' : '단체사진 미리보기'}</button>

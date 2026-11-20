@@ -1,0 +1,179 @@
+/* Instructor scolding: cartoon chalk, a shouted "집중!!" and raised-hands punishment. */
+.classroom-scold {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: 96%;
+  translate: -50% 0;
+  pointer-events: none;
+}
+.classroom-chalk {
+  position: absolute;
+  left: -7px;
+  bottom: 0;
+  width: 16px;
+  height: 5px;
+  border-radius: 2px;
+  background: #fbfaf2;
+  box-shadow: 0 0 0 1.2px #8c8a7c, 0 3px 5px #0003;
+  animation: scold-chalk-fly .62s cubic-bezier(.35, 0, .7, 1) both;
+}
+.classroom-bonk {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  translate: -50% 0;
+  padding: 1px 7px;
+  border: 2px solid #283452;
+  border-radius: 8px;
+  background: #ffe066;
+  color: #283452;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  animation: scold-bonk 1.8s .58s ease-out both;
+}
+.classroom-shout {
+  display: block;
+  padding: 3px 10px;
+  border: 2px solid #b72f2f;
+  border-radius: 12px 12px 12px 3px;
+  background: #fff1ee;
+  color: #b72f2f;
+  font-size: 15px;
+  font-weight: 860;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 #b72f2f30;
+  animation: scold-shout .45s cubic-bezier(.3, 1.6, .5, 1) both, scold-shake .4s .45s ease-in-out 4;
+}
+.classroom-punish-tag {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  overflow: hidden;
+  padding: 2px 7px 5px;
+  border: 1.5px solid #283452;
+  border-radius: 9px;
+  background: #fffbea;
+  color: #283452;
+  font-size: 11.5px;
+  font-weight: 760;
+  white-space: nowrap;
+  animation: scold-tremble 1.4s ease-in-out infinite;
+}
+.classroom-punish-tag svg { color: #a06a12; }
+.classroom-punish-tag svg:nth-of-type(2) { margin-right: 3px; transform: scaleX(-1); }
+.classroom-punish-tag i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: #e8a33c;
+  transform-origin: left;
+  animation: scold-timer linear both;
+}
+
+.classroom-scold-notice {
+  position: absolute;
+  z-index: 30;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  max-width: calc(100% - 24px);
+  padding: 7px 16px;
+  border: 1.5px solid #b72f2f;
+  border-radius: 999px;
+  background: #fff1ee;
+  color: #9d2626;
+  font-size: 14px;
+  font-weight: 720;
+  text-align: center;
+  box-shadow: 0 6px 18px #9d262626;
+  animation: scold-shout .45s cubic-bezier(.3, 1.6, .5, 1) both;
+}
+.auditorium-scene { position: relative; }
+
+.classroom-actor:has(> .classroom-scold-menu) { z-index: 400 !important; }
+.classroom-actor > .classroom-scold-hit { cursor: pointer; }
+.classroom-actor > .classroom-scold-hit:hover { background: #b72f2f14; border-radius: 12px; }
+.classroom-actor > .classroom-scold-hit:focus-visible { outline: 2px solid #b72f2f; outline-offset: 2px; border-radius: 12px; }
+.classroom-scold-menu {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  gap: 3px;
+  width: 158px;
+  padding: 7px;
+  border: 1px solid #cbd9e7;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 28px #0f1b4c33;
+  text-align: left;
+  pointer-events: auto;
+}
+.classroom-actor[data-seat-side="left"] > .classroom-scold-menu { left: 0; translate: 0 0; }
+.classroom-actor[data-seat-side="right"] > .classroom-scold-menu { left: auto; right: 0; translate: 0 0; }
+.classroom-scold-menu > p { margin: 0 4px 3px; overflow: hidden; color: #506780; font-size: 11.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.classroom-scold-menu > p.error { color: #a63829; white-space: normal; }
+.classroom-scold-menu button {
+  display: grid;
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: #f5f7fc;
+  color: #283452;
+  text-align: left;
+  cursor: pointer;
+}
+.classroom-scold-menu button:hover:not(:disabled) { background: #fff1ee; color: #9d2626; }
+.classroom-scold-menu button.is-forgive:hover:not(:disabled) { background: #eaf6ea; color: #2c6a35; }
+.classroom-scold-menu button:focus-visible { outline: 2px solid #4656a5; outline-offset: 1px; }
+.classroom-scold-menu b { font-size: 13px; font-weight: 750; }
+.classroom-scold-menu small { color: #6b7590; font-size: 11px; }
+
+.activity-scold-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.activity-scold-list li { display: grid; gap: 5px; }
+.activity-scold-list li > span:first-child { font-size: 14px; font-weight: 700; }
+.activity-scold-buttons { display: flex; flex-wrap: wrap; gap: 5px; }
+.activity-scold-buttons button { font-size: 13px !important; }
+
+@keyframes scold-chalk-fly {
+  0% { transform: translate(-70px, -150px) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(0, 0) rotate(720deg); opacity: 1; }
+}
+@keyframes scold-bonk {
+  0% { transform: scale(.3); opacity: 0; }
+  18% { transform: scale(1.25); opacity: 1; }
+  30% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { transform: translateY(-8px); opacity: 0; }
+}
+@keyframes scold-shout {
+  0% { transform: scale(.4) rotate(-6deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes scold-shake {
+  0%, 100% { rotate: 0deg; }
+  25% { rotate: -6deg; }
+  75% { rotate: 6deg; }
+}
+@keyframes scold-tremble {
+  0%, 100% { transform: none; }
+  50% { transform: translateY(1px) rotate(1.5deg); }
+}
+@keyframes scold-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (max-width: 760px) {
+  .classroom-shout { padding: 2px 7px; font-size: 12px; }
+  .classroom-bonk { font-size: 11px; }
+  .classroom-punish-tag { padding: 1px 5px 4px; font-size: 10px; }
+  .classroom-scold-notice { top: 4px; padding: 4px 10px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
