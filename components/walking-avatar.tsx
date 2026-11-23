@@ -6,7 +6,7 @@ import { StorybookAvatarArt } from './storybook-avatar-art';
 
 type Facing = 'left' | 'right' | 'up' | 'down';
 
-export function WalkingAvatar({ position, origin, dockExit, floor, mine, number, instructor, name, character, avatar, scale, children }: {
+export function WalkingAvatar({ position, origin, dockExit, floor, mine, number, instructor, name, character, avatar, scale, flying = false, children }: {
   position?: ClassroomPosition | null;
   origin: ClassroomPosition;
   dockExit?: ClassroomPosition;
@@ -18,6 +18,8 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
   character: Character;
   avatar?: AvatarCustomization;
   scale?: number;
+  /** Just hit by the instructor's chalk: fly back to the seat in an arc instead of walking. */
+  flying?: boolean;
   children?: ReactNode;
 }) {
   const destination = position ?? origin;
@@ -45,6 +47,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
         delete node.dataset.travelling;
         delete node.dataset.walking;
         delete node.dataset.returning;
+        delete node.dataset.flying;
       }
     };
   }, []);
@@ -75,6 +78,29 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
 
     const from = { x: old.x + (offset[0] || 0) / width, y: old.y + (offset[1] || 0) / height };
     const target = { x, y };
+    if (flying && shouldSit && !old.shouldSit) {
+      // Waits for the chalk to land, then arcs over the desks and drops into the seat.
+      // The element glides along the floor; the 3D renderer and CSS add the height and spin.
+      const dx = (from.x - x) * width, dy = (from.y - y) * height;
+      setSeated(false);
+      node.dataset.travelling = '';
+      node.dataset.flying = '';
+      const flight = node.animate([
+        { translate: `${dx}px ${dy}px` },
+        { translate: '0px 0px' }
+      ], { duration: 950, delay: 600, easing: 'cubic-bezier(.33, 0, .4, 1)', fill: 'backwards' });
+      animation.current = flight;
+      const land = () => {
+        if (animation.current !== flight) return;
+        animation.current = null;
+        delete node.dataset.travelling;
+        delete node.dataset.flying;
+        setSeated(true);
+      };
+      flight.onfinish = land;
+      flight.oncancel = land;
+      return;
+    }
     const rising = old.shouldSit && !shouldSit && !interrupted;
     const distanceBetween = (a: ClassroomPosition, b: ClassroomPosition) => Math.hypot((b.x-a.x)*width, (b.y-a.y)*height);
     const points = [from];
@@ -156,7 +182,7 @@ export function WalkingAvatar({ position, origin, dockExit, floor, mine, number,
     };
     walk.onfinish = settle;
     walk.oncancel = settle;
-  }, [x, y, shouldSit, dockExit?.x, dockExit?.y, floor]);
+  }, [x, y, shouldSit, dockExit?.x, dockExit?.y, floor]); // `flying` is read when the seat change arrives, not re-run on its own.
 
   const className = `classroom-actor${position || instructor ? ' classroom-walker' : ''}${mine ? ' is-mine' : ''}${instructor ? ' is-instructor' : ''}`;
   const style = {

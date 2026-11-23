@@ -87,8 +87,12 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
           heading = Math.atan2(point.x - old.x, point.z - old.z);
         } else if (moving && !old) heading = actor.dataset.facing === 'left' ? -.7 : .7;
         positions.set(id, { ...point, heading });
+        // A chalk-struck student arcs through the air and spins on the way back to the seat.
+        const flight = actor.hasAttribute('data-flying') ? actor.getAnimations()[0]?.effect?.getComputedTiming().progress : undefined;
+        if (typeof flight === 'number') travelling = true;
         frames.push({ ...profile, ...point, heading, scale: profile.instructor ? .74 : 1,
-          seated, stride: actor.hasAttribute('data-walking') ? now / 115 : 0 });
+          seated, stride: actor.hasAttribute('data-walking') ? now / 115 : 0,
+          ...(typeof flight === 'number' ? { lift: Math.sin(flight * Math.PI) * 1.1, spin: flight * Math.PI * 4 } : {}) });
       }
       previous = positions;
       try {
@@ -107,7 +111,7 @@ export function AuditoriumRenderer({capacity, backdrop, visible, actors, onLayou
       queueActors();
     });
     mutations.observe(floor, { subtree: true, childList: true, attributes: true,
-      attributeFilter: ['style', 'data-travelling', 'data-walking', 'data-pose', 'data-illustrated'] });
+      attributeFilter: ['style', 'data-travelling', 'data-walking', 'data-flying', 'data-pose', 'data-illustrated'] });
     document.addEventListener('visibilitychange', queueActors);
     function resize() {
       frame = 0;

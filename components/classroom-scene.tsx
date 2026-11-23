@@ -241,7 +241,9 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
       const position = studentPositions.get(seat.number);
       const bubble = bubbles.get(seat.number);
       const point = seatPoint(seat.number - firstSeat);
-      return <WalkingAvatar key={`${roomDay}/${seat.number}`} position={position} origin={point} dockExit={seatExit(point)} scale={point.scale}
+      const chalk = seat.activity?.scold;
+      const chalkHit = chalk?.kind === 'chalk' && Date.parse(data.updatedAt) - chalk.at < 3000;
+      return <WalkingAvatar key={`${roomDay}/${seat.number}`} position={position} origin={point} dockExit={seatExit(point)} scale={point.scale} flying={chalkHit}
         floor={movement.floor} character={seat.character ?? defaultCharacter(seat.number)} avatar={seat.avatar} mine={seat.mine} number={seat.number} name={seat.name}>
         {bubble && <div className="classroom-seat-bubble" key={bubble.id} title={bubble.text}><span>{bubble.text}</span></div>}
         <span className="classroom-walker-name">{seat.name}</span>

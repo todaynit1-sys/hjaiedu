@@ -177,3 +177,12 @@
   .classroom-punish-tag { padding: 1px 5px 4px; font-size: 10px; }
   .classroom-scold-notice { top: 4px; padding: 4px 10px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Flying back to the seat after a chalk hit; the 3D model gets the same arc from the renderer. */
+.classroom-actor[data-flying] > .classroom-actor-sprite,
+.classroom-actor[data-flying] .storybook-actor-art { animation: scold-fly-home 950ms 600ms cubic-bezier(.33, 0, .4, 1) both; }
+@keyframes scold-fly-home {
+  0% { translate: 0 0; rotate: 0deg; }
+  50% { translate: 0 -90%; rotate: 380deg; }
+  100% { translate: 0 0; rotate: 720deg; }
+}

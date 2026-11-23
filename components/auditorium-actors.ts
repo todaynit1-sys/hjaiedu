@@ -5,6 +5,9 @@ import { avatarAppearance } from './classroom-avatar';
 
 export type AuditoriumActorFrame = {
   id: string;
+  /** Height above the floor and extra turn while flying back to the seat after a chalk hit. */
+  lift?: number;
+  spin?: number;
   character: Character;
   avatar?: AvatarCustomization;
   instructor?: boolean;
@@ -465,7 +468,8 @@ function identity(frame: AuditoriumActorFrame) {
 
 function poseChanged(last: AuditoriumActorFrame | undefined, frame: AuditoriumActorFrame) {
   return !last || last.x !== frame.x || last.z !== frame.z || last.scale !== frame.scale ||
-    last.heading !== frame.heading || last.stride !== frame.stride || last.seated !== frame.seated;
+    last.heading !== frame.heading || last.stride !== frame.stride || last.seated !== frame.seated ||
+    last.lift !== frame.lift || last.spin !== frame.spin;
 }
 
 /** Batch articulated actors so all visible seats share a small, fixed number of GPU draws. */
@@ -494,9 +498,9 @@ export function createAuditoriumActors(parent: THREE.Object3D) {
     const swing = walking ? Math.sin(frame.stride) : 0;
     const rise = walking ? (.009 + .024 * (1 - Math.cos(frame.stride * 2))) * (1 - sit) : 0;
     const hips = lerp(.611, .698, sit);
-    transform.position.set(frame.x, rise * frame.scale, frame.z);
+    transform.position.set(frame.x, rise * frame.scale + (frame.lift ?? 0), frame.z);
     transform.scale.setScalar(frame.scale);
-    transform.rotation.set(0, frame.heading, 0, 'YXZ');
+    transform.rotation.set(0, frame.heading + (frame.spin ?? 0), 0, 'YXZ');
     transform.updateMatrix();
     pose.root.copy(transform.matrix);
     joint(pose, 'torso', 'root', 0, hips, -.023 * sit,

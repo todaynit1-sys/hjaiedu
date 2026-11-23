@@ -205,6 +205,11 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     if (!kind) throw new AppError('혼내는 방법을 골라주세요.');
     // Only the latest scolding per student is kept, so repeated taps never grow storage.
     ((day.activities ??= {})[target[0]] ??= {}).scold = { kind, at: Date.now() };
+    // Chalk knocks a wandering student straight back into their own seat (an open OX quiz keeps its spots).
+    if (kind === 'chalk' && !day.quiz?.open) {
+      delete day.positions?.[target[0]];
+      delete day.wanderers?.[target[0]];
+    }
     return;
   }
   if (['quiz-start', 'quiz-reveal', 'quiz-clear', 'hand-lower'].includes(String(action.type))) {

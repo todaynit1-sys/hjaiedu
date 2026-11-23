@@ -353,3 +353,17 @@ test('a model answer stays hidden from every screen until the instructor publish
   mutate(room, {type:'question-start', prompt:'정답 없는 질문', key:'  '}, null, true);
   assert.equal(ensureDay(room).questionRound!.key, undefined);
 });
+
+test('chalk sends a wandering student back to their own seat, other scolds leave them where they are', () => {
+  const room = newRoom('분필');
+  mutate(room, {type:'heartbeat'}, 'a', false);
+  mutate(room, {type:'move', position:{x:.5, y:.6}}, 'a', false);
+  mutate(room, {type:'scold', seatNumber:1, kind:'focus'}, null, true);
+  assert.deepEqual(snapshot(room, today(), 'a', 'local').seats[0].position, {x:.5, y:.6});
+  mutate(room, {type:'scold', seatNumber:1, kind:'chalk'}, null, true);
+  assert.equal(snapshot(room, today(), 'a', 'local').seats[0].position, undefined);
+  mutate(room, {type:'move', wander:true}, 'a', false);
+  assert.ok(snapshot(room, today(), 'a', 'local').seats[0].wanderSince);
+  mutate(room, {type:'scold', seatNumber:1, kind:'chalk'}, null, true);
+  assert.equal(snapshot(room, today(), 'a', 'local').seats[0].wanderSince, undefined);
+});
