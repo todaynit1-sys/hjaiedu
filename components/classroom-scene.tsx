@@ -5,7 +5,7 @@ import { Chalkboard } from './chalkboard';
 import { StorybookAvatarArt } from './storybook-avatar-art';
 import { INSTRUCTOR_HOME, seatExit, useClassroomMovement, useWanderClock, wanderingPosition } from './classroom-movement';
 import { WalkingAvatar } from './walking-avatar';
-import { ActivityBadge, ClassroomActivities, ScoldEffect, ScoldMenu, ScoldNotice, type ClassroomAction } from './classroom-activities';
+import { ActivityBadge, ClassroomActivities, ScoldEffect, ScoldMenu, ScoldNotice, useLiveScold, type ClassroomAction } from './classroom-activities';
 import { AuditoriumArt } from './auditorium-art';
 import { AuditoriumRenderer, type AuditoriumActorProfile, type AuditoriumProjection } from './auditorium-renderer';
 import { AUDITORIUM_PAGE_SIZE, AUDITORIUM_SCREEN, STORYBOOK_SCREEN, auditoriumCapacity, auditoriumSeat } from '../lib/auditorium';
@@ -150,8 +150,9 @@ export function ClassroomScene({ data, onAvatarChange, onNicknameChange, onMove,
     wandering ? wanderingPosition(since, now, home, number) : undefined;
   const ownNumber = host ? 0 : mySeat?.number ?? 0;
   const ownHome = host ? INSTRUCTOR_HOME : onOwnPage ? seatPoint(ownNumber - firstSeat) : {x: .5, y: .5};
+  const ownScold = useLiveScold(host ? undefined : mySeat, data.updatedAt);
   const movement = useClassroomMovement(roomDay, ownMotion, ownHome,
-    wander(ownMotion?.wanderSince, ownHome, ownNumber), canMoveHere ? onMove : undefined);
+    wander(ownMotion?.wanderSince, ownHome, ownNumber), canMoveHere ? onMove : undefined, ownScold?.kind === 'chalk');
   const instructorPosition = host ? movement.position : wander(data.instructor?.wanderSince, INSTRUCTOR_HOME, 0) ?? data.instructor?.position;
   const studentPositions = new Map(pageSeats.map(seat => [seat.number, seat.mine ? movement.position :
     wander(seat.wanderSince, seatPoint(seat.number - firstSeat), seat.number) ?? seat.position]));

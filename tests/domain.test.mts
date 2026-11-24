@@ -362,6 +362,11 @@ test('chalk sends a wandering student back to their own seat, other scolds leave
   assert.deepEqual(snapshot(room, today(), 'a', 'local').seats[0].position, {x:.5, y:.6});
   mutate(room, {type:'scold', seatNumber:1, kind:'chalk'}, null, true);
   assert.equal(snapshot(room, today(), 'a', 'local').seats[0].position, undefined);
+  // Right after the hit the seat wins: walking or wandering is refused, sitting is fine.
+  assert.throws(() => mutate(room, {type:'move', position:{x:.5, y:.6}}, 'a', false), /분필/);
+  assert.throws(() => mutate(room, {type:'move', wander:true}, 'a', false), /분필/);
+  mutate(room, {type:'move', position:null}, 'a', false);
+  ensureDay(room).activities!.a.scold!.at -= 5_001;
   mutate(room, {type:'move', wander:true}, 'a', false);
   assert.ok(snapshot(room, today(), 'a', 'local').seats[0].wanderSince);
   mutate(room, {type:'scold', seatNumber:1, kind:'chalk'}, null, true);

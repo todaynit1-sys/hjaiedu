@@ -1,5 +1,5 @@
 const randomUUID = () => crypto.randomUUID();
-import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, QUESTION_KEY_MAX_LENGTH, REACTIONS, SCOLD_KINDS, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
+import { CHARACTERS, QUESTION_ANSWER_MAX_LENGTH, QUESTION_PROMPT_MAX_LENGTH, QUESTION_KEY_MAX_LENGTH, REACTIONS, SCOLD_KINDS, SCOLD_TIME, defaultCharacter, type Day, type Poll, type PollKind, type PublicQuestionRound, type Room, type Snapshot } from './types.ts';
 import { auditoriumQuizPosition } from './auditorium.ts';
 import { parseAvatarCustomization } from './avatar-customization.ts';
 
@@ -239,6 +239,11 @@ export function mutate(room: Room, action: Record<string, unknown>, guest: strin
     if (!host && !guest) throw new AppError('먼저 강의실에 참여해주세요.', 401);
     if (!day.active || (!host && !day.participants?.[guest!])) throw new AppError('진행 중인 강의실에서 움직일 수 있어요.', 409);
     const legacyQuiz = action.ignoreLegacyQuiz === true ? undefined : day.quiz;
+    // A chalk hit pins the student to their seat for a moment; sitting down is still allowed.
+    const hit = host ? undefined : day.activities?.[guest!]?.scold;
+    if (hit?.kind === 'chalk' && Date.now() - hit.at < SCOLD_TIME.chalk && (action.wander === true || action.position !== null)) {
+      throw new AppError('분필 맞고 자리로 돌아갔어요. 잠깐만 앉아 있어요!', 409);
+    }
     if (action.wander === true) {
       if (legacyQuiz?.open) throw new AppError('OX 퀴즈가 끝나면 자율 이동을 켤 수 있어요.', 409);
       if (host) {

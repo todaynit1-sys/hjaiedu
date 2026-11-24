@@ -72,13 +72,58 @@ export function useLiveScold(seat: ClassroomSeat | undefined, updatedAt: string)
   return live ? { ...live, elapsed: now - live.at } : undefined;
 }
 
+let smackAudio: AudioContext | undefined;
+const smacked = new Set<string>();
+/** A synthesized cartoon "빡!": a sharp crack of noise over a quick falling knock, no audio files needed. */
+function playChalkSmack(delay: number) {
+  try {
+    const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
+    const ctx = smackAudio ??= new AudioCtor();
+    if (ctx.state === 'suspended') void ctx.resume();
+    const start = ctx.currentTime + Math.max(0, delay) / 1000;
+    const master = ctx.createGain();
+    master.gain.value = .55;
+    master.connect(ctx.destination);
+    const length = Math.floor(ctx.sampleRate * .12);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) samples[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+    const crack = ctx.createBufferSource();
+    crack.buffer = buffer;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass'; band.frequency.value = 2400; band.Q.value = .9;
+    crack.connect(band).connect(master);
+    crack.start(start);
+    const knock = ctx.createOscillator();
+    const knockGain = ctx.createGain();
+    knock.type = 'triangle';
+    knock.frequency.setValueAtTime(950, start);
+    knock.frequency.exponentialRampToValueAtTime(140, start + .09);
+    knockGain.gain.setValueAtTime(.9, start);
+    knockGain.gain.exponentialRampToValueAtTime(.001, start + .14);
+    knock.connect(knockGain).connect(master);
+    knock.start(start);
+    knock.stop(start + .16);
+  } catch { /* Sound is a bonus; a blocked or missing audio device must never break the classroom. */ }
+}
+
 export function ScoldEffect({ seat, updatedAt }: { seat: ClassroomSeat; updatedAt: string }) {
   const scold = useLiveScold(seat, updatedAt);
+  const hitAt = scold?.kind === 'chalk' && scold.elapsed < 1_500 ? scold.at : undefined;
+  useEffect(() => {
+    if (hitAt === undefined) return;
+    // Each throw sounds once per screen, landing with the chalk; late joiners and re-renders stay quiet.
+    const id = `${seat.number}:${hitAt}`;
+    if (smacked.has(id)) return;
+    smacked.add(id);
+    playChalkSmack(580 - (scold?.elapsed ?? 0));
+  }, [hitAt, seat.number]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!scold) return null;
   // A negative delay resumes the animation at the shared moment, so late joiners stay in sync.
   const style = { animationDelay: `-${Math.min(scold.elapsed, 4_000)}ms` };
   return <div className="classroom-scold" data-kind={scold.kind} key={scold.at} aria-hidden="true">
-    {scold.kind === 'chalk' && <><span className="classroom-chalk" style={style} /><span className="classroom-bonk" style={style}>딱!</span></>}
+    {scold.kind === 'chalk' && <><span className="classroom-chalk" style={style} /><span className="classroom-bonk" style={style}>빡!</span></>}
     {scold.kind === 'focus' && <span className="classroom-shout" style={style}>집중!!</span>}
     {scold.kind === 'hands' && <span className="classroom-punish-tag"><Hand size={13} /><Hand size={13} />벌서는 중
       <i style={{ animationDuration: `${SCOLD_TIME.hands}ms`, animationDelay: `-${scold.elapsed}ms` }} /></span>}

@@ -45,7 +45,7 @@ export function useWanderClock(enabled: boolean, updatedAt: string) {
 
 export function useClassroomMovement(roomDay: string, motion: AvatarMotion | undefined,
   home: ClassroomPosition, wanderPosition: ClassroomPosition | undefined,
-  onMove?: (move: ClassroomMove) => Promise<void>) {
+  onMove?: (move: ClassroomMove) => Promise<void>, frozen = false) {
   const floor = useRef<HTMLDivElement>(null);
   const [target, setTarget] = useState<ClassroomMove>();
   const [error, setError] = useState('');
@@ -75,9 +75,19 @@ export function useClassroomMovement(roomDay: string, motion: AvatarMotion | und
     }, 200);
     return () => { live = false; pending.current = null; clearInterval(timer); };
   }, [roomDay, onMove]);
+  // A chalk hit wins over any walk the student had queued: drop it and let the flight home play.
+  useEffect(() => {
+    if (!frozen) return;
+    pending.current = null;
+    setTarget(undefined);
+  }, [frozen]);
 
   function move(move: ClassroomMove) {
     if (!onMove || !motion) return;
+    if (frozen && move !== null) {
+      setError('분필 맞고 자리로 돌아갔어요. 잠깐만 앉아 있어요!');
+      return;
+    }
     pending.current = { move };
     setTarget(move);
     setError('');
